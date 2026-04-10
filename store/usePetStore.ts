@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { Pet, PetState } from '../types';
+import { PetRepository } from '../storage/PetRepository';
 
 interface PetStore {
   pet: Pet | null;
-  updateHealth: (delta: number) => void;
-  levelUp: () => void;
+  updateHealth: (delta: number) => Promise<void>;
+  levelUp: () => Promise<void>;
+  loadPet: () => Promise<void>;
 }
 
 const getPetState = (vida: number): PetState => {
@@ -15,25 +17,36 @@ const getPetState = (vida: number): PetState => {
   return PetState.HAPPY;
 };
 
-export const usePetStore = create<PetStore>((set) => ({
+const petRepo = new PetRepository();
+
+export const usePetStore = create<PetStore>((set, get) => ({
   pet: null,
-  updateHealth: (delta) => {
-    set((state) => {
-      if (!state.pet) return state;
-      const nuevaVida = Math.min(100, Math.max(0, state.pet.vida + delta));
-      return {
-        pet: {
-          ...state.pet,
-          vida: nuevaVida,
-          state: getPetState(nuevaVida),
-        },
-      };
-    });
+  updateHealth: async (delta) => {
+    const { pet } = get();
+    if (!pet) return;
+    const nuevaVida = Math.min(100, Math.max(0, pet.vida + delta));
+    const updatedPet = {
+      ...pet,
+      vida: nuevaVida,
+      state: getPetState(nuevaVida),
+    };
+    await petRepo.save(updatedPet);
+    set({ pet: updatedPet });
   },
-  levelUp: () => {
-    set((state) => {
-      if (!state.pet) return state;
-      return { pet: { ...state.pet, nivel: state.pet.nivel + 1, xp: 0 } };
-    });
+  levelUp: async () => {
+    const { pet } = get();
+    if (!pet) return;
+    const updatedPet = { ...pet, nivel: pet.nivel + 1, xp: 0 };
+    await petRepo.save(updatedPet);
+    set({ pet: updatedPet });
+  },
+  loadPet: async () => {
+    const pet = await petRepo.get();
+    if (pet) {
+      set({ pet });
+    }
   },
 }));
+
+// Hydration al iniciar
+usePetStore.getState().loadPet();
