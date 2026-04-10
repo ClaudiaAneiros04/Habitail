@@ -29,20 +29,49 @@ export enum PetState {
   HAPPY = 'HAPPY',         // vida 76-100
 }
 
+export enum VerificationType {
+  BOOLEAN = 'BOOLEAN',
+  NUMERIC = 'NUMERIC',
+  TIMER = 'TIMER'
+}
+
+export interface User {
+  id: string;
+  username: string; // From ER
+  email?: string; // From ER
+  avatar?: string; // From ER
+  fechaRegistro: string; // From ER
+  puntos: number; // From ER
+  onboardingCompleted: boolean; // From Frontend
+}
+
+export interface Pet {
+  id: string;
+  userId: string;
+  vida: number;
+  nivel: number;
+  skinActiva: string;
+  skinsDesbloqueadas: string[];
+  accesorios: string[]; // List of strings or json
+  // Frontend extras:
+  xp: number;
+  state: PetState;
+}
+
 export interface Habit {
   id: string;
   userId: string;
   nombre: string;
   descripcion?: string;
-  categoria: Category;
+  categoria: Category | string;
   icono: string;
-  color: string;
-  frecuencia: Frequency;
-  diasSemana: number[]; // 0=Domingo ... 6=Sábado
-  horaRecordatorio?: string; // "HH:mm"
-  tipoVerificacion: 'checkbox'; // MVP solo checkbox
-  nivelPrioridad: Priority;
-  fechaInicio: string; // ISO date string
+  colorHex: string;
+  frecuencia: Frequency | string;
+  diasSemana: number[]; // Array of numbers
+  horaRecordatorio?: string;
+  tipoVerificacion: VerificationType | string;
+  nivelPrioridad: Priority | string;
+  fechaInicio: string;
   fechaFin?: string;
   activo: boolean;
 }
@@ -51,29 +80,24 @@ export interface HabitLog {
   id: string;
   habitId: string;
   userId: string;
-  fecha: string; // ISO date string "YYYY-MM-DD"
+  fecha: string;
   completado: boolean;
+  valor?: number;
   nota?: string;
-  timestampRegistro: string; // ISO datetime
+  timestampRegistro: string;
 }
 
-export interface User {
+export interface SuggestedHabit {
   id: string;
   nombre: string;
-  onboardingCompleted: boolean;
-  lastOpenedAt: string; // ISO datetime
-  puntos: number;
-  createdAt: string;
+  categoria: Category | string;
+  icono: string;
+  descripcion: string;
+  locale: string;
 }
 
-export interface Pet {
+export interface UserInterest {
   id: string;
   userId: string;
-  nombre: string;
-  vida: number; // 0-100
-  nivel: number;
-  xp: number;
-  skinActual: string;
-  accesorioActual?: string;
-  state: PetState;
+  categoria: Category | string;
 }

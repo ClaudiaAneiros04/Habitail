@@ -9,7 +9,15 @@ export interface IPetRepository {
 export class PetRepository implements IPetRepository {
   private mapRowToPet(row: any): Pet {
     return {
-      ...row,
+      id: row.id,
+      userId: row.userId,
+      vida: row.vida,
+      nivel: row.nivel,
+      skinActiva: row.skinActiva,
+      skinsDesbloqueadas: row.skinsDesbloqueadas ? JSON.parse(row.skinsDesbloqueadas) : [],
+      accesorios: row.accesorios ? JSON.parse(row.accesorios) : [],
+      xp: row.xp,
+      state: row.state as PetState,
     };
   }
 
@@ -22,8 +30,18 @@ export class PetRepository implements IPetRepository {
   async save(pet: Pet): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO pets (id, userId, nombre, vida, nivel, xp, skinActual, accesorioActual, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [pet.id, pet.userId, pet.nombre, pet.vida, pet.nivel, pet.xp, pet.skinActual, pet.accesorioActual || null, pet.state]
+      `INSERT OR REPLACE INTO pets (id, userId, vida, nivel, skinActiva, skinsDesbloqueadas, accesorios, xp, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        pet.id,
+        pet.userId,
+        pet.vida,
+        pet.nivel,
+        pet.skinActiva,
+        JSON.stringify(pet.skinsDesbloqueadas || []),
+        JSON.stringify(pet.accesorios || []),
+        pet.xp,
+        pet.state
+      ]
     );
   }
 }

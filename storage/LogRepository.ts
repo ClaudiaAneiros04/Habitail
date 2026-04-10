@@ -1,4 +1,4 @@
-import { HabitLog } from '../db/schema';
+import { HabitLog } from '../types';
 import { getDb } from './database';
 
 export interface ILogRepository {
@@ -19,14 +19,15 @@ export class LogRepository implements ILogRepository {
     const db = await getDb();
     await db.runAsync(
       `INSERT OR REPLACE INTO habit_logs 
-      (id, habitId, userId, fecha, completado, nota, timestampRegistro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (id, habitId, userId, fecha, completado, valor, nota, timestampRegistro) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         log.id,
         log.habitId,
         log.userId,
         log.fecha,
         log.completado ? 1 : 0,
+        log.valor !== undefined ? log.valor : null,
         log.nota || null,
         log.timestampRegistro
       ]

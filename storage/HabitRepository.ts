@@ -1,4 +1,4 @@
-import { Habit } from '../db/schema';
+import { Habit } from '../types';
 import { getDb } from './database';
 
 export interface IHabitRepository {
@@ -34,7 +34,7 @@ export class HabitRepository implements IHabitRepository {
     const db = await getDb();
     await db.runAsync(
       `INSERT OR REPLACE INTO habits 
-      (id, userId, nombre, descripcion, categoria, icono, color, frecuencia, diasSemana, horaRecordatorio, tipVerificacion, nivelPrioridad, fechaInicio, fechaFin, activo) 
+      (id, userId, nombre, descripcion, categoria, icono, colorHex, frecuencia, diasSemana, horaRecordatorio, tipoVerificacion, nivelPrioridad, fechaInicio, fechaFin, activo) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         habit.id,
@@ -43,11 +43,11 @@ export class HabitRepository implements IHabitRepository {
         habit.descripcion || null,
         habit.categoria,
         habit.icono,
-        habit.color,
+        habit.colorHex,
         habit.frecuencia,
         JSON.stringify(habit.diasSemana),
         habit.horaRecordatorio || null,
-        habit.tipVerificacion,
+        habit.tipoVerificacion,
         habit.nivelPrioridad,
         habit.fechaInicio,
         habit.fechaFin || null,

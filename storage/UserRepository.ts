@@ -12,7 +12,12 @@ export class UserRepository implements IUserRepository {
     const row = await db.getFirstAsync<any>('SELECT * FROM users LIMIT 1');
     if (!row) return null;
     return {
-      ...row,
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      avatar: row.avatar,
+      fechaRegistro: row.fechaRegistro,
+      puntos: row.puntos,
       onboardingCompleted: Boolean(row.onboardingCompleted),
     };
   }
@@ -20,14 +25,15 @@ export class UserRepository implements IUserRepository {
   async save(user: User): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO users (id, nombre, onboardingCompleted, lastOpenedAt, puntos, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO users (id, username, email, avatar, fechaRegistro, puntos, onboardingCompleted) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
-        user.nombre,
-        user.onboardingCompleted ? 1 : 0,
-        user.lastOpenedAt,
+        user.username,
+        user.email || null,
+        user.avatar || null,
+        user.fechaRegistro,
         user.puntos,
-        user.createdAt
+        user.onboardingCompleted ? 1 : 0
       ]
     );
   }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Habit } from '../db/schema';
+import { Habit } from '../types';
 
 /**
  * Interface que define el estado y las acciones del store de hábitos.
