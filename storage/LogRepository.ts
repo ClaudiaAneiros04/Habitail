@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HabitLog } from '../db/schema';
-
-const LOGS_STORAGE_KEY = '@habitail_logs';
+import { getDb } from './database';
 
 export interface ILogRepository {
   save(log: HabitLog): Promise<void>;
@@ -10,34 +8,40 @@ export interface ILogRepository {
 }
 
 export class LogRepository implements ILogRepository {
-  private async getAll(): Promise<HabitLog[]> {
-    try {
-      const data = await AsyncStorage.getItem(LOGS_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('[LogRepository] Error in getAll():', error);
-      return [];
-    }
+  private mapRowToLog(row: any): HabitLog {
+    return {
+      ...row,
+      completado: Boolean(row.completado),
+    };
   }
 
   async save(log: HabitLog): Promise<void> {
-    const logs = await this.getAll();
-    const existingIndex = logs.findIndex(l => l.id === log.id);
-    if(existingIndex >= 0) {
-      logs[existingIndex] = log; // Update if exists
-    } else {
-      logs.push(log);
-    }
-    await AsyncStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(logs));
+    const db = await getDb();
+    await db.runAsync(
+      `INSERT OR REPLACE INTO habit_logs 
+      (id, habitId, userId, fecha, completado, nota, timestampRegistro) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        log.id,
+        log.habitId,
+        log.userId,
+        log.fecha,
+        log.completado ? 1 : 0,
+        log.nota || null,
+        log.timestampRegistro
+      ]
+    );
   }
 
   async getByHabit(habitId: string): Promise<HabitLog[]> {
-    const logs = await this.getAll();
-    return logs.filter(log => log.habitId === habitId);
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE habitId = ?', [habitId]);
+    return rows.map(this.mapRowToLog);
   }
 
   async getByDate(fecha: string): Promise<HabitLog[]> {
-    const logs = await this.getAll();
-    return logs.filter(log => log.fecha === fecha);
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE fecha = ?', [fecha]);
+    return rows.map(this.mapRowToLog);
   }
 }

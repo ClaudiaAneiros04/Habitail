@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../db/schema';
-
-const HABITS_STORAGE_KEY = '@habitail_habits';
+import { getDb } from './database';
 
 export interface IHabitRepository {
   get(): Promise<Habit[]>;
@@ -12,38 +10,60 @@ export interface IHabitRepository {
 }
 
 export class HabitRepository implements IHabitRepository {
+  private mapRowToHabit(row: any): Habit {
+    return {
+      ...row,
+      diasSemana: JSON.parse(row.diasSemana),
+      activo: Boolean(row.activo),
+    };
+  }
+
   async get(): Promise<Habit[]> {
-    try {
-      const data = await AsyncStorage.getItem(HABITS_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('[HabitRepository] Error in get():', error);
-      return [];
-    }
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>('SELECT * FROM habits');
+    return rows.map(this.mapRowToHabit);
   }
 
   async getById(id: string): Promise<Habit | null> {
-    const habits = await this.get();
-    return habits.find((h) => h.id === id) || null;
+    const db = await getDb();
+    const row = await db.getFirstAsync<any>('SELECT * FROM habits WHERE id = ?', [id]);
+    return row ? this.mapRowToHabit(row) : null;
   }
 
   async save(habit: Habit): Promise<void> {
-    const habits = await this.get();
-    const existingIndex = habits.findIndex(h => h.id === habit.id);
-    if(existingIndex >= 0) {
-      habits[existingIndex] = habit; // Update if exists
-    } else {
-      habits.push(habit);
-    }
-    await AsyncStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(habits));
+    const db = await getDb();
+    await db.runAsync(
+      `INSERT OR REPLACE INTO habits 
+      (id, userId, nombre, descripcion, categoria, icono, color, frecuencia, diasSemana, horaRecordatorio, tipVerificacion, nivelPrioridad, fechaInicio, fechaFin, activo) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        habit.id,
+        habit.userId,
+        habit.nombre,
+        habit.descripcion || null,
+        habit.categoria,
+        habit.icono,
+        habit.color,
+        habit.frecuencia,
+        JSON.stringify(habit.diasSemana),
+        habit.horaRecordatorio || null,
+        habit.tipVerificacion,
+        habit.nivelPrioridad,
+        habit.fechaInicio,
+        habit.fechaFin || null,
+        habit.activo ? 1 : 0
+      ]
+    );
   }
 
   async update(id: string, changes: Partial<Habit>): Promise<void> {
-    const habits = await this.get();
-    const updated = habits.map((h) => 
-      h.id === id ? { ...h, ...changes } : h
-    );
-    await AsyncStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(updated));
+    const db = await getDb();
+    const current = await this.getById(id);
+    if (!current) return;
+    
+    // Updates the habit by merging fields and persisting again using INSERT OR REPLACE
+    const updated = { ...current, ...changes };
+    await this.save(updated);
   }
 
   async archive(id: string): Promise<void> {
