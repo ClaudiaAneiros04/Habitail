@@ -1,0 +1,30 @@
+{
+  "tabs": {
+    "hoy": "Today",
+    "habitos": "Habits",
+    "stats": "Statistics",
+    "mascota": "Pet"
+  },
+  "home": {
+    "header": {
+      "buenos_dias": "Good morning",
+      "buenas_tardes": "Good afternoon",
+      "buenas_noches": "Good night"
+    },
+    "progress": {
+      "texto": "{{completados}} of {{total}} habits"
+    }
+  },
+  "habits": {
+    "empty": {
+      "titulo": "No habits yet",
+      "subtitulo": "Create your first habit to get started"
+    }
+  },
+  "common": {
+    "guardar": "Save",
+    "cancelar": "Cancel",
+    "eliminar": "Delete",
+    "editar": "Edit"
+  }
+}
