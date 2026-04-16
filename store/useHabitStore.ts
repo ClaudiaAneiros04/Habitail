@@ -12,9 +12,9 @@ interface HabitState {
   
   /**
    * Añade un nuevo hábito a la lista generando su UUID automáticamente.
-   * @param habitData Datos del hábito a guardar (sin id).
+   * @param habitData Datos del hábito a guardar (puede incluir id opcionalmente).
    */
-  addHabit: (habitData: Omit<Habit, 'id'>) => void;
+  addHabit: (habitData: Omit<Habit, 'id'> & { id?: string }) => void;
   
   /**
    * Actualiza campos específicos de un hábito existente.
@@ -49,8 +49,8 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
    * Recibe el objeto, le asigna un UUID y lo guarda en el estado y almacenamiento.
    */
   addHabit: (habitData) => {
-    // Generar UUID v4 (polyfill simple para compatibilidad general en RN)
-    const newId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    // Usar el ID provisto o generar UUID v4 (polyfill simple para compatibilidad general en RN)
+    const newId = habitData.id || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
