@@ -135,15 +135,26 @@ export default function HabitsScreen() {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          router.push('/add-habit/basic-info');
-        }}
-      >
-        <Ionicons name="add" size={32} color="#FFF" />
-      </TouchableOpacity>
+      {/* Grupo de Botones Flotantes (FABs) */}
+      <View style={styles.fabContainer}>
+        {/* FAB Secundario: Biblioteca */}
+        <TouchableOpacity
+          style={styles.fabSecondary}
+          onPress={() => router.push('/habit-library')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="library" size={24} color={Colors.primary} />
+        </TouchableOpacity>
+        
+        {/* FAB Principal: Crear Hábito (Wizard) */}
+        <TouchableOpacity
+          style={styles.fabMain}
+          onPress={() => router.push('/add-habit/basic-info')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={32} color="#FFF" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -228,21 +239,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
     right: 24,
     bottom: 24,
+    alignItems: 'center',
+    gap: 16,
+  },
+  fabMain: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 28,
-    elevation: 4,
+    borderRadius: 32,
+    elevation: 6,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+  },
+  fabSecondary: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    elevation: 4,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   emptyContainer: {
     padding: 32,
