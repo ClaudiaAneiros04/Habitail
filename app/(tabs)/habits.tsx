@@ -139,7 +139,7 @@ export default function HabitsScreen() {
       <TouchableOpacity
         style={styles.fab}
         onPress={() => {
-          router.push('/add-habit');
+          router.push('/add-habit/basic-info');
         }}
       >
         <Ionicons name="add" size={32} color="#FFF" />
