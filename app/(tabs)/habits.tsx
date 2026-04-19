@@ -139,8 +139,7 @@ export default function HabitsScreen() {
       <TouchableOpacity
         style={styles.fab}
         onPress={() => {
-          Alert.alert("Nuevo Hábito", "Navegación al formulario no implementada aún.");
-          // router.push('/add-habit');
+          router.push('/add-habit');
         }}
       >
         <Ionicons name="add" size={32} color="#FFF" />
