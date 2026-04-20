@@ -9,6 +9,8 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Keyb
 import { Colors } from '../../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useHabitStore } from '../../store/useHabitStore';
+import { Frequency, VerificationType, Priority } from '../../types';
 
 // 12 tonos HEX para el Selector de Color (ColorPicker)
 const PREDEFINED_COLORS = [
@@ -47,18 +49,28 @@ export default function AppearanceScreen() {
   const [selectedColor, setSelectedColor] = useState(PREDEFINED_COLORS[7]); // Por defecto: Azul
   const [selectedIcon, setSelectedIcon] = useState(ICONS[0]); // Por defecto: 'fitness'
 
+  const addHabit = useHabitStore(state => state.addHabit);
+
   // Transición hacia el siguiente paso
   const handleNext = () => {
-    // Viaja hacia el Paso 3, arrastrando todo el ecosistema de valores recabados
-    router.push({
-      pathname: '/add-habit/step3', // Modificar a '/add-habit/frequency' en el próximo paso si se requiere renombrar
-      params: { 
-        ...params, // Hereda 'nombre' y 'categoria'
-        descripcion: description,
-        colorHex: selectedColor,
-        icono: selectedIcon
-      }
+    // Como no hay paso 3 interactivo implementado, guardamos directamente con defaults
+    addHabit({
+      userId: 'default-user',
+      nombre: nombreHabito,
+      descripcion: description,
+      categoria: params.categoria as string,
+      icono: selectedIcon,
+      colorHex: selectedColor,
+      frecuencia: Frequency.DAILY,
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
+      tipoVerificacion: VerificationType.BOOLEAN,
+      nivelPrioridad: Priority.NORMAL,
+      fechaInicio: new Date().toISOString(),
+      activo: true,
     });
+    
+    // Volver a la raíz
+    router.replace('/');
   };
 
   return (
@@ -156,8 +168,8 @@ export default function AppearanceScreen() {
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextText}>Siguiente</Text>
-            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+            <Text style={styles.nextText}>Guardar Hábito</Text>
+            <Ionicons name="checkmark" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

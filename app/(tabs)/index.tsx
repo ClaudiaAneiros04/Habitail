@@ -2,13 +2,15 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { useHabitStore, loadHabitsFromStorage } from '../../store/useHabitStore';
+import { getHabitsForToday } from '../../utils/frequencyEngine';
 /**
  * Pantalla principal que muestra el resumen de actividades del día actual.
  * Utiliza el store useHabitStore para obtener la lista de hábitos.
  */
 export default function TodayScreen() {
   const [hasHydrated, setHasHydrated] = React.useState(false);
-  const habits = useHabitStore((state) => state.habits);
+  const allHabits = useHabitStore((state) => state.habits);
+  const habits = getHabitsForToday(allHabits, new Date());
 
   React.useEffect(() => {
     const hydrate = async () => {

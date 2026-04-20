@@ -9,7 +9,8 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from
 import { Colors } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Category, SuggestedHabit } from '../types';
+import { Category, SuggestedHabit, Frequency, Priority } from '../types';
+import { createHabitFromLibrary } from '../services/habitCreation';
 
 // Mock de hábitos sugeridos (En una app real podría venir de una API local/remota)
 const SUGGESTED_HABITS: SuggestedHabit[] = [
@@ -42,15 +43,17 @@ export default function HabitLibraryScreen() {
   }, [activeTab]);
 
   // Maneja el botón de añadir rápido
-  const handleAddTemplate = (habit: SuggestedHabit) => {
-    // Redirige al Wizard de creación enviando los datos default pre-cargados
-    router.push({
-      pathname: '/add-habit/basic-info',
-      params: { 
-        nombre: habit.nombre, 
-        categoria: habit.categoria,
-      }
-    });
+  const handleAddTemplate = async (habit: SuggestedHabit) => {
+    try {
+      await createHabitFromLibrary(habit, {
+        userId: 'default-user',
+        frecuencia: Frequency.DAILY,
+        nivelPrioridad: Priority.NORMAL,
+      });
+      router.replace('/');
+    } catch (error) {
+      console.error('Error al instanciar hábito desde la biblioteca:', error);
+    }
   };
 
   return (
