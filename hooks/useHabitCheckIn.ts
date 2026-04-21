@@ -1,8 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
+import { Animated } from 'react-native';
 import { useLogStore } from '../store/useLogStore';
 import { usePetStore } from '../store/usePetStore';
+import { useHabitStore } from '../store/useHabitStore';
 import { HabitLog } from '../types';
 import { formatISO, startOfDay, parseISO } from 'date-fns';
+import { getHabitsForToday } from '../utils/frequencyEngine';
 
 /**
  * Hook principal y modular para gestionar el Check-In (completar/desmarcar) de los hábitos.
@@ -12,10 +15,18 @@ import { formatISO, startOfDay, parseISO } from 'date-fns';
  * - Persistencia del estado histórico a través de logStore.
  * - Conexión automática con el sistema de gamificación (petStore).
  * - Verificación determinista del estado para un día en particular.
+ * - Lógica de avance y recompensas (Bounce effect y Confetti).
  */
 export const useHabitCheckIn = () => {
   const { logs, addLog } = useLogStore();
   const { updateHealth } = usePetStore();
+  const { habits } = useHabitStore();
+
+  /**
+   * Valor animado expuesto para que el frontend lo pueda inyectar en propiedades de estilo
+   * como Transform -> scale, para darle un efecto visual reactivo (Bounce).
+   */
+  const bounceValue = useRef(new Animated.Value(1)).current;
 
   /**
    * Genera un ID determinista para el registro (log) de un día específico.
@@ -53,18 +64,56 @@ export const useHabitCheckIn = () => {
   }, [logs]);
 
   /**
+   * Calcula el progreso de cumplimiento de los hábitos de un día de manera reactiva.
+   * Utilizado para poder alimentar una barra de progreso que se llene al ir completando tareas.
+   * 
+   * @param fecha - La fecha para la cual calcular el progreso diario.
+   * @returns number - Valor numérico entre 0 (0%) y 1 (100%).
+   */
+  const getDailyProgress = useCallback((fecha: Date): number => {
+    const todayHabits = getHabitsForToday(habits, fecha);
+    if (todayHabits.length === 0) return 0;
+
+    const completedCount = todayHabits.filter(habit => getStatusForDay(habit.id, fecha)).length;
+    return completedCount / todayHabits.length;
+  }, [habits, getStatusForDay]);
+
+  /**
+   * Ejecuta una animación de resorte (spring) para dar un efecto de rebote.
+   * Esta función puede ser llamada desde el frontend al pulsar sobre el check de un hábito.
+   */
+  const triggerBounce = useCallback(() => {
+    Animated.sequence([
+      Animated.spring(bounceValue, {
+        toValue: 1.15,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(bounceValue, {
+        toValue: 1,
+        friction: 4,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [bounceValue]);
+
+  /**
    * Marca un hábito como completado en una fecha dada.
    * Revisa primero si no estaba ya completado para evitar actualizaciones superfluas.
    * De no estarlo, crea o actualiza un registro de log como completado, lo persiste 
    * en el estado global persistente (logStore) e impacta la gamificación sumando salud.
+   * Revisa si se completaron todos los hábitos del día, devolviendo el estado 'shouldLaunchConfetti'.
    * 
    * @param habitId - El identificador único del hábito.
    * @param fecha - La fecha calendario en la que se completó el hábito.
+   * @returns Promesa resolviendo a un objeto con la bandera { shouldLaunchConfetti: boolean }
    */
-  const markComplete = useCallback(async (habitId: string, fecha: Date) => {
+  const markComplete = useCallback(async (habitId: string, fecha: Date): Promise<{ shouldLaunchConfetti: boolean }> => {
     // 1. Verificamos el estado actual para evitar procesos redundantes
     const status = getStatusForDay(habitId, fecha);
-    if (status) return; // Ya está completado en esa fecha, abortar
+    if (status) return { shouldLaunchConfetti: false }; // Ya está completado en esa fecha, abortar
 
     // 2. Crear la entidad de registro (log)
     const newLog: HabitLog = {
@@ -81,7 +130,23 @@ export const useHabitCheckIn = () => {
 
     // 4. Actualizamos la gamificación (+10 de salud por completar la tarea)
     await updateHealth(10);
-  }, [addLog, getStatusForDay, updateHealth]);
+
+    // 5. Verificamos el requerimiento 'All Tasks Done'
+    const todayHabits = getHabitsForToday(habits, fecha);
+    let shouldLaunchConfetti = false;
+
+    if (todayHabits.length > 0) {
+      // Contamos los que ya estaban completados en la UI/Estado actual (excluyendo el que acabamos de hacer)
+      const previouslyCompleted = todayHabits.filter(h => h.id !== habitId && getStatusForDay(h.id, fecha)).length;
+      
+      // Si los ya completados más este nuevo llenan la lista entera
+      if (previouslyCompleted + 1 === todayHabits.length) {
+        shouldLaunchConfetti = true;
+      }
+    }
+
+    return { shouldLaunchConfetti };
+  }, [addLog, getStatusForDay, updateHealth, habits]);
 
   /**
    * Desmarca un hábito (lo marca como incompleto) para una fecha dada.
@@ -92,7 +157,7 @@ export const useHabitCheckIn = () => {
    * @param habitId - El identificador único del hábito que se desea desmarcar.
    * @param fecha - La fecha en la que se desmarca el hábito.
    */
-  const markIncomplete = useCallback(async (habitId: string, fecha: Date) => {
+  const markIncomplete = useCallback(async (habitId: string, fecha: Date): Promise<void> => {
     // 1. Verificamos el estado actual para evitar procesos redundantes
     const status = getStatusForDay(habitId, fecha);
     if (!status) return; // Ya está desmarcado o nunca se completó, abortar
@@ -117,8 +182,12 @@ export const useHabitCheckIn = () => {
 
   // Exponemos la Interfaz limpia para el Desarrollador de Frontend
   return {
+    bounceValue,
+    triggerBounce,
+    getDailyProgress,
     markComplete,
     markIncomplete,
     getStatusForDay
   };
 };
+
