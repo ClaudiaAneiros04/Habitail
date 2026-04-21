@@ -5,6 +5,7 @@ export interface ILogRepository {
   save(log: HabitLog): Promise<void>;
   getByHabit(habitId: string): Promise<HabitLog[]>;
   getByDate(fecha: string): Promise<HabitLog[]>;
+  getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
 }
 
 export class LogRepository implements ILogRepository {
@@ -43,6 +44,16 @@ export class LogRepository implements ILogRepository {
   async getByDate(fecha: string): Promise<HabitLog[]> {
     const db = await getDb();
     const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE fecha = ?', [fecha]);
+    return rows.map(this.mapRowToLog);
+  }
+
+  async getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]> {
+    const db = await getDb();
+    // Query optimized by fetching between two dates. Ideal for range views.
+    const rows = await db.getAllAsync<any>(
+      'SELECT * FROM habit_logs WHERE habitId = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha ASC', 
+      [habitId, fromDate, toDate]
+    );
     return rows.map(this.mapRowToLog);
   }
 }
