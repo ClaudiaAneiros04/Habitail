@@ -309,13 +309,20 @@ export default function HomeScreen() {
             data={sortedHabits}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.flatListContent}
-            renderItem={({ item }) => (
-              <HabitItem 
-                habit={item}
-                completed={completedHabitsObj[item.id]?.completado || false}
-                onToggle={() => handleToggleHabit(item)}
-              />
-            )}
+            renderItem={({ item }) => {
+              // Simulamos una racha de ejemplo (p.ej.: mock de 5 para todos, o random si prefieres)
+              // Aquí usarías preferentemente data real de un streakStore o lógica (que la DB no tiene por ahora).
+              const mockedStreak = item.nombre.length; // mock trivial para demo
+              
+              return (
+                <HabitItem 
+                  habit={item}
+                  completed={completedHabitsObj[item.id]?.completado || false}
+                  onToggle={(habitId) => handleToggleHabit(item)}
+                  streak={mockedStreak > 3 ? mockedStreak : undefined} // Mostramos badge solo si > 3
+                />
+              );
+            }}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="leaf-outline" size={48} color={Colors.inactive} />
