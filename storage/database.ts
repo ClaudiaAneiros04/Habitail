@@ -80,5 +80,8 @@ export const initDb = async () => {
       categoria TEXT NOT NULL,
       FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
     );
+
+    -- Índice compuesto para optimizar las consultas por rango de fechas para un hábito específico
+    CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fecha);
   `);
 };
