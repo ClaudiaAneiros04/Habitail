@@ -87,6 +87,7 @@ export default function HomeScreen() {
 
   const allHabits = useHabitStore((state) => state.habits);
   const addLog = useLogStore((state) => state.addLog);
+  const deleteLog = useLogStore((state) => state.deleteLog);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
 
   // Inicialización de la app
@@ -178,43 +179,57 @@ export default function HomeScreen() {
    */
   const handleToggleHabit = useCallback(async (habit: Habit) => {
     const currentLog = completedHabitsObj[habit.id];
-    const isCurrentlyCompleted = currentLog?.completado || false;
-    const newCompletedStatus = !isCurrentlyCompleted;
-    
+    const isCurrentlyCompleted = currentLog?.completado === true;
     const dateStr = formatDateDB(selectedDate);
     const logId = `${habit.id}_${dateStr}`;
-    
-    const newLog: HabitLog = {
-      id: logId,
-      habitId: habit.id,
-      userId: habit.userId || 'local-user', // fallback
-      fecha: dateStr,
-      completado: newCompletedStatus,
-      timestampRegistro: new Date().toISOString(),
-    };
 
-    // Actualización optimista
-    setCompletedHabitsObj(prev => ({
-      ...prev,
-      [habit.id]: newLog
-    }));
-
-    try {
-      await addLog(newLog);
-    } catch (error) {
-      console.error('Failed to save log', error);
-      // Revertir optimismo si falla
+    if (isCurrentlyCompleted) {
+      // El usuario DESMARCA: eliminamos el registro de la DB.
+      // Semántica: "sin registro" (NONE) en lugar de "incumplido" (FAILED).
+      // Actualización optimista: quitamos el log del mapa local.
       setCompletedHabitsObj(prev => {
-        const reverted = { ...prev };
-        if (currentLog) {
-          reverted[habit.id] = currentLog;
-        } else {
-          delete reverted[habit.id];
-        }
-        return reverted;
+        const next = { ...prev };
+        delete next[habit.id];
+        return next;
       });
+      try {
+        await deleteLog(logId);
+      } catch (error) {
+        console.error('Failed to delete log', error);
+        // Revertir optimismo: restaurar el log anterior
+        if (currentLog) {
+          setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: currentLog }));
+        }
+      }
+    } else {
+      // El usuario MARCA como completado: guardamos un log con completado:true.
+      const newLog: HabitLog = {
+        id: logId,
+        habitId: habit.id,
+        userId: habit.userId || 'local-user',
+        fecha: dateStr,
+        completado: true,
+        timestampRegistro: new Date().toISOString(),
+      };
+      // Actualización optimista
+      setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: newLog }));
+      try {
+        await addLog(newLog);
+      } catch (error) {
+        console.error('Failed to save log', error);
+        // Revertir optimismo si falla
+        setCompletedHabitsObj(prev => {
+          const reverted = { ...prev };
+          if (currentLog) {
+            reverted[habit.id] = currentLog;
+          } else {
+            delete reverted[habit.id];
+          }
+          return reverted;
+        });
+      }
     }
-  }, [completedHabitsObj, selectedDate, addLog]);
+  }, [completedHabitsObj, selectedDate, addLog, deleteLog]);
 
   /**
    * Genera el saludo de la cabecera en base a si es mañana, tarde o noche 

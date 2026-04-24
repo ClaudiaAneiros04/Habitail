@@ -33,3 +33,281 @@ Las fechas se persisten siempre basándonos en un formato consistente e ISO-comp
 Para mantener la eficacia de esta estrategia:
 * Nunca insertar fechas en formatos localizados (ej: `DD-MM-YYYY` no es lexicográficamente ordenable de manera natural, rompería el rango en SQLite).
 * El filtrado en DB es prioritario sobre el filtrado en arrays en TS. El `LogRepository` entrega sólo el rango que se necesita pintar.
+
+---
+
+# Errores y Aprendizajes — Fase 3
+
+Registro técnico de todos los errores detectados durante la Fase 3 del proyecto Habitail
+(integración UI de rachas + Home Screen + History Screen). Se documenta dónde apareció cada
+error, por qué se producía y cómo se resolvió.
+
+---
+
+## Error 1 — `expo-sqlite` en Web: `.wasm` no resuelto por Metro
+
+### Dónde se encontró
+Consola del servidor Expo al ejecutar `npx expo start --web --clear`.
+
+### Síntoma
+```
+Web Bundling failed
+Unable to resolve "./wa-sqlite/wa-sqlite.wasm"
+from "node_modules\expo-sqlite\web\worker.ts"
+```
+Las pantallas "Hoy" e "Historial" se quedaban en estado de carga infinita porque
+el worker de SQLite nunca se inicializaba.
+
+### Por qué se producía
+`expo-sqlite` en web usa WebAssembly (`.wasm`) para ejecutar SQLite a través de
+`wa-sqlite`. Metro Bundler, el empaquetador de Expo, por defecto no reconoce la
+extensión `.wasm` como un asset válido y lanza un error de resolución de módulo.
+
+### Solución
+Añadir `.wasm` a la lista de extensiones de assets en `metro.config.js`:
+
+```js
+// metro.config.js
+config.resolver.assetExts.push('wasm');
+```
+
+---
+
+## Error 2 — `initDb()` nunca se llamaba: tablas SQLite inexistentes
+
+### Dónde se encontró
+Consola del navegador al intentar marcar un hábito o navegar al historial.
+
+### Síntoma
+```
+Error: Error code 1: no such table: habit_logs
+```
+El toggle de hábito fallaba silenciosamente; el historial no mostraba ningún dato.
+
+### Por qué se producía
+`storage/database.ts` exportaba la función `initDb()` (responsable de ejecutar todos
+los `CREATE TABLE IF NOT EXISTS`), pero **nadie la llamaba** en el arranque de la app.
+Los repositorios intentaban hacer queries sobre tablas que aún no existían.
+
+### Solución
+Llamar a `initDb()` en el layout raíz (`app/_layout.tsx`) bloqueando el renderizado
+hasta que la promesa resuelva:
+
+```ts
+// app/_layout.tsx
+const [dbReady, setDbReady] = useState(false);
+
+useEffect(() => {
+  initDb()
+    .then(() => setDbReady(true))
+    .catch(console.error);
+}, []);
+
+if (!dbReady) return <ActivityIndicator />;
+```
+
+---
+
+## Error 3 — `NoModificationAllowedError`: múltiples conexiones OPFS a SQLite
+
+### Dónde se encontró
+Consola del navegador, aparecía junto al Error 2.
+
+### Síntoma
+```
+NoModificationAllowedError: Failed to execute 'createSyncAccessHandle'
+on 'FileSystemFileHandle': Access Handles cannot be created if there
+is another open Access Handle or Writable stream associated with the same file.
+```
+
+### Por qué se producía
+`expo-sqlite` en web usa el sistema de ficheros OPFS del navegador, que solo admite
+**una conexión de escritura simultánea** al mismo archivo. La función `getDb()` original
+llamaba a `SQLite.openDatabaseAsync()` cada vez que se invocaba — sin cachear la
+instancia. Como `LogRepository` se instanciaba tanto en `useLogStore` como en
+`useHabitStats`, el motor intentaba abrir dos conexiones paralelas, provocando el error.
+
+### Solución
+Refactorizar `database.ts` al patrón **Singleton** usando una promesa cacheada.
+La BD se abre **una única vez** y, en esa misma apertura, se crean todas las tablas:
+
+```ts
+// storage/database.ts
+let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
+  if (!_dbPromise) {
+    _dbPromise = (async () => {
+      const db = await SQLite.openDatabaseAsync('habitail.db');
+      await db.execAsync(`CREATE TABLE IF NOT EXISTS habit_logs (...);`);
+      return db;
+    })();
+  }
+  return _dbPromise;
+};
+```
+
+Con esto se eliminan los Errores 2 y 3 a la vez: la tabla siempre existe antes de
+la primera query, y nunca hay más de una conexión activa.
+
+---
+
+## Error 4 — Booleanos SQLite invertidos en web (`Boolean("0") === true`)
+
+### Dónde se encontró
+`storage/LogRepository.ts`, método `mapRowToLog`.
+
+### Síntoma
+Un hábito marcado como **completado** en la pantalla "Hoy" aparecía como
+**incumplido** (X roja) en la pantalla Historial.
+
+### Por qué se producía
+`expo-sqlite` sobre `wa-sqlite` (WASM en web) puede devolver columnas `INTEGER`
+como **strings JavaScript** (`"0"` / `"1"`) en lugar de números. La conversión
+original usaba `Boolean(row.completado)`, pero en JS cualquier string no vacío es
+`true`, incluyendo `"0"`:
+
+```ts
+Boolean("0")  // → true  ← ¡INCORRECTO!
+Boolean("1")  // → true
+Boolean(0)    // → false
+Boolean(1)    // → true
+```
+
+Esto hacía que todos los logs se leyeran como `completado: true`, o que se
+invirtiera la lógica dependiendo del valor exacto recibido.
+
+### Solución
+Normalizar el valor con `Number()` antes de la comparación estricta. `Number()`
+maneja correctamente todos los tipos posibles:
+
+```ts
+// LogRepository.ts — mapRowToLog
+completado: Number(row.completado) === 1,
+// Number("0") === 0 → false ✓
+// Number("1") === 1 → true  ✓
+// Number(0)   === 0 → false ✓
+// Number(1)   === 1 → true  ✓
+```
+
+Se aplicó la misma robustez al guardar, para evitar que valores truthy no-boolean
+acaben como `1` en SQLite:
+
+```ts
+log.completado === true ? 1 : 0,
+```
+
+---
+
+## Error 5 — Desmarcar un hábito guardaba `completado: false`, creando falsos FAILED
+
+### Dónde se encontró
+Flujo: Home Screen → desmarcar hábito → Historial para ese día.
+
+### Síntoma
+Al desmarcar un hábito que estaba completado, el historial de ese día mostraba
+una **X roja** (incumplido), cuando el comportamiento esperado es que no apareciese
+ningún indicador (sin registro).
+
+### Por qué se producía
+El toggle de `handleToggleHabit` en `index.tsx` siempre guardaba un log, tanto al
+marcar (`completado: true`) como al desmarcar (`completado: false`). El historial
+interpretaba cualquier log con `completado: false` como "el usuario incumplió
+explícitamente ese día".
+
+### Solución
+Cambiar la **semántica del toggle** según la dirección de la acción:
+
+- **Marcar** → `addLog({ completado: true })` — guarda el registro de éxito.
+- **Desmarcar** → `deleteLog(logId)` — **elimina** la fila de la DB.
+
+Así el historial solo puede ver tres estados limpios:
+- Log con `completado: true` → ✓ verde (COMPLETED)
+- Sin log + día pasado/hoy → ✗ roja suave (FAILED por ausencia, no por registro negativo)
+- Día futuro → sin indicador (NONE)
+
+Se añadió `deleteById` a `LogRepository` y `deleteLog` a `useLogStore` para
+soportar esta semántica.
+
+---
+
+## Error 6 — Historial no mostraba X roja en hábitos no realizados días anteriores
+
+### Dónde se encontró
+`app/(tabs)/history.tsx`, lógica de resolución de `statusType`.
+
+### Síntoma
+Los hábitos de días pasados que no se habían completado aparecían sin ningún
+indicador (NONE) en lugar de mostrar la X roja suave esperada.
+
+### Por qué se producía
+La lógica original solo derivaba `FAILED` cuando existía un log explícito con
+`completado: false`. Como tras la solución del Error 5 esos logs nunca se crean,
+la ausencia de un log siempre producía `NONE`, incluso para días ya pasados.
+
+### Solución
+Cambiar la condición de `statusType` para derivar `FAILED` de la **ausencia de
+log en un día que ya pasó**, no de la presencia de un log negativo:
+
+```ts
+// history.tsx — renderItem
+if (!isPastOrToday) {
+  statusType = 'NONE';           // futuro: sin juzgar
+} else if (log && log.completado) {
+  statusType = 'COMPLETED';      // completado explícitamente
+} else {
+  statusType = 'FAILED';         // pasado o hoy sin completar
+}
+```
+
+Se añadió también un estilo visual `historyItemFailed` (tinte rosado sutil) y
+`itemNameFailed` (opacidad 60%) para comunicar el incumplimiento de forma
+informativa y no punitiva.
+
+---
+
+## Error 7 — `Unexpected text node` en el badge de racha
+
+### Dónde se encontró
+`components/HabitItem.tsx`, badge del contador de racha.
+
+### Síntoma
+Warning en la consola:
+```
+Unexpected text node: . A text node cannot be a child of a <View>.
+```
+
+### Por qué se producía
+El JSX mezclaba texto literal (emoji + espacios) con expresiones dentro de un
+`<Text>`, generando nodos de texto "sueltos" que React Native no admite como
+hijos directos de un `<View>`:
+
+```tsx
+// ❌ Genera nodos de texto sueltos
+<Text>🔥 {displayStreak} {displayStreak === 1 ? 'día' : 'días'}</Text>
+//    ^^^     ^^^^^^^^^      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//   texto    expresión             expresión → tres nodos separados
+```
+
+### Solución
+Unificar todo el contenido en un único string mediante un template literal,
+eliminando los nodos de texto intermedios:
+
+```tsx
+// ✅ Un único nodo de texto
+<Text>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
+```
+
+---
+
+## Resumen de aprendizajes clave
+
+| # | Área | Lección |
+|---|---|---|
+| 1 | Metro / Bundler | Extensiones no estándar como `.wasm` deben registrarse explícitamente en `assetExts` |
+| 2 | Ciclo de vida | La inicialización asíncrona de la DB debe **bloquear el render** hasta completarse |
+| 3 | SQLite Web | OPFS solo admite **una conexión simultánea** → usar patrón Singleton |
+| 4 | SQLite Web | `wa-sqlite` puede devolver INTEGER como **string**; nunca usar `Boolean()` directamente |
+| 5 | Semántica de datos | "Sin registro" ≠ "incumplido". Desmarcar debe **borrar** el log, no actualizarlo a `false` |
+| 6 | Lógica de UI | El estado FAILED debe derivarse de la **ausencia de éxito** en días pasados, no de registros negativos |
+| 7 | React Native JSX | Un `<View>` no admite texto suelto; los strings mixtos deben envolverse en template literals |

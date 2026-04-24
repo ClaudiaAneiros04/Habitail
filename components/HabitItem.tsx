@@ -90,7 +90,7 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
             {/* Badge de Racha. Lo mostramos siempre que > 0 */}
             {displayStreak > 0 && (
               <View style={styles.streakBadge}>
-                <Text style={styles.streakText}>🔥 {displayStreak} {displayStreak === 1 ? 'día' : 'días'}</Text>
+                <Text style={styles.streakText}>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
               </View>
             )}
           </View>

@@ -3,16 +3,25 @@ import { getDb } from './database';
 
 export interface ILogRepository {
   save(log: HabitLog): Promise<void>;
+  deleteById(id: string): Promise<void>;
   getByHabit(habitId: string): Promise<HabitLog[]>;
   getByDate(fecha: string): Promise<HabitLog[]>;
   getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
 }
 
 export class LogRepository implements ILogRepository {
+  /**
+   * Convierte una fila raw de SQLite al modelo tipado HabitLog.
+   * IMPORTANTE: expo-sqlite en web (wa-sqlite/WASM) puede devolver
+   * columnas INTEGER como strings ("0"/"1"). Boolean("0") === true en JS
+   * porque es un string no vacío, lo que invertiría el estado de 'completado'.
+   * Se usa Number() para normalizar cualquier tipo (0, 1, "0", "1", true, false)
+   * antes de la comparación estricta.
+   */
   private mapRowToLog(row: any): HabitLog {
     return {
       ...row,
-      completado: Boolean(row.completado),
+      completado: Number(row.completado) === 1,
     };
   }
 
@@ -27,7 +36,7 @@ export class LogRepository implements ILogRepository {
         log.habitId,
         log.userId,
         log.fecha,
-        log.completado ? 1 : 0,
+        log.completado === true ? 1 : 0, // Cast explícito: evita que valores truthy no-boolean se guarden como 1
         log.valor !== undefined ? log.valor : null,
         log.nota || null,
         log.timestampRegistro
@@ -39,6 +48,17 @@ export class LogRepository implements ILogRepository {
     const db = await getDb();
     const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE habitId = ?', [habitId]);
     return rows.map(this.mapRowToLog);
+  }
+
+  /**
+   * Elimina un log por su ID.
+   * Se usa cuando el usuario desmarca un hábito: la semántica correcta es
+   * "sin registro" (NONE), no "incumplido" (FAILED). Si guardáramos un log
+   * con completado=false, el historial mostraría una X roja incorrectamente.
+   */
+  async deleteById(id: string): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM habit_logs WHERE id = ?', [id]);
   }
 
   async getByDate(fecha: string): Promise<HabitLog[]> {

@@ -126,6 +126,9 @@ export default function HistoryScreen() {
   };
 
   const isToday = selectedDate.getTime() === startOfDayDate(new Date()).getTime();
+  // Una fecha es "pasada o hoy" si NO es futura. En ese caso, los hábitos
+  // no completados deben mostrarse como incumplidos (X roja suave).
+  const isPastOrToday = !isFutureDate(selectedDate);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -168,20 +171,34 @@ export default function HistoryScreen() {
             contentContainerStyle={styles.flatListContent}
             renderItem={({ item }) => {
               const log = logsObj[item.id];
+              // Resolución del estado de cada hábito en la fecha seleccionada:
+              // - Día futuro          → NONE (el hábito aún no tiene fecha de expiración)
+              // - Día pasado/hoy + log completado=true → COMPLETED (✓ verde)
+              // - Día pasado/hoy + sin log o log no completado → FAILED (✗ roja suave)
               let statusType: 'COMPLETED' | 'FAILED' | 'NONE' = 'NONE';
-              
-              if (log) {
-                statusType = log.completado ? 'COMPLETED' : 'FAILED';
+
+              if (!isPastOrToday) {
+                statusType = 'NONE';              // fecha futura: sin juzgar
+              } else if (log && log.completado) {
+                statusType = 'COMPLETED';         // completado explícitamente
+              } else {
+                statusType = 'FAILED';            // pasado o hoy sin completar
               }
 
               return (
-                <View style={styles.historyItem}>
+                <View style={[
+                  styles.historyItem,
+                  statusType === 'FAILED' && styles.historyItemFailed,
+                ]}>
                   <View style={styles.leftPill}>
                     <View style={[styles.iconBox, { backgroundColor: item.colorHex || Colors.primary }]}>
                       <Ionicons name={(item.icono as any) || 'star'} size={20} color="#FFF" />
                     </View>
                     <View>
-                      <Text style={styles.itemName}>{item.nombre}</Text>
+                      <Text style={[
+                        styles.itemName,
+                        statusType === 'FAILED' && styles.itemNameFailed,
+                      ]}>{item.nombre}</Text>
                       {item.horaRecordatorio && (
                         <Text style={styles.itemTime}>{item.horaRecordatorio}</Text>
                       )}
@@ -273,9 +290,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
+  // Tinte rojizo sutil para ítems incumplidos: no punitivo, solo informativo.
+  historyItemFailed: {
+    backgroundColor: 'rgba(251, 113, 133, 0.07)', // #FB7185 al 7% de opacidad
+    borderWidth: 1,
+    borderColor: 'rgba(251, 113, 133, 0.20)',
+  },
   leftPill: { flexDirection: 'row', alignItems: 'center' },
   iconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   itemName: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  // Nombre ligeramente atenuado para hábitos incumplidos.
+  itemNameFailed: { opacity: 0.6 },
   itemTime: { fontSize: 12, color: Colors.text, opacity: 0.5, marginTop: 2 },
   
   statusBox: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
