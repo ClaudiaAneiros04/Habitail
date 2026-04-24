@@ -2,6 +2,23 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 
+/**
+ * Componente principal de enrutamiento basado en pestañas (Bottom Navigation).
+ * 
+ * Gestiona el marco de navegación inferior de toda la aplicación utilizando la API 
+ * de Expo Router. Aplica los tokens de color (`Colors`) a todas las áreas comunes
+ * (barra inferior, cabecera, indicadores activos/inactivos) para garantizar 
+ * consistencia y accesibilidad.
+ * 
+ * Se ha estructurado en 5 pestañas organizadas por contexto de uso:
+ * 1. Hoy: Acción prioritaria (Check-in).
+ * 2. Hábitos: Biblioteca y gestión CRUD.
+ * 3. Historial: Inspección de registros pasados (Read-only).
+ * 4. Estadísticas: Métricas gamificadas y KPIs del usuario.
+ * 5. Mascota: Gestión del avatar gamificado (Life & Health).
+ * 
+ * @returns {JSX.Element} El contenedor principal con el diseño de navegación Tab.
+ */
 export default function TabLayout() {
   return (
     <Tabs
@@ -33,6 +50,15 @@ export default function TabLayout() {
           title: 'Mis Hábitos',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Historial',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
       />
