@@ -1,3 +1,13 @@
+# Bitácora de Aprendizaje — Habitail
+ 
+## Índice de Contenidos
+ 
+1.  [Diseño de Arquitectura de Datos y Optimización: Índices](#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
+2.  [Lógica de Negocio — Fase 3: Rachas y Check-in](#lógica-de-negocio--fase-3-rachas-y-check-in)
+3.  [Errores y Aprendizajes — Fase 3](#errores-y-aprendizajes--fase-3)
+ 
+---
+ 
 # Diseño de Arquitectura de Datos y Optimización: Índices en Consultas de Hábitos
 
 ## Contexto Técnico
@@ -35,7 +45,32 @@ Para mantener la eficacia de esta estrategia:
 * El filtrado en DB es prioritario sobre el filtrado en arrays en TS. El `LogRepository` entrega sólo el rango que se necesita pintar.
 
 ---
-
+ 
+# Lógica de Negocio — Fase 3: Rachas y Check-in
+ 
+En esta fase se implementó la inteligencia detrás del seguimiento de hábitos, centrándose en la persistencia, la gamificación y el cálculo de métricas de éxito.
+ 
+## 1. Motor de Cálculo de Rachas (`streakCalculator.ts`)
+ 
+El `streakCalculator` es un módulo de lógica pura encargado de procesar los `habit_logs` para derivar estadísticas.
+ 
+*   **Racha Actual (`calculateCurrentStreak`)**:
+    *   **Diaria**: Verifica si hay un log para "hoy". Si no, mira "ayer". Si hay, retrocede día a día hasta encontrar un hueco.
+    *   **Semanal**: Evalúa semanas naturales (L-D). Una racha se mantiene si hay al menos un registro en cada semana consecutiva.
+*   **Racha Máxima (`calculateMaxStreak`)**: Algoritmo de "ventana deslizante" que recorre todo el historial buscando el segmento más largo de días consecutivos completados.
+*   **Tasa de Cumplimiento (`calculateCompletionRate`)**: Porcentaje de días con éxito sobre un periodo (ej. últimos 30 días), normalizando múltiples registros en un mismo día.
+ 
+## 2. Hook de Gestión de Estado (`useHabitCheckIn.ts`)
+ 
+Este hook actúa como el orquestador principal entre la UI y las diferentes capas de datos.
+ 
+*   **Abstracción de Persistencia**: Encapsula las llamadas a `logStore` y `LogRepository`, gestionando la generación de IDs deterministas (`log_habitId_timestamp`).
+*   **Semántica de Datos**: Implementa la lógica de que **desmarcar** un hábito debe **eliminar** el registro (`deleteById`) en lugar de actualizarlo a `false`, permitiendo una distinción clara en el historial entre "No realizado" y "Día aún no llegado".
+*   **Integración de Gamificación**: Cada acción de éxito (`markComplete`) dispara automáticamente una actualización de salud en el `petStore` (+10 HP).
+*   **Feedback Visual (DX)**: Expone valores animados (`bounceValue`) y lógica de celebración (`shouldLaunchConfetti`) cuando se detecta que el último hábito del día ha sido completado.
+ 
+---
+ 
 # Errores y Aprendizajes — Fase 3
 
 Registro técnico de todos los errores detectados durante la Fase 3 del proyecto Habitail
