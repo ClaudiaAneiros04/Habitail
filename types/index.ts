@@ -48,14 +48,13 @@ export interface User {
 export interface Pet {
   id: string;
   userId: string;
-  vida: number;
+  vida: number; // 0-100
   nivel: number;
-  skinActiva: string;
-  skinsDesbloqueadas: string[];
-  accesorios: string[]; // List of strings or json
-  // Frontend extras:
   xp: number;
-  state: PetState;
+  xpParaSiguienteNivel: number;
+  estadoActual: PetState;
+  skinEquipada: string;
+  accesorios: string[];
 }
 
 export interface Habit {

@@ -32,16 +32,17 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
           onboardingCompleted INTEGER NOT NULL DEFAULT 0
         );
 
+        DROP TABLE IF EXISTS pets;
         CREATE TABLE IF NOT EXISTS pets (
           id TEXT PRIMARY KEY NOT NULL,
           userId TEXT NOT NULL,
           vida INTEGER NOT NULL DEFAULT 100,
           nivel INTEGER NOT NULL DEFAULT 1,
-          skinActiva TEXT NOT NULL,
-          skinsDesbloqueadas TEXT NOT NULL,
-          accesorios TEXT NOT NULL,
           xp INTEGER NOT NULL DEFAULT 0,
-          state TEXT NOT NULL,
+          xpParaSiguienteNivel INTEGER NOT NULL DEFAULT 100,
+          estadoActual TEXT NOT NULL,
+          skinEquipada TEXT NOT NULL,
+          accesorios TEXT NOT NULL,
           FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
         );
 

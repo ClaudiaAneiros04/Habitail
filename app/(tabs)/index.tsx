@@ -10,6 +10,8 @@ import { getHabitsForToday } from '../../utils/frequencyEngine';
 
 import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
+import PetDisplay from '../../components/Pet/PetDisplay';
+import { usePetStore } from '../../store/usePetStore';
 
 // Native Date Helpers
 /**
@@ -89,6 +91,7 @@ export default function HomeScreen() {
   const addLog = useLogStore((state) => state.addLog);
   const deleteLog = useLogStore((state) => state.deleteLog);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
+  const pet = usePetStore((state) => state.pet);
 
   // Inicialización de la app
   useEffect(() => {
@@ -279,6 +282,9 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Mascota Virtual */}
+      <PetDisplay pet={pet} />
 
       {/* Selector de Fecha */}
       <View style={styles.dateSelector}>
