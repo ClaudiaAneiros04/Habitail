@@ -346,3 +346,97 @@ eliminando los nodos de texto intermedios:
 | 5 | Semántica de datos | "Sin registro" ≠ "incumplido". Desmarcar debe **borrar** el log, no actualizarlo a `false` |
 | 6 | Lógica de UI | El estado FAILED debe derivarse de la **ausencia de éxito** en días pasados, no de registros negativos |
 | 7 | React Native JSX | Un `<View>` no admite texto suelto; los strings mixtos deben envolverse en template literals |
+
+---
+
+# Lógica de Negocio — Fase 4: useHabitStats
+
+## 1. Queries SQL de agregación: por qué COUNT en lugar de cargar filas
+
+### El problema que se quería evitar
+El patrón ingenuo para calcular estadísticas sería:
+```ts
+const logs = await logRepo.getByHabit(habitId); // todos los logs
+const completed = logs.filter(l => l.completado && l.fecha >= from).length;
+```
+Con un año de uso diario, `getByHabit` traería >365 objetos `HabitLog` a memoria JavaScript solo para contarlos. En dispositivos de gama baja esto bloquea el JS thread durante la hidratación del hook.
+
+### La solución: agregación en SQLite
+Se añadieron dos métodos al `LogRepository`:
+
+```sql
+-- getStatsByPeriod (hábito individual)
+SELECT
+  COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS totalCompleted,
+  (CAST(julianday(?) AS INTEGER) - CAST(julianday(?) AS INTEGER) + 1) AS totalDays
+FROM habit_logs
+WHERE habitId = ? AND fecha >= ? AND fecha <= ?
+```
+
+**Por qué `COUNT(DISTINCT CASE WHEN ...)`:**
+- `DISTINCT fecha` evita que múltiples logs el mismo día (edge case poco probable pero posible) inflen `totalCompleted`.
+- `CASE WHEN completado = 1` filtra en SQL usando el valor numérico persistido, evitando el gotcha de `Boolean("0") === true` (ver Error 4).
+
+**Por qué `julianday()` para calcular `totalDays`:**
+- SQLite no tiene una función nativa `DATEDIFF`. La alternativa habitual es calcular en TS iterando fechas, pero eso es O(días) en JS.
+- `julianday()` convierte una fecha ISO a número de días julianos. La resta + 1 da el número de días calendario del rango en una sola expresión SQL.
+- Se usa `CAST(... AS INTEGER)` para truncar la parte decimal (julianday devuelve float).
+
+**Por qué el índice existente `idx_habit_logs_habit_fecha` ya cubre estas queries:**
+El índice compuesto `(habitId, fecha)` permite que SQLite localice los logs del hábito en O(log N) y recorra solo los del rango de fechas sin leer la tabla completa. El `COUNT(DISTINCT ...)` opera directamente sobre las entradas del índice B-Tree.
+
+---
+
+## 2. Cálculo de `totalDays` en SQL vs. TS
+
+`totalDays` representa el «universo» de días del periodo (no los días en que el hábito debía hacerse según su frecuencia). Esta simplificación es intencional:
+
+- Para `completionRate` de pantalla de resumen, tiene más sentido decir «completaste 15 de los últimos 30 días» que «completaste 15 de los 15 días que tocaba hacer».
+- Calcular los días de frecuencia activa requeriría cruzar con `diasSemana` del hábito y aplicar lógica de `WEEKLY`/`MONTHLY`, complejidad que se reserva para una futura iteración.
+- Para hábitos `DAILY`, `totalDays` = días del periodo = lo correcto.
+- Para hábitos `WEEKLY`, `totalDays` sobreestima el denominador (7× más días que semanas), lo que produce un `completionRate` aparentemente bajo. **Este es un caso borde conocido y documentado.**
+
+---
+
+## 3. Caché Zustand: por qué sin persistencia en AsyncStorage
+
+`useStatsStore` cachea los resultados en memoria (Zustand) pero **no** los persiste en `AsyncStorage`:
+
+1. **Los stats son datos derivados**: son calculables de la DB en ~1 query. Si se persisten, hay que gestionar la invalidación cuando se añaden nuevos logs, lo que añade complejidad sin beneficio real.
+2. **Ciclo de vida claro**: el caché vive mientras la app está en memoria. Al relanzar, la primera petición recalcula (una query rápida). No hay riesgo de mostrar datos obsoletos al iniciar.
+3. **Invalidación explícita**: `refresh()` y `invalidateHabit(habitId)` permiten al consumidor forzar recálculo cuando sabe que los datos cambiaron (ej. tras un check-in).
+
+---
+
+## 4. Inyección de dependencias en useHabitStats
+
+El hook acepta `_logRepo` y `_habitRepo` como parámetros opcionales para facilitar tests unitarios sin necesidad de mockear módulos (`jest.mock`):
+
+```ts
+// En producción (no se pasan repos)
+const stats = useHabitStats({ habitId: 'abc', period: 'weekly', userId: 'u1' });
+
+// En tests (repos mockeados)
+const stats = useHabitStats({
+  habitId: 'abc', period: 'weekly', userId: 'u1',
+  _logRepo: mockLogRepo,
+  _habitRepo: mockHabitRepo,
+});
+```
+
+Los repos se guardan en `useRef` para evitar recrearlos en cada render (son objetos sin estado interno).
+
+---
+
+## 5. Casos borde documentados y pendientes
+
+| Caso | Estado | Solución actual |
+|---|---|---|
+| Hábito sin logs | ✅ Cubierto | Retorna `EMPTY_STATS` (todos 0) |
+| `totalDays = 0` (periodo vacío) | ✅ Cubierto | `completionRate = 0`, sin división por cero |
+| Hábito `WEEKLY`: `completionRate` sobreestimado | ⚠️ Documentado | Denominador son días calendario, no semanas activas |
+| Hábito `MONTHLY`: racha semanal vs mensual | ⚠️ Pendiente | `calculateMaxStreak` asume frecuencia diaria |
+| Vista global: `currentStreak` y `maxStreak` | ⚠️ Pendiente | Se pasa `logs=[]` → rachas siempre 0. Requiere `getLogsForRangeGlobal` |
+| Zona horaria distinta a UTC | ⚠️ Riesgo conocido | `startOfDay` usa TZ local; si el servidor CI está en UTC y el usuario en UTC+2, los rangos pueden desplazarse 1 día en el límite |
+| Hábito eliminado (no encontrado en DB) | ✅ Cubierto | `getById` devuelve null → retorna `EMPTY_STATS` |
+

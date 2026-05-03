@@ -1,12 +1,37 @@
 import { HabitLog } from '../types';
 import { getDb } from './database';
 
+/**
+ * Resultado compacto que devuelven las queries de estadísticas.
+ * Solo contadores — nunca filas individuales — para mantener el uso de memoria
+ * O(1) independientemente del historial del usuario.
+ */
+export interface PeriodStats {
+  /** Número de días con al menos un log completado dentro del periodo. */
+  totalCompleted: number;
+  /**
+   * Número de días calendario dentro del periodo en que el hábito ya existía.
+   * Se calcula en SQL para evitar iterar fechas en TypeScript.
+   */
+  totalDays: number;
+}
+
 export interface ILogRepository {
   save(log: HabitLog): Promise<void>;
   deleteById(id: string): Promise<void>;
   getByHabit(habitId: string): Promise<HabitLog[]>;
   getByDate(fecha: string): Promise<HabitLog[]>;
   getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
+  /**
+   * Devuelve estadísticas agregadas (sin filas individuales) para un hábito
+   * en un rango de fechas. Ideal para alimentar useHabitStats.
+   */
+  getStatsByPeriod(habitId: string, fromDate: string, toDate: string): Promise<PeriodStats>;
+  /**
+   * Versión global: agrega estadísticas para TODOS los hábitos de un usuario
+   * en el rango de fechas indicado.
+   */
+  getGlobalStatsByPeriod(userId: string, fromDate: string, toDate: string): Promise<PeriodStats>;
 }
 
 export class LogRepository implements ILogRepository {
@@ -94,5 +119,86 @@ export class LogRepository implements ILogRepository {
     
     // Mapea la base de datos cruda al modelo tipado resolviendo booleanos y otros casteos
     return rows.map(this.mapRowToLog);
+  }
+
+  /**
+   * Retorna estadísticas de cumplimiento para un hábito concreto en un rango de fechas,
+   * ejecutando la agregación íntegramente en SQLite.
+   *
+   * Por qué en SQL y no en TS:
+   * - Un usuario activo puede acumular >3.000 logs/año por hábito.
+   * - Traerlos todos a memoria para contar con Array.filter sería O(N) en RAM y tiempo.
+   * - SQLite aplica el filtro y el COUNT usando el índice compuesto
+   *   idx_habit_logs_habit_fecha, resultando en O(log N) sin allocar objetos JS.
+   *
+   * Sobre totalDays:
+   * - La columna se calcula como la diferencia de días entre fromDate y toDate + 1,
+   *   lo que representa el «universo» de días posibles del periodo.
+   * - Esto es deliberadamente simple: la pantalla de stats muestra la completionRate
+   *   respecto a los días del periodo, no solo los días en que el hábito debía hacerse.
+   *   Si se necesitara calcular vs días de frecuencia activa, habría que cruzar con la
+   *   tabla habits y aplicar lógica de diasSemana — complejidad que se reserva para
+   *   una futura versión.
+   *
+   * @param habitId  - UUID del hábito.
+   * @param fromDate - Fecha inicial del periodo, formato ISO 8601 YYYY-MM-DD.
+   * @param toDate   - Fecha final del periodo, formato ISO 8601 YYYY-MM-DD.
+   */
+  async getStatsByPeriod(habitId: string, fromDate: string, toDate: string): Promise<PeriodStats> {
+    const db = await getDb();
+
+    // COUNT(DISTINCT fecha) evita que múltiples logs en el mismo día inflen el contador.
+    // completado = 1 usa el valor numérico persistido; el índice (habitId, fecha) cubre
+    // tanto el filtro WHERE como el ORDER BY implícito del COUNT.
+    const row = await db.getFirstAsync<{ totalCompleted: number; totalDays: number }>(
+      `SELECT
+         COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS totalCompleted,
+         (CAST(julianday(?) AS INTEGER) - CAST(julianday(?) AS INTEGER) + 1) AS totalDays
+       FROM habit_logs
+       WHERE habitId = ?
+         AND fecha >= ?
+         AND fecha <= ?`,
+      [toDate, fromDate, habitId, fromDate, toDate]
+    );
+
+    return {
+      totalCompleted: row?.totalCompleted ?? 0,
+      totalDays: row?.totalDays ?? 0,
+    };
+  }
+
+  /**
+   * Versión global de getStatsByPeriod: agrega los logs de todos los hábitos
+   * de un usuario en el rango indicado.
+   *
+   * Se usa cuando useHabitStats se llama sin habitId (vista resumen global).
+   * COUNT(DISTINCT fecha || '|' || habitId) cuenta combinaciones únicas de
+   * (día, hábito) para no inflar el total con hábitos distintos en el mismo día.
+   *
+   * totalDays en la vista global representa la ventana de días del periodo,
+   * independiente del número de hábitos activos (igual que getStatsByPeriod).
+   *
+   * @param userId   - UUID del usuario.
+   * @param fromDate - Fecha inicial, formato ISO 8601 YYYY-MM-DD.
+   * @param toDate   - Fecha final, formato ISO 8601 YYYY-MM-DD.
+   */
+  async getGlobalStatsByPeriod(userId: string, fromDate: string, toDate: string): Promise<PeriodStats> {
+    const db = await getDb();
+
+    const row = await db.getFirstAsync<{ totalCompleted: number; totalDays: number }>(
+      `SELECT
+         COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha || '|' || habitId END) AS totalCompleted,
+         (CAST(julianday(?) AS INTEGER) - CAST(julianday(?) AS INTEGER) + 1) AS totalDays
+       FROM habit_logs
+       WHERE userId = ?
+         AND fecha >= ?
+         AND fecha <= ?`,
+      [toDate, fromDate, userId, fromDate, toDate]
+    );
+
+    return {
+      totalCompleted: row?.totalCompleted ?? 0,
+      totalDays: row?.totalDays ?? 0,
+    };
   }
 }
