@@ -488,4 +488,34 @@ La alternativa SQL sería un CTE recursivo para generar los 365 días y hacer LE
 - `eachDayOfInterval` de date-fns es más legible y testeable.
 - 365 iteraciones en JS son microsegundos; sin impacto de rendimiento medible.
 
+---
+
+# Lógica de Negocio — Fase 4: chartAggregator
+
+## 1. Diseño de `isDayScheduled`
+
+La función determina si el hábito estaba programado para un día dado, respetando `frecuencia`, `diasSemana`, `fechaInicio` y `fechaFin`. Es el discriminador central que hace que `total` solo cuente días activos (sin dividir por días inactivos).
+
+**Convención de `diasSemana`:** usa `date.getDay()` → 0=Dom, 1=Lun, …, 6=Sáb. Coincide con la convención de `frequencyEngine.ts`.
+
+## 2. Casos borde documentados
+
+| Caso | Solución implementada |
+|---|---|
+| Mes con 5 semanas | `aggregateByMonth` itera semanas ISO completas mientras no superen `monthEnd` → genera 5 entradas naturalmente |
+| Mes que empieza en miércoles | La primera semana se recorta con `max([weekStart, monthStart])` → `total` refleja solo los días del mes |
+| Hábito creado a mitad de semana | `isDayScheduled` retorna `false` si `day < fechaInicio` → esos días tienen `total=0`, `value=0`, no cuentan como incumplidos |
+| Logs duplicados el mismo día | `countDaysInPeriod` usa un `Set<string>` de fechas completadas → deduplicación automática |
+| Cambio de `diasSemana` a mitad del periodo | Se usa siempre la configuración **actual** del hábito. No se trackea el historial de cambios de configuración. Si en el futuro se necesita, habría que añadir un campo `diasSemanaHistorial` o similar |
+| `total = 0` en un periodo | `computeRate` devuelve `0` explícitamente antes de dividir |
+| Logs fuera del rango solicitado | `countDaysInPeriod` itera solo los días del periodo y comprueba si hay log para esa fecha. Logs de otras semanas/meses están en el Set pero nunca se consultan porque su fecha no coincide con ningún día del array |
+
+## 3. `aggregateByMonth`: semanas ISO vs. bloques de 7 días
+
+Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días empezando el día 1 del mes porque:
+- Las semanas ISO son el concepto que el usuario percibe como "semana natural".
+- Los bloques fijos producen etiquetas confusas para el gráfico (ej: "días 1-7" cruza lunes y martes de semanas distintas).
+- date-fns ya proporciona `startOfWeek`/`endOfWeek` con `weekStartsOn: 1`.
+
+
 
