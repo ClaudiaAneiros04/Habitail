@@ -440,3 +440,52 @@ Los repos se guardan en `useRef` para evitar recrearlos en cada render (son obje
 | Zona horaria distinta a UTC | ⚠️ Riesgo conocido | `startOfDay` usa TZ local; si el servidor CI está en UTC y el usuario en UTC+2, los rangos pueden desplazarse 1 día en el límite |
 | Hábito eliminado (no encontrado en DB) | ✅ Cubierto | `getById` devuelve null → retorna `EMPTY_STATS` |
 
+---
+
+# Lógica de Negocio — Fase 4: useHeatmapData
+
+## 1. Diseño SQL: DATE(fecha) para agrupar por día
+
+El campo `fecha` se persiste con `formatISO()` → produce strings con hora y offset como `2026-05-03T00:00:00+02:00`. Agrupar directamente con `GROUP BY fecha` crearía un grupo por timestamp, no por día. La solución:
+
+```sql
+GROUP BY DATE(fecha)
+ORDER BY DATE(fecha) ASC
+```
+
+`DATE()` extrae la parte de fecha en UTC de cualquier formato ISO 8601, resolviendo la agrupación correctamente. Trade-off: no se puede usar el índice `(habitId, fecha)` en el WHERE con `DATE(fecha)`, pero para 365 logs por hábito el escaneo del subconjunto es despreciable frente a la corrección.
+
+---
+
+## 2. Nuevo índice: `idx_habit_logs_user_fecha`
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
+```
+
+`getHeatmapGlobal` filtra por `userId` (no por `habitId`). El índice `(habitId, fecha)` no sirve porque SQLite no puede usarlo cuando la primera columna no aparece en WHERE. Sin el nuevo índice → full scan de toda la tabla. Con él → O(log N) para localizar el subconjunto del usuario.
+
+---
+
+## 3. Casos borde del heatmap
+
+| Caso | Estado | Detalle |
+|---|---|---|
+| Días sin hábitos activos | ✅ Cubierto | Sin logs → sin fila SQL → value=0 en mergeHeatmapData |
+| Hábito semanal, día no programado | ✅ Cubierto | Si no hay log ese día, no hay fila → value=0 (no incumplido) |
+| Primer uso sin logs | ✅ Cubierto | Array vacío de SQL → 365 entradas value=0, sin error |
+| Rango que cruza cambio de año | ✅ Cubierto | `subDays` y `eachDayOfInterval` de date-fns manejan bisiestos y cruces |
+| Zona horaria UTC vs local | ⚠️ Riesgo conocido | `DATE()` en SQLite usa el offset del string ISO; check-ins de madrugada en TZ negativa pueden caer en el día UTC siguiente |
+| value=1 en práctica | ⚠️ Informativo | La app borra logs al desmarcar (Error 5); en la práctica value=1 casi nunca aparece. Las queries lo soportan correctamente si la semántica cambia |
+| Modo global: hábito activo sin log | ⚠️ Limitación conocida | SQL solo evalúa días CON logs. Un hábito activo no completado (sin log) aparece como value=0, no value=1. Requeriría JOIN con habits + lógica de frecuencia en SQL (CTE complejo, reservado para futura iteración) |
+
+---
+
+## 4. mergeHeatmapData: TypeScript vs CTE recursivo en SQL
+
+La alternativa SQL sería un CTE recursivo para generar los 365 días y hacer LEFT JOIN. Se eligió TypeScript porque:
+- Los CTEs recursivos tienen compatibilidad limitada en versiones antiguas de SQLite embebido.
+- `eachDayOfInterval` de date-fns es más legible y testeable.
+- 365 iteraciones en JS son microsegundos; sin impacto de rendimiento medible.
+
+
