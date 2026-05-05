@@ -7,6 +7,7 @@ interface PetStore {
   updateHealth: (delta: number) => Promise<void>;
   levelUp: () => Promise<void>;
   loadPet: () => Promise<void>;
+  updatePet: (updates: Partial<Pet>) => Promise<void>;
 }
 
 const getPetState = (vida: number): PetState => {
@@ -65,6 +66,13 @@ export const usePetStore = create<PetStore>((set, get) => ({
       await petRepo.save(defaultPet);
       set({ pet: defaultPet });
     }
+  },
+  updatePet: async (updates) => {
+    const { pet } = get();
+    if (!pet) return;
+    const updatedPet = { ...pet, ...updates };
+    await petRepo.save(updatedPet);
+    set({ pet: updatedPet });
   },
 }));
 

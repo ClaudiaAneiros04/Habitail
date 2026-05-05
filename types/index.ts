@@ -43,6 +43,7 @@ export interface User {
   fechaRegistro: string; // From ER
   puntos: number; // From ER
   onboardingCompleted: boolean; // From Frontend
+  inventario?: string[]; // IDs de items comprados
 }
 
 export interface Pet {

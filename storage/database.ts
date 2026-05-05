@@ -96,6 +96,14 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
 
         CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fecha);
       `);
+      
+      // MIGRATION: Add inventario column if it doesn't exist
+      try {
+        await db.execAsync(`ALTER TABLE users ADD COLUMN inventario TEXT;`);
+      } catch (e) {
+        // Ignorar si la columna ya existe
+      }
+
       return db;
     })();
   }
