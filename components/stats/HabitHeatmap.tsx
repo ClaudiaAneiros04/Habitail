@@ -46,6 +46,11 @@ export const HabitHeatmap: React.FC = () => {
     });
   };
 
+  /**
+   * API CONNECTION POINT: En una implementación real, esta función se reemplazaría
+   * por una llamada al backend (ej: GET /stats/heatmap/:habitId).
+   * Los datos deberían venir formateados como un array de objetos { date: 'YYYY-MM-DD', count: number }.
+   */
   const chartData = generateMockData();
 
   /**
