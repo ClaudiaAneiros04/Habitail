@@ -11,6 +11,8 @@ import { Theme } from '../../constants/theme';
 import { StatCard } from '../../components/stats/StatCard';
 import { StatsTabs, TabType } from '../../components/stats/StatsTabs';
 import { HabitSelector } from '../../components/stats/HabitSelector';
+import { HabitHeatmap } from '../../components/stats/HabitHeatmap';
+
 
 /**
  * StatsScreen - Pantalla principal de estadísticas.
@@ -69,14 +71,9 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Espacio reservado para gráficos futuros */}
-        <View style={styles.chartPlaceholder}>
-          <View style={styles.placeholderIcon} />
-          <Text style={styles.placeholderTitle}>Visualización de Progreso</Text>
-          <Text style={styles.placeholderText}>
-            Próximamente: Gráficos de actividad y tendencias de cumplimiento.
-          </Text>
-        </View>
+        {/* Visualización de Actividad Anual (Heatmap) */}
+        <HabitHeatmap />
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -124,34 +121,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Theme.spacing.sm,
   },
-  chartPlaceholder: {
-    marginTop: Theme.spacing.xl,
-    padding: Theme.spacing.xl,
-    backgroundColor: Theme.colors.cardBackground,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: Theme.colors.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Theme.colors.background,
-    marginBottom: Theme.spacing.md,
-  },
-  placeholderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Theme.colors.text,
-    marginBottom: Theme.spacing.xs,
-  },
-  placeholderText: {
-    color: Theme.colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
 });
+

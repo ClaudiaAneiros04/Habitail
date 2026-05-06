@@ -39,7 +39,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Hoy',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
@@ -48,7 +48,7 @@ export default function TabLayout() {
         name="habits"
         options={{
           title: 'Mis Hábitos',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="list-outline" size={size} color={color} />
           ),
         }}
@@ -57,7 +57,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'Historial',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="time-outline" size={size} color={color} />
           ),
         }}
@@ -66,7 +66,7 @@ export default function TabLayout() {
         name="stats"
         options={{
           title: 'Estadísticas',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
         }}
@@ -75,7 +75,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Mascota',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="paw-outline" size={size} color={color} />
           ),
         }}
