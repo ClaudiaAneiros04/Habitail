@@ -518,4 +518,16 @@ Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días em
 - date-fns ya proporciona `startOfWeek`/`endOfWeek` con `weekStartsOn: 1`.
 
 
+---
 
+# Gestión de Assets — Fase 5: Fuentes y Recursos
+
+## 1. Implementación de petAssetResolver y Fallback Visual
+
+Durante la integración de la lógica visual de la mascota, se detectó que los archivos físicos de sprites (`.png`) en `assets/pet/states/` y `assets/pet/skins/` aún no están disponibles.
+
+Para garantizar la disponibilidad visual de la app en cualquier momento:
+- Se implementó un sistema de **fallback** en `petAssetResolver(state: PetState)` que utiliza emojis y un `backgroundColor` acorde al estado de la mascota.
+- Se configuró la función con un flag `USE_IMAGE_ASSETS` (inicialmente `false`) para que no utilice `require()` en archivos faltantes. Esto previene un error duro de Metro Bundler en tiempo de compilación.
+- **Tamaño estándar de assets esperado:** Los PNG finales deben ser de 128x128 píxeles con fondo transparente.
+- Este diseño asegura que cuando los assets gráficos definitivos estén listos, la transición solo requiera colocar los archivos en la ruta y cambiar el flag a `true`, sin alterar componentes visuales ni tests.
