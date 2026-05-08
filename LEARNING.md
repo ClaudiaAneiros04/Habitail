@@ -346,3 +346,176 @@ eliminando los nodos de texto intermedios:
 | 5 | Semántica de datos | "Sin registro" ≠ "incumplido". Desmarcar debe **borrar** el log, no actualizarlo a `false` |
 | 6 | Lógica de UI | El estado FAILED debe derivarse de la **ausencia de éxito** en días pasados, no de registros negativos |
 | 7 | React Native JSX | Un `<View>` no admite texto suelto; los strings mixtos deben envolverse en template literals |
+
+---
+
+# Lógica de Negocio — Fase 4: useHabitStats
+
+## 1. Queries SQL de agregación: por qué COUNT en lugar de cargar filas
+
+### El problema que se quería evitar
+El patrón ingenuo para calcular estadísticas sería:
+```ts
+const logs = await logRepo.getByHabit(habitId); // todos los logs
+const completed = logs.filter(l => l.completado && l.fecha >= from).length;
+```
+Con un año de uso diario, `getByHabit` traería >365 objetos `HabitLog` a memoria JavaScript solo para contarlos. En dispositivos de gama baja esto bloquea el JS thread durante la hidratación del hook.
+
+### La solución: agregación en SQLite
+Se añadieron dos métodos al `LogRepository`:
+
+```sql
+-- getStatsByPeriod (hábito individual)
+SELECT
+  COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS totalCompleted,
+  (CAST(julianday(?) AS INTEGER) - CAST(julianday(?) AS INTEGER) + 1) AS totalDays
+FROM habit_logs
+WHERE habitId = ? AND fecha >= ? AND fecha <= ?
+```
+
+**Por qué `COUNT(DISTINCT CASE WHEN ...)`:**
+- `DISTINCT fecha` evita que múltiples logs el mismo día (edge case poco probable pero posible) inflen `totalCompleted`.
+- `CASE WHEN completado = 1` filtra en SQL usando el valor numérico persistido, evitando el gotcha de `Boolean("0") === true` (ver Error 4).
+
+**Por qué `julianday()` para calcular `totalDays`:**
+- SQLite no tiene una función nativa `DATEDIFF`. La alternativa habitual es calcular en TS iterando fechas, pero eso es O(días) en JS.
+- `julianday()` convierte una fecha ISO a número de días julianos. La resta + 1 da el número de días calendario del rango en una sola expresión SQL.
+- Se usa `CAST(... AS INTEGER)` para truncar la parte decimal (julianday devuelve float).
+
+**Por qué el índice existente `idx_habit_logs_habit_fecha` ya cubre estas queries:**
+El índice compuesto `(habitId, fecha)` permite que SQLite localice los logs del hábito en O(log N) y recorra solo los del rango de fechas sin leer la tabla completa. El `COUNT(DISTINCT ...)` opera directamente sobre las entradas del índice B-Tree.
+
+---
+
+## 2. Cálculo de `totalDays` en SQL vs. TS
+
+`totalDays` representa el «universo» de días del periodo (no los días en que el hábito debía hacerse según su frecuencia). Esta simplificación es intencional:
+
+- Para `completionRate` de pantalla de resumen, tiene más sentido decir «completaste 15 de los últimos 30 días» que «completaste 15 de los 15 días que tocaba hacer».
+- Calcular los días de frecuencia activa requeriría cruzar con `diasSemana` del hábito y aplicar lógica de `WEEKLY`/`MONTHLY`, complejidad que se reserva para una futura iteración.
+- Para hábitos `DAILY`, `totalDays` = días del periodo = lo correcto.
+- Para hábitos `WEEKLY`, `totalDays` sobreestima el denominador (7× más días que semanas), lo que produce un `completionRate` aparentemente bajo. **Este es un caso borde conocido y documentado.**
+
+---
+
+## 3. Caché Zustand: por qué sin persistencia en AsyncStorage
+
+`useStatsStore` cachea los resultados en memoria (Zustand) pero **no** los persiste en `AsyncStorage`:
+
+1. **Los stats son datos derivados**: son calculables de la DB en ~1 query. Si se persisten, hay que gestionar la invalidación cuando se añaden nuevos logs, lo que añade complejidad sin beneficio real.
+2. **Ciclo de vida claro**: el caché vive mientras la app está en memoria. Al relanzar, la primera petición recalcula (una query rápida). No hay riesgo de mostrar datos obsoletos al iniciar.
+3. **Invalidación explícita**: `refresh()` y `invalidateHabit(habitId)` permiten al consumidor forzar recálculo cuando sabe que los datos cambiaron (ej. tras un check-in).
+
+---
+
+## 4. Inyección de dependencias en useHabitStats
+
+El hook acepta `_logRepo` y `_habitRepo` como parámetros opcionales para facilitar tests unitarios sin necesidad de mockear módulos (`jest.mock`):
+
+```ts
+// En producción (no se pasan repos)
+const stats = useHabitStats({ habitId: 'abc', period: 'weekly', userId: 'u1' });
+
+// En tests (repos mockeados)
+const stats = useHabitStats({
+  habitId: 'abc', period: 'weekly', userId: 'u1',
+  _logRepo: mockLogRepo,
+  _habitRepo: mockHabitRepo,
+});
+```
+
+Los repos se guardan en `useRef` para evitar recrearlos en cada render (son objetos sin estado interno).
+
+---
+
+## 5. Casos borde documentados y pendientes
+
+| Caso | Estado | Solución actual |
+|---|---|---|
+| Hábito sin logs | ✅ Cubierto | Retorna `EMPTY_STATS` (todos 0) |
+| `totalDays = 0` (periodo vacío) | ✅ Cubierto | `completionRate = 0`, sin división por cero |
+| Hábito `WEEKLY`: `completionRate` sobreestimado | ⚠️ Documentado | Denominador son días calendario, no semanas activas |
+| Hábito `MONTHLY`: racha semanal vs mensual | ⚠️ Pendiente | `calculateMaxStreak` asume frecuencia diaria |
+| Vista global: `currentStreak` y `maxStreak` | ⚠️ Pendiente | Se pasa `logs=[]` → rachas siempre 0. Requiere `getLogsForRangeGlobal` |
+| Zona horaria distinta a UTC | ⚠️ Riesgo conocido | `startOfDay` usa TZ local; si el servidor CI está en UTC y el usuario en UTC+2, los rangos pueden desplazarse 1 día en el límite |
+| Hábito eliminado (no encontrado en DB) | ✅ Cubierto | `getById` devuelve null → retorna `EMPTY_STATS` |
+
+---
+
+# Lógica de Negocio — Fase 4: useHeatmapData
+
+## 1. Diseño SQL: DATE(fecha) para agrupar por día
+
+El campo `fecha` se persiste con `formatISO()` → produce strings con hora y offset como `2026-05-03T00:00:00+02:00`. Agrupar directamente con `GROUP BY fecha` crearía un grupo por timestamp, no por día. La solución:
+
+```sql
+GROUP BY DATE(fecha)
+ORDER BY DATE(fecha) ASC
+```
+
+`DATE()` extrae la parte de fecha en UTC de cualquier formato ISO 8601, resolviendo la agrupación correctamente. Trade-off: no se puede usar el índice `(habitId, fecha)` en el WHERE con `DATE(fecha)`, pero para 365 logs por hábito el escaneo del subconjunto es despreciable frente a la corrección.
+
+---
+
+## 2. Nuevo índice: `idx_habit_logs_user_fecha`
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
+```
+
+`getHeatmapGlobal` filtra por `userId` (no por `habitId`). El índice `(habitId, fecha)` no sirve porque SQLite no puede usarlo cuando la primera columna no aparece en WHERE. Sin el nuevo índice → full scan de toda la tabla. Con él → O(log N) para localizar el subconjunto del usuario.
+
+---
+
+## 3. Casos borde del heatmap
+
+| Caso | Estado | Detalle |
+|---|---|---|
+| Días sin hábitos activos | ✅ Cubierto | Sin logs → sin fila SQL → value=0 en mergeHeatmapData |
+| Hábito semanal, día no programado | ✅ Cubierto | Si no hay log ese día, no hay fila → value=0 (no incumplido) |
+| Primer uso sin logs | ✅ Cubierto | Array vacío de SQL → 365 entradas value=0, sin error |
+| Rango que cruza cambio de año | ✅ Cubierto | `subDays` y `eachDayOfInterval` de date-fns manejan bisiestos y cruces |
+| Zona horaria UTC vs local | ⚠️ Riesgo conocido | `DATE()` en SQLite usa el offset del string ISO; check-ins de madrugada en TZ negativa pueden caer en el día UTC siguiente |
+| value=1 en práctica | ⚠️ Informativo | La app borra logs al desmarcar (Error 5); en la práctica value=1 casi nunca aparece. Las queries lo soportan correctamente si la semántica cambia |
+| Modo global: hábito activo sin log | ⚠️ Limitación conocida | SQL solo evalúa días CON logs. Un hábito activo no completado (sin log) aparece como value=0, no value=1. Requeriría JOIN con habits + lógica de frecuencia en SQL (CTE complejo, reservado para futura iteración) |
+
+---
+
+## 4. mergeHeatmapData: TypeScript vs CTE recursivo en SQL
+
+La alternativa SQL sería un CTE recursivo para generar los 365 días y hacer LEFT JOIN. Se eligió TypeScript porque:
+- Los CTEs recursivos tienen compatibilidad limitada en versiones antiguas de SQLite embebido.
+- `eachDayOfInterval` de date-fns es más legible y testeable.
+- 365 iteraciones en JS son microsegundos; sin impacto de rendimiento medible.
+
+---
+
+# Lógica de Negocio — Fase 4: chartAggregator
+
+## 1. Diseño de `isDayScheduled`
+
+La función determina si el hábito estaba programado para un día dado, respetando `frecuencia`, `diasSemana`, `fechaInicio` y `fechaFin`. Es el discriminador central que hace que `total` solo cuente días activos (sin dividir por días inactivos).
+
+**Convención de `diasSemana`:** usa `date.getDay()` → 0=Dom, 1=Lun, …, 6=Sáb. Coincide con la convención de `frequencyEngine.ts`.
+
+## 2. Casos borde documentados
+
+| Caso | Solución implementada |
+|---|---|
+| Mes con 5 semanas | `aggregateByMonth` itera semanas ISO completas mientras no superen `monthEnd` → genera 5 entradas naturalmente |
+| Mes que empieza en miércoles | La primera semana se recorta con `max([weekStart, monthStart])` → `total` refleja solo los días del mes |
+| Hábito creado a mitad de semana | `isDayScheduled` retorna `false` si `day < fechaInicio` → esos días tienen `total=0`, `value=0`, no cuentan como incumplidos |
+| Logs duplicados el mismo día | `countDaysInPeriod` usa un `Set<string>` de fechas completadas → deduplicación automática |
+| Cambio de `diasSemana` a mitad del periodo | Se usa siempre la configuración **actual** del hábito. No se trackea el historial de cambios de configuración. Si en el futuro se necesita, habría que añadir un campo `diasSemanaHistorial` o similar |
+| `total = 0` en un periodo | `computeRate` devuelve `0` explícitamente antes de dividir |
+| Logs fuera del rango solicitado | `countDaysInPeriod` itera solo los días del periodo y comprueba si hay log para esa fecha. Logs de otras semanas/meses están en el Set pero nunca se consultan porque su fecha no coincide con ningún día del array |
+
+## 3. `aggregateByMonth`: semanas ISO vs. bloques de 7 días
+
+Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días empezando el día 1 del mes porque:
+- Las semanas ISO son el concepto que el usuario percibe como "semana natural".
+- Los bloques fijos producen etiquetas confusas para el gráfico (ej: "días 1-7" cruza lunes y martes de semanas distintas).
+- date-fns ya proporciona `startOfWeek`/`endOfWeek` con `weekStartsOn: 1`.
+
+
+

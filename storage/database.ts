@@ -94,6 +94,11 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
         );
 
         CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fecha);
+
+        -- Índice para consultas globales (heatmap/stats por userId sin habitId concreto).
+        -- Sin este índice, getHeatmapGlobal y getGlobalStatsByPeriod harían full scan
+        -- de toda la tabla habit_logs para localizar los registros de un usuario.
+        CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
       `);
       return db;
     })();
