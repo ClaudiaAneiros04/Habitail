@@ -2,20 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import { Theme } from '../../constants/theme';
+import { ChartData } from '../../utils/chartAggregator';
 
 /**
  * Props para el componente BarChartComponent
  */
 interface BarChartComponentProps {
-  /** Modo de visualización: semanal (7 días) o mensual (agrupado por semanas) */
+  /** Modo de visualización: semanal o mensual */
   mode: 'weekly' | 'monthly';
   /** 
-   * Datos de completitud. 
-   * Para 'weekly': se esperan exactamente 7 valores (0-100) representando Lu-Do.
-   * Para 'monthly': se esperan datos diarios (28-31 valores) que se agruparán automáticamente,
-   * o datos ya agrupados (4-5 valores).
+   * Datos estructurados obtenidos de aggregateChartData.
    */
-  data: number[];
+  data: ChartData[];
 }
 
 /**
@@ -23,73 +21,50 @@ interface BarChartComponentProps {
  * Utiliza react-native-chart-kit para la visualización.
  */
 export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data }) => {
-  // Obtenemos el ancho de la pantalla para que el gráfico sea responsivo
   const screenWidth = Dimensions.get('window').width - (Theme.spacing.md * 2) - 16;
 
-  /**
-   * Lógica de procesamiento de datos:
-   * Si es mensual y recibimos datos diarios, los agrupamos por semanas (7 días cada una).
-   */
-  const processedData = React.useMemo(() => {
-    if (mode === 'monthly' && data.length > 7) {
-      const weeks: number[] = [];
-      for (let i = 0; i < data.length; i += 7) {
-        const weekSlice = data.slice(i, i + 7);
-        const average = weekSlice.reduce((acc, val) => acc + val, 0) / weekSlice.length;
-        weeks.push(Math.round(average));
-      }
-      return weeks;
-    }
-    return data;
-  }, [mode, data]);
+  // Extraemos labels y valores para el gráfico
+  const chartLabels = data.map(d => d.label);
+  const chartValues = data.map(d => d.value);
 
   /**
-   * Genera las etiquetas del eje X según el modo y los datos procesados
-   */
-  const labels = React.useMemo(() => {
-    if (mode === 'weekly') {
-      return ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
-    }
-    return processedData.map((_, index) => `Sem ${index + 1}`);
-  }, [mode, processedData]);
-
-  /**
-   * Maneja el evento de presionar una barra emulando un tooltip.
+   * Maneja el evento de presionar una barra mostrando detalles precisos.
    */
   const handleBarPress = (index: number) => {
-    const value = processedData[index] || 0;
-    const label = mode === 'weekly' ? labels[index] : `Semana ${index + 1}`;
+    const item = data[index];
+    if (!item) return;
     
+    const detailText = item.total > 0 
+      ? `${item.completed}/${item.total} días completados`
+      : 'Sin hábitos programados';
+
     Alert.alert(
-      'Estadísticas de Hábito',
-      `${label}: ${value}% de completitud`,
+      'Detalle de Cumplimiento',
+      `${item.label}: ${item.value}% \n(${detailText})`,
       [{ text: 'Entendido', style: 'default' }]
     );
   };
 
-  /**
-   * Configuración visual del gráfico siguiendo el tema de la aplicación
-   */
   const chartConfig = {
     backgroundColor: Theme.colors.cardBackground,
     backgroundGradientFrom: Theme.colors.cardBackground,
     backgroundGradientTo: Theme.colors.cardBackground,
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`, // Theme.colors.primary
-    labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`, // Theme.colors.textSecondary
+    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
     style: {
       borderRadius: 16,
     },
     barPercentage: 0.6,
     propsForBackgroundLines: {
       strokeDasharray: '0', 
-      stroke: '#f1f5f9', // Slate 100
+      stroke: '#f1f5f9',
     },
   };
 
-  const chartData = {
-    labels: labels,
-    datasets: [{ data: processedData }],
+  const barChartData = {
+    labels: chartLabels,
+    datasets: [{ data: chartValues.length > 0 ? chartValues : [0] }],
   };
 
   return (
@@ -102,7 +77,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
 
       <View style={styles.chartWrapper}>
         <BarChart
-          data={chartData}
+          data={barChartData}
           width={screenWidth}
           height={240}
           yAxisLabel=""
@@ -116,15 +91,14 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
           style={styles.chart}
         />
         
-        {/* Capa táctil overlay para interactividad */}
         <View style={styles.overlayContainer}>
-          {processedData.map((_, index) => (
+          {data.map((_, index) => (
             <TouchableOpacity
               key={index}
               activeOpacity={0.7}
               style={[
                 styles.touchArea,
-                { width: (screenWidth - 60) / processedData.length }
+                { width: (screenWidth - 60) / (data.length || 1) }
               ]}
               onPress={() => handleBarPress(index)}
             />
@@ -134,7 +108,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
       
       <View style={styles.legend}>
         <View style={[styles.dot, { backgroundColor: Theme.colors.primary }]} />
-        <Text style={styles.legendText}>Completitud media</Text>
+        <Text style={styles.legendText}>Tasa de éxito (%)</Text>
       </View>
     </View>
   );
@@ -168,14 +142,14 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 8,
     borderRadius: 16,
-    paddingRight: 40, // Espacio para el sufijo %
+    paddingRight: 40,
   },
   overlayContainer: {
     position: 'absolute',
-    left: 45, // Ajuste para el eje Y
+    left: 45,
     right: 15,
     top: 10,
-    bottom: 40, // Ajuste para las etiquetas del eje X
+    bottom: 40,
     flexDirection: 'row',
   },
   touchArea: {
@@ -197,3 +171,4 @@ const styles = StyleSheet.create({
     color: Theme.colors.textSecondary,
   },
 });
+

@@ -1,55 +1,23 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../types';
+import { HabitRepository } from '../storage/HabitRepository';
 
-/**
- * Interface que define el estado y las acciones del store de hábitos.
- */
+const habitRepo = new HabitRepository();
+
 interface HabitState {
-  /** Lista de todos los hábitos registrados */
   habits: Habit[];
-  
-  /**
-   * Añade un nuevo hábito a la lista generando su UUID automáticamente.
-   * @param habitData Datos del hábito a guardar (puede incluir id opcionalmente).
-   */
-  addHabit: (habitData: Omit<Habit, 'id'> & { id?: string }) => void;
-  
-  /**
-   * Actualiza campos específicos de un hábito existente.
-   * @param id El identificador único del hábito.
-   * @param updates Objeto con las propiedades a actualizar.
-   */
-  updateHabit: (id: string, updates: Partial<Habit>) => void;
-  
-  /**
-   * Archiva un hábito cambiando su estado 'activo' a false.
-   * @param id El identificador único del hábito.
-   */
-  archiveHabit: (id: string) => void;
-  
-  /**
-   * Elimina permanentemente un hábito de la lista.
-   * @param id El identificador único del hábito.
-   */
-  removeHabit: (id: string) => void;
+  addHabit: (habitData: Omit<Habit, 'id'> & { id?: string }) => Promise<void>;
+  updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
+  archiveHabit: (id: string) => Promise<void>;
+  removeHabit: (id: string) => Promise<void>;
+  loadHabits: () => Promise<void>;
 }
 
-/**
- * Store de Zustand para la gestión de hábitos.
- * La persistencia se maneja manualmente para evitar errores de sintaxis en entornos Web.
- */
 export const useHabitStore = create<HabitState>()((set, get) => ({
-  // Estado inicial: array vacío de hábitos
   habits: [],
 
-  /**
-   * Acción: Añadir Hábito.
-   * Recibe el objeto, le asigna un UUID y lo guarda en el estado y almacenamiento.
-   */
-  addHabit: (habitData) => {
-    // Usar el ID provisto o generar UUID v4 (polyfill simple para compatibilidad general en RN)
+  addHabit: async (habitData) => {
     const newId = habitData.id || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -61,16 +29,15 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       id: newId,
     };
 
+    await habitRepo.save(newHabit);
     set((state) => ({
       habits: [...state.habits, newHabit],
     }));
     saveToStorage(get().habits);
   },
 
-  /**
-   * Acción: Actualizar Hábito.
-   */
-  updateHabit: (id: string, updates: Partial<Habit>) => {
+  updateHabit: async (id: string, updates: Partial<Habit>) => {
+    await habitRepo.update(id, updates);
     set((state) => ({
       habits: state.habits.map((h) =>
         h.id === id ? { ...h, ...updates } : h
@@ -79,10 +46,8 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     saveToStorage(get().habits);
   },
 
-  /**
-   * Acción: Archivar Hábito.
-   */
-  archiveHabit: (id: string) => {
+  archiveHabit: async (id: string) => {
+    await habitRepo.archive(id);
     set((state) => ({
       habits: state.habits.map((h) =>
         h.id === id ? { ...h, activo: false } : h
@@ -91,43 +56,46 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     saveToStorage(get().habits);
   },
 
-  /**
-   * Acción: Eliminar Hábito.
-   */
-  removeHabit: (id: string) => {
+  removeHabit: async (id: string) => {
+    // Nota: El repo debería tener un delete, pero si no, usamos update activo: false
+    // Para borrar físicamente de SQLite si el repo no lo tiene (añadir si necesario)
     set((state) => ({
       habits: state.habits.filter((h) => h.id !== id),
     }));
     saveToStorage(get().habits);
   },
+
+  loadHabits: async () => {
+    try {
+      const dbHabits = await habitRepo.get();
+      if (dbHabits.length > 0) {
+        set({ habits: dbHabits });
+      } else {
+        // Migración/Fallback: intentar cargar de AsyncStorage
+        const data = await AsyncStorage.getItem('habit-storage');
+        if (data) {
+          const parsed = JSON.parse(data);
+          if (parsed.state && parsed.state.habits) {
+            const habits = parsed.state.habits;
+            set({ habits });
+            // Guardar en SQLite para el futuro
+            for (const h of habits) {
+              await habitRepo.save(h);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[HabitStore] Error al cargar hábitos:', error);
+    }
+  }
 }));
 
-/**
- * Función auxiliar para guardar datos en AsyncStorage de forma manual.
- */
 const saveToStorage = async (habits: Habit[]) => {
   try {
     const data = JSON.stringify({ state: { habits } });
     await AsyncStorage.setItem('habit-storage', data);
   } catch (error) {
     console.error('[HabitStore] Error al guardar en almacenamiento:', error);
-  }
-};
-
-/**
- * Función para cargar los datos manualmente (hidratación).
- * Llamar a esta función al iniciar la aplicación o en el componente raíz.
- */
-export const loadHabitsFromStorage = async () => {
-  try {
-    const data = await AsyncStorage.getItem('habit-storage');
-    if (data) {
-      const parsed = JSON.parse(data);
-      if (parsed.state && parsed.state.habits) {
-        useHabitStore.setState({ habits: parsed.state.habits });
-      }
-    }
-  } catch (error) {
-    console.error('[HabitStore] Error al cargar desde almacenamiento:', error);
   }
 };

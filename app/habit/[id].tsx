@@ -7,15 +7,10 @@ import { es } from 'date-fns/locale';
 
 import { useHabitStore } from '../../store/useHabitStore';
 import { Colors } from '../../constants/colors';
-import { useHabitStats } from '../../components/useHabitStats';
+import { useHabitStats } from '../../hooks/useHabitStats';
 
 /**
- * Pantalla que muestra el detalle de un hábito en específico.
- * Se centra en visualizar la información histórica del usuario: su racha actual resaltada (Gamificación), 
- * su mejor puntuación histórica y su persistencia general (ratio de terminación).
- * Utiliza el router de Expo (basado en file-system) para extraer el ID de URL.
- * 
- * @returns {JSX.Element} Screen container con scrollview y tarjetas visuales.
+ * Pantalla que muestra el detalle de un hábito en específico con lógica real.
  */
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -23,6 +18,17 @@ export default function HabitDetailScreen() {
   
   const allHabits = useHabitStore((state) => state.habits);
   const habit = allHabits.find(h => h.id === id);
+
+  // Obtenemos los stats calculados en base a la lógica centralizada
+  const { 
+    currentStreak, 
+    maxStreak, 
+    completionRate, 
+    loading 
+  } = useHabitStats({
+    habitId: id as string,
+    period: 'total'
+  });
 
   if (!habit) {
     return (
@@ -32,9 +38,6 @@ export default function HabitDetailScreen() {
     );
   }
 
-  // Obtenemos los stats calculados en base a logic/
-  const { currentStreak, maxStreak, completionRate, isLoading } = useHabitStats(habit);
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -42,12 +45,11 @@ export default function HabitDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalles del Hábito</Text>
-        <View style={{ width: 24 }} /> {/* Spacer */}
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
-        {/* Habit Card Header */}
         <View style={styles.card}>
           <View style={[styles.iconContainer, { backgroundColor: habit.colorHex || Colors.primary }]}>
             <Ionicons name={(habit.icono as any) || 'star'} size={48} color="#FFF" />
@@ -56,14 +58,12 @@ export default function HabitDetailScreen() {
           {habit.descripcion && <Text style={styles.habitDesc}>{habit.descripcion}</Text>}
         </View>
 
-        {/* Stats Section */}
         <Text style={styles.sectionTitle}>Estadísticas</Text>
 
         <View style={styles.statsContainer}>
-          {/* Main Streak Tile */}
           <View style={styles.statTilePrimary}>
             <Text style={styles.statTileLabelPrimary}>Racha Actual</Text>
-            {isLoading ? (
+            {loading ? (
               <ActivityIndicator size="small" color="#FFF" style={{ marginTop: 8 }} />
             ) : (
               <View style={styles.streakRow}>
@@ -76,21 +76,18 @@ export default function HabitDetailScreen() {
           </View>
 
           <View style={styles.secondaryStatsRow}>
-            {/* Max Streak */}
             <View style={styles.statTileSmall}>
               <Text style={styles.statTileLabel}>Mejor Racha</Text>
               <Text style={styles.statTileValue}>{maxStreak}</Text>
             </View>
 
-            {/* Completion Rate */}
             <View style={styles.statTileSmall}>
-              <Text style={styles.statTileLabel}>Índice de Éxito</Text>
-              <Text style={styles.statTileValue}>{completionRate}%</Text>
+              <Text style={styles.statTileLabel}>Éxito Total</Text>
+              <Text style={styles.statTileValue}>{completionRate.toFixed(1)}%</Text>
             </View>
           </View>
         </View>
 
-        {/* Metadata Details */}
         <Text style={styles.sectionTitle}>Información</Text>
         <View style={styles.infoBox}>
           <View style={styles.infoRow}>
@@ -119,6 +116,7 @@ export default function HabitDetailScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },

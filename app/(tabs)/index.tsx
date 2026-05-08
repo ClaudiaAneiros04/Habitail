@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Activ
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../../constants/colors';
-import { useHabitStore, loadHabitsFromStorage } from '../../store/useHabitStore';
+import { useHabitStore } from '../../store/useHabitStore';
 import { useLogStore } from '../../store/useLogStore';
 import { Habit, HabitLog, Priority } from '../../types';
 import { getHabitsForToday } from '../../utils/frequencyEngine';
@@ -93,7 +93,7 @@ export default function HomeScreen() {
   // Inicialización de la app
   useEffect(() => {
     const hydrate = async () => {
-      await loadHabitsFromStorage();
+      await useHabitStore.getState().loadHabits();
       setHasHydrated(true);
     };
     hydrate();
@@ -206,7 +206,7 @@ export default function HomeScreen() {
       const newLog: HabitLog = {
         id: logId,
         habitId: habit.id,
-        userId: habit.userId || 'local-user',
+        userId: habit.userId || 'default-user',
         fecha: dateStr,
         completado: true,
         timestampRegistro: new Date().toISOString(),

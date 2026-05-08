@@ -1,23 +1,16 @@
 import * as SQLite from 'expo-sqlite';
 
 /**
- * Promesa singleton de la base de datos.
- * Solo se abre UNA conexión para toda la vida de la app.
- * Esto previene el error de web "Multiple Access Handles" de expo-sqlite,
- * ya que el worker OPFS de SQLite no admite más de una conexión simultánea.
+ * Promesa singleton de la base de datos persistida en globalThis.
+ * Durante el desarrollo (HMR), los módulos se recargan pero globalThis persiste.
+ * Esto previene que se abran múltiples conexiones al mismo archivo habitail.db,
+ * lo cual lanzaría el error "Access Handles cannot be created..." en Web (OPFS).
  */
-let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+const globalDb = globalThis as any;
 
-/**
- * Devuelve la conexión única a la base de datos, inicializando
- * el esquema (CREATE TABLE IF NOT EXISTS) la primera vez que se llama.
- *
- * Al ser una promesa cacheada, todas las llamadas simultáneas comparten
- * la misma apertura y esperan a que el esquema esté listo antes de operar.
- */
 export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
-  if (!_dbPromise) {
-    _dbPromise = (async () => {
+  if (!globalDb._dbPromise) {
+    globalDb._dbPromise = (async () => {
       const db = await SQLite.openDatabaseAsync('habitail.db');
       await db.execAsync(`
         PRAGMA journal_mode = WAL;
@@ -103,7 +96,7 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
       return db;
     })();
   }
-  return _dbPromise;
+  return globalDb._dbPromise;
 };
 
 /**

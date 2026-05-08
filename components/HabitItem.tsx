@@ -4,14 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Habit } from '../types';
 import { Colors } from '../constants/colors';
-import { useHabitStats } from './useHabitStats';
+import { useHabitStats } from '../hooks/useHabitStats';
 
 /**
  * Propiedades del componente HabitItem.
- * @property {Habit} habit - Objeto con toda la información del hábito a renderizar.
- * @property {boolean} completed - Indica si el hábito está marcado como completado o no.
- * @property {(habitId: string) => void} onToggle - Callback que se ejecuta cuando el usuario toca la fila del hábito.
- * @property {number} [streak] - (Opcional) Días consecutivos de racha forzado desde arriba.
  */
 interface HabitItemProps {
   habit: Habit;
@@ -22,27 +18,19 @@ interface HabitItemProps {
 
 /**
  * Renderiza la tarjeta individual para un hábito.
- * Si el hábito está completado, se oscurece y se muestra un checkmark con animación de escalado.
- * Se decidió gestionar el estado fuera (y pasarlo por prop 'completed') para 
- * mantener el componente de UI puramente presentacional, pero internamente consume 'useHabitStats'
- * para pintar la racha si está disponible.
- *
- * @param {HabitItemProps} props - Propiedades del componente.
- * @returns {JSX.Element} Componente TouchableOpacity que envuelve el ítem.
  */
 export default function HabitItem({ habit, completed, onToggle, streak }: HabitItemProps) {
-  // Animación del checkbox
   const checkScale = useRef(new Animated.Value(completed ? 1 : 0)).current;
 
-  // Calculamos la racha internamente si el padre no nos la fuerza
-  const { currentStreak, refetch } = useHabitStats(habit);
+  // Usamos el nuevo hook centralizado
+  const { currentStreak, refresh } = useHabitStats({ 
+    habitId: habit.id,
+    period: 'total' // Queremos la racha total para el badge
+  });
   
-  // Racha definitiva a mostrar (forzada por prop o calculada de bbdd)
   const displayStreak = streak !== undefined ? streak : currentStreak;
-
   const router = useRouter();
 
-  // Reacciona a los cambios en "completed"
   useEffect(() => {
     Animated.spring(checkScale, {
       toValue: completed ? 1 : 0,
@@ -51,15 +39,10 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
       speed: 16,
     }).start();
     
-    // Si completamos/descompletamos, volvemos a calcular la racha
-    refetch();
-  }, [completed, checkScale, refetch]);
+    // Si completamos/descompletamos, invalidamos caché y recalculamos
+    refresh();
+  }, [completed, checkScale, refresh]);
 
-  /**
-   * Navega a la pantalla de detalle inmersiva para ese hábito en específico.
-   * Decisión de UI: Se separa la pulsación sobre la tarjeta (Navegar) 
-   * de la pulsación sobre el checkmark (Completar).
-   */
   const goToDetail = () => {
     router.push(`/habit/${habit.id}`);
   };
@@ -87,7 +70,6 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
               </Text>
             )}
             
-            {/* Badge de Racha. Lo mostramos siempre que > 0 */}
             {displayStreak > 0 && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
@@ -101,7 +83,7 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
         style={[styles.checkbox, completed && styles.checkboxCompleted]}
         onPress={() => onToggle(habit.id)}
         activeOpacity={0.6}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} // Área de tap un poco más generosa para el checkbox
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Animated.View style={{ transform: [{ scale: checkScale }], opacity: checkScale }}>
           <Ionicons name="checkmark" size={20} color="#FFF" />
@@ -110,6 +92,7 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
     </TouchableOpacity>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

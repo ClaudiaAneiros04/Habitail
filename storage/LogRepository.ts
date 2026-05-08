@@ -43,6 +43,8 @@ export interface ILogRepository {
    * los hábitos del usuario. Valor 2 solo si todos los logs del día completaron.
    */
   getHeatmapGlobal(userId: string, fromDate: string, toDate: string): Promise<HeatmapRawRow[]>;
+  getLogsForRangeGlobal(userId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
+  getAll(): Promise<HabitLog[]>;
 }
 
 /**
@@ -310,5 +312,20 @@ export class LogRepository implements ILogRepository {
     );
 
     return rows;
+  }
+
+  async getLogsForRangeGlobal(userId: string, fromDate: string, toDate: string): Promise<HabitLog[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(
+      'SELECT * FROM habit_logs WHERE userId = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha ASC',
+      [userId, fromDate, toDate]
+    );
+    return rows.map(this.mapRowToLog);
+  }
+
+  async getAll(): Promise<HabitLog[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs');
+    return rows.map(this.mapRowToLog);
   }
 }

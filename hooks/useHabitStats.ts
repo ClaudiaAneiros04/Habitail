@@ -158,19 +158,9 @@ export const useHabitStats = ({
         const periodStats = await logRepo.getGlobalStatsByPeriod(userId, fromDate, toDate);
 
         // b) Para las rachas globales necesitamos los logs del periodo.
-        //    No existe getLogsForRangeGlobal en el repo actual; hacemos la query
-        //    directa a través de getGlobalStatsByPeriod ya cargado, y para las
-        //    rachas usamos getByDate iterando... pero eso sería O(N días).
-        //
-        //    DECISIÓN: En vista global, currentStreak y maxStreak se calculan
-        //    sobre el total de logs del periodo. Dado que getLogsForRange solo
-        //    acepta habitId, usamos periodStats.totalCompleted como aproximación
-        //    para las rachas globales en esta versión.
-        //
-        //    TODO: añadir getLogsForRangeGlobal(userId, from, to) al repository
-        //    para calcular rachas globales correctamente en una futura iteración.
-        //    Ver LEARNING.md — Fase 4 — Casos borde pendientes.
-        const result = computeGlobalStats(periodStats, [], new Date());
+        const logs = await logRepo.getLogsForRangeGlobal(userId, fromDate, toDate);
+
+        const result = computeGlobalStats(periodStats, logs, new Date());
         setData(cacheKey, result);
       }
     } catch (err) {

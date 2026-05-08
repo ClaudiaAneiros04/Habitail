@@ -20,10 +20,19 @@ export const useUserStore = create<UserStore>((set, get) => ({
     set({ user: updatedUser });
   },
   loadUser: async () => {
-    const user = await userRepo.get();
-    if (user) {
-      set({ user });
+    let user = await userRepo.get();
+    if (!user) {
+      // Crear usuario por defecto si no existe (Fase inicial/Demo)
+      user = {
+        id: 'default-user',
+        username: 'Usuario',
+        fechaRegistro: new Date().toISOString(),
+        puntos: 0,
+        onboardingCompleted: true,
+      };
+      await userRepo.save(user);
     }
+    set({ user });
   },
 }));
 
