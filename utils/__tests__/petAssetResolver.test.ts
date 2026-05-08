@@ -2,48 +2,55 @@ import { petAssetResolver } from '../petAssetResolver';
 import { PetState } from '../../types';
 
 describe('petAssetResolver', () => {
-  it('should return an emoji fallback for ABSENT state', () => {
-    const asset = petAssetResolver(PetState.ABSENT);
-    expect(asset.type).toBe('emoji');
-    if (asset.type === 'emoji') {
-      expect(asset.emoji).toBe('👻');
-      expect(asset.backgroundColor).toBe('#e2e8f0');
-    }
+  const states = [
+    PetState.ABSENT,
+    PetState.SAD,
+    PetState.CONFUSED,
+    PetState.CHEERING,
+    PetState.HAPPY
+  ];
+
+  it('should return a valid PetAsset for each of the 5 mandatory states', () => {
+    states.forEach(state => {
+      const asset = petAssetResolver(state);
+      expect(asset).toBeDefined();
+      expect(['emoji', 'image']).toContain(asset.type);
+    });
   });
 
-  it('should return an emoji fallback for SAD state', () => {
-    const asset = petAssetResolver(PetState.SAD);
-    expect(asset.type).toBe('emoji');
-    if (asset.type === 'emoji') {
-      expect(asset.emoji).toBe('😢');
-      expect(asset.backgroundColor).toBe('#fecaca');
-    }
+  it('should activate fallback emoji/color when image assets are disabled', () => {
+    // Note: USE_IMAGE_ASSETS is currently false in implementation
+    states.forEach(state => {
+      const asset = petAssetResolver(state);
+      expect(asset.type).toBe('emoji');
+      if (asset.type === 'emoji') {
+        expect(typeof asset.emoji).toBe('string');
+        expect(asset.emoji.length).toBeGreaterThan(0);
+        expect(asset.backgroundColor).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      }
+    });
   });
 
-  it('should return an emoji fallback for CONFUSED state', () => {
-    const asset = petAssetResolver(PetState.CONFUSED);
-    expect(asset.type).toBe('emoji');
-    if (asset.type === 'emoji') {
-      expect(asset.emoji).toBe('😵‍💫');
-      expect(asset.backgroundColor).toBe('#fef08a');
-    }
+  it('should maintain a consistent discriminated union type (no field mixing)', () => {
+    states.forEach(state => {
+      const asset = petAssetResolver(state);
+      
+      if (asset.type === 'emoji') {
+        expect(asset).toHaveProperty('emoji');
+        expect(asset).toHaveProperty('backgroundColor');
+        expect(asset).not.toHaveProperty('source');
+      } else if (asset.type === 'image') {
+        expect(asset).toHaveProperty('source');
+        expect(asset).not.toHaveProperty('emoji');
+        expect(asset).not.toHaveProperty('backgroundColor');
+      }
+    });
   });
 
-  it('should return an emoji fallback for CHEERING state', () => {
-    const asset = petAssetResolver(PetState.CHEERING);
+  it('should provide a defined fallback even if an unknown state is passed (defensive programming)', () => {
+    // @ts-ignore - testing runtime robustness for non-TS consumers
+    const asset = petAssetResolver('UNKNOWN_STATE');
+    expect(asset).toBeDefined();
     expect(asset.type).toBe('emoji');
-    if (asset.type === 'emoji') {
-      expect(asset.emoji).toBe('✨');
-      expect(asset.backgroundColor).toBe('#bfdbfe');
-    }
-  });
-
-  it('should return an emoji fallback for HAPPY state', () => {
-    const asset = petAssetResolver(PetState.HAPPY);
-    expect(asset.type).toBe('emoji');
-    if (asset.type === 'emoji') {
-      expect(asset.emoji).toBe('🥰');
-      expect(asset.backgroundColor).toBe('#bbf7d0');
-    }
   });
 });

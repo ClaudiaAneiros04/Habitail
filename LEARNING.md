@@ -531,3 +531,12 @@ Para garantizar la disponibilidad visual de la app en cualquier momento:
 - Se configuró la función con un flag `USE_IMAGE_ASSETS` (inicialmente `false`) para que no utilice `require()` en archivos faltantes. Esto previene un error duro de Metro Bundler en tiempo de compilación.
 - **Tamaño estándar de assets esperado:** Los PNG finales deben ser de 128x128 píxeles con fondo transparente.
 - Este diseño asegura que cuando los assets gráficos definitivos estén listos, la transición solo requiera colocar los archivos en la ruta y cambiar el flag a `true`, sin alterar componentes visuales ni tests.
+
+## 2. Casos Borde y Decisiones de Assets (Fase 5)
+
+| Caso Borde | Impacto / Riesgo | Compensación Aplicada / Recomendación |
+| :--- | :--- | :--- |
+| **PNG sin fondo transparente** | El sprite taparía el color de fondo del contenedor o el overlay de la barra de vida/UI, rompiendo la estética "pixel-art" limpia. | **Compensación:** Si un asset llega sin canal alfa, se debe remover el fondo mediante edición externa. En `petAssetResolver`, se asume transparencia total para respetar el `backgroundColor` del placeholder. |
+| **Diferencias de rendering Emojis (iOS vs Android)** | Los emojis varían en estilo y saturación (3D en Apple, plano en Android/Google). | **Solución:** Se han seleccionado colores de fondo pasteles universales que armonizan con ambas familias de emojis. Se recomienda no usar sombras internas en los contenedores de placeholders para evitar choques visuales. |
+| **Licencias restrictivas (Uso no comercial)** | Algunos assets de itch.io/lospec pueden prohibir uso comercial o requerir atribución estricta. | **Protocolo:** Todos los assets externos DEBEN listarse en `assets/LICENSE.md`. En caso de duda o licencia NC (No Comercial), se mantendrá el fallback de emoji o se buscarán alternativas CC0. |
+| **Fallo de carga o Asset inexistente** | Un `require` a un archivo físico inexistente rompe el build de Metro. | **Prevención:** El sistema de "doble vía" con `USE_IMAGE_ASSETS` actúa como un disyuntor (circuit breaker). Si se activa, se garantiza que cada `PetState` obligatorio tiene un puntero válido o un fallback defensivo. |
