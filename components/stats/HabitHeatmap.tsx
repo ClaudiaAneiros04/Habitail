@@ -20,6 +20,7 @@ interface HabitHeatmapProps {
  */
 export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
   const { user } = useUserStore();
+  const currentYear = new Date().getFullYear();
   
   // Obtenemos los datos reales usando el hook de lógica
   const { data, isLoading, error } = useHeatmapData({
@@ -76,8 +77,8 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
         >
           <ContributionGraph
             values={data}
-            endDate={new Date()}
-            numDays={365}
+            endDate={new Date(currentYear, 11, 31)}
+            numDays={((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0) ? 366 : 365}
             width={980}
             height={220}
             chartConfig={chartConfig}

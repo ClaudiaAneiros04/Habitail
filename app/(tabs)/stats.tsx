@@ -43,7 +43,9 @@ export default function StatsScreen() {
   const [isLogsLoading, setIsLogsLoading] = useState(false);
 
   // Mapeo de TabType a StatsPeriod/AggregateMode
-  const period = activeTab === 'Semanal' ? 'weekly' : 'monthly';
+  const period: 'weekly' | 'monthly' | 'total' = 
+    activeTab === 'Semanal' ? 'weekly' : 
+    activeTab === 'Mensual' ? 'monthly' : 'total';
 
   // 1. Obtener métricas clave (Rachas y Tasas) usando el hook de lógica centralizada
   const { 
@@ -53,7 +55,7 @@ export default function StatsScreen() {
     loading: isStatsLoading 
   } = useHabitStats({
     habitId: selectedHabitId,
-    period: period === 'weekly' ? 'weekly' : 'monthly',
+    period,
     userId: user?.id
   });
 

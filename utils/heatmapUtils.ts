@@ -65,11 +65,10 @@ export interface HeatmapDateRange {
  * @returns HeatmapDateRange con fromDate y toDate en formato YYYY-MM-DD.
  */
 export const buildHeatmapRange = (referenceDate: Date = new Date()): HeatmapDateRange => {
-  const today = startOfDay(referenceDate);
-  const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+  const year = referenceDate.getFullYear();
   return {
-    fromDate: fmt(subDays(today, 364)), // 365 días totales: today - 364 días
-    toDate: fmt(today),
+    fromDate: `${year}-01-01`,
+    toDate: `${year}-12-31`,
   };
 };
 
