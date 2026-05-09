@@ -219,10 +219,10 @@ maneja correctamente todos los tipos posibles:
 ```ts
 // LogRepository.ts — mapRowToLog
 completado: Number(row.completado) === 1,
-// Number("0") === 0 → false ✓
-// Number("1") === 1 → true  ✓
-// Number(0)   === 0 → false ✓
-// Number(1)   === 1 → true  ✓
+// Number("0") === 0 → false 
+// Number("1") === 1 → true  
+// Number(0)   === 0 → false 
+// Number(1)   === 1 → true  
 ```
 
 Se aplicó la misma robustez al guardar, para evitar que valores truthy no-boolean
@@ -257,8 +257,8 @@ Cambiar la **semántica del toggle** según la dirección de la acción:
 - **Desmarcar** → `deleteLog(logId)` — **elimina** la fila de la DB.
 
 Así el historial solo puede ver tres estados limpios:
-- Log con `completado: true` → ✓ verde (COMPLETED)
-- Sin log + día pasado/hoy → ✗ roja suave (FAILED por ausencia, no por registro negativo)
+- Log con `completado: true` →  verde (COMPLETED)
+- Sin log + día pasado/hoy →  roja suave (FAILED por ausencia, no por registro negativo)
 - Día futuro → sin indicador (NONE)
 
 Se añadió `deleteById` a `LogRepository` y `deleteLog` a `useLogStore` para
@@ -318,8 +318,8 @@ El JSX mezclaba texto literal (emoji + espacios) con expresiones dentro de un
 hijos directos de un `<View>`:
 
 ```tsx
-// ❌ Genera nodos de texto sueltos
-<Text>🔥 {displayStreak} {displayStreak === 1 ? 'día' : 'días'}</Text>
+//  Genera nodos de texto sueltos
+<Text> {displayStreak} {displayStreak === 1 ? 'día' : 'días'}</Text>
 //    ^^^     ^^^^^^^^^      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //   texto    expresión             expresión → tres nodos separados
 ```
@@ -329,8 +329,8 @@ Unificar todo el contenido en un único string mediante un template literal,
 eliminando los nodos de texto intermedios:
 
 ```tsx
-// ✅ Un único nodo de texto
-<Text>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
+//  Un único nodo de texto
+<Text>{` ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
 ```
 
 ---
@@ -432,13 +432,13 @@ Los repos se guardan en `useRef` para evitar recrearlos en cada render (son obje
 
 | Caso | Estado | Solución actual |
 |---|---|---|
-| Hábito sin logs | ✅ Cubierto | Retorna `EMPTY_STATS` (todos 0) |
-| `totalDays = 0` (periodo vacío) | ✅ Cubierto | `completionRate = 0`, sin división por cero |
-| Hábito `WEEKLY`: `completionRate` sobreestimado | ⚠️ Documentado | Denominador son días calendario, no semanas activas |
-| Hábito `MONTHLY`: racha semanal vs mensual | ⚠️ Pendiente | `calculateMaxStreak` asume frecuencia diaria |
-| Vista global: `currentStreak` y `maxStreak` | ⚠️ Pendiente | Se pasa `logs=[]` → rachas siempre 0. Requiere `getLogsForRangeGlobal` |
-| Zona horaria distinta a UTC | ⚠️ Riesgo conocido | `startOfDay` usa TZ local; si el servidor CI está en UTC y el usuario en UTC+2, los rangos pueden desplazarse 1 día en el límite |
-| Hábito eliminado (no encontrado en DB) | ✅ Cubierto | `getById` devuelve null → retorna `EMPTY_STATS` |
+| Hábito sin logs |  Cubierto | Retorna `EMPTY_STATS` (todos 0) |
+| `totalDays = 0` (periodo vacío) |  Cubierto | `completionRate = 0`, sin división por cero |
+| Hábito `WEEKLY`: `completionRate` sobreestimado |  Documentado | Denominador son días calendario, no semanas activas |
+| Hábito `MONTHLY`: racha semanal vs mensual |  Pendiente | `calculateMaxStreak` asume frecuencia diaria |
+| Vista global: `currentStreak` y `maxStreak` |  Pendiente | Se pasa `logs=[]` → rachas siempre 0. Requiere `getLogsForRangeGlobal` |
+| Zona horaria distinta a UTC |  Riesgo conocido | `startOfDay` usa TZ local; si el servidor CI está en UTC y el usuario en UTC+2, los rangos pueden desplazarse 1 día en el límite |
+| Hábito eliminado (no encontrado en DB) |  Cubierto | `getById` devuelve null → retorna `EMPTY_STATS` |
 
 ---
 
@@ -471,13 +471,13 @@ CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fech
 
 | Caso | Estado | Detalle |
 |---|---|---|
-| Días sin hábitos activos | ✅ Cubierto | Sin logs → sin fila SQL → value=0 en mergeHeatmapData |
-| Hábito semanal, día no programado | ✅ Cubierto | Si no hay log ese día, no hay fila → value=0 (no incumplido) |
-| Primer uso sin logs | ✅ Cubierto | Array vacío de SQL → 365 entradas value=0, sin error |
-| Rango que cruza cambio de año | ✅ Cubierto | `subDays` y `eachDayOfInterval` de date-fns manejan bisiestos y cruces |
-| Zona horaria UTC vs local | ⚠️ Riesgo conocido | `DATE()` en SQLite usa el offset del string ISO; check-ins de madrugada en TZ negativa pueden caer en el día UTC siguiente |
-| value=1 en práctica | ⚠️ Informativo | La app borra logs al desmarcar (Error 5); en la práctica value=1 casi nunca aparece. Las queries lo soportan correctamente si la semántica cambia |
-| Modo global: hábito activo sin log | ⚠️ Limitación conocida | SQL solo evalúa días CON logs. Un hábito activo no completado (sin log) aparece como value=0, no value=1. Requeriría JOIN con habits + lógica de frecuencia en SQL (CTE complejo, reservado para futura iteración) |
+| Días sin hábitos activos |  Cubierto | Sin logs → sin fila SQL → value=0 en mergeHeatmapData |
+| Hábito semanal, día no programado |  Cubierto | Si no hay log ese día, no hay fila → value=0 (no incumplido) |
+| Primer uso sin logs |  Cubierto | Array vacío de SQL → 365 entradas value=0, sin error |
+| Rango que cruza cambio de año |  Cubierto | `subDays` y `eachDayOfInterval` de date-fns manejan bisiestos y cruces |
+| Zona horaria UTC vs local |  Riesgo conocido | `DATE()` en SQLite usa el offset del string ISO; check-ins de madrugada en TZ negativa pueden caer en el día UTC siguiente |
+| value=1 en práctica |  Informativo | La app borra logs al desmarcar (Error 5); en la práctica value=1 casi nunca aparece. Las queries lo soportan correctamente si la semántica cambia |
+| Modo global: hábito activo sin log |  Limitación conocida | SQL solo evalúa días CON logs. Un hábito activo no completado (sin log) aparece como value=0, no value=1. Requeriría JOIN con habits + lógica de frecuencia en SQL (CTE complejo, reservado para futura iteración) |
 
 ---
 
