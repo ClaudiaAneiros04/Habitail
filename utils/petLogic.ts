@@ -1,5 +1,12 @@
 import { ImageSourcePropType } from 'react-native';
-import { PetState } from '../types';
+import { PetState, Priority } from '../types';
+
+export interface HabitCheckInResult {
+  id: string;
+  prioridad: Priority | string;
+  completado: boolean;
+}
+
 
 export type PetAsset = 
   | { type: 'image'; source: ImageSourcePropType }
@@ -72,3 +79,53 @@ export function petAssetResolver(state: PetState): PetAsset {
     backgroundColor: fallback.backgroundColor,
   };
 }
+
+/**
+ * Calcula la nueva vida de la mascota tras aplicar los deltas de salud de los check-ins del día.
+ * Función pura, no modifica el estado externo.
+ * Un hábito sin log para el día cuenta como fallido (completado: false).
+ * 
+ * @param vidaActual - El nivel de vida actual antes de aplicar los cambios [0, 100].
+ * @param habitos - Lista de resultados de los hábitos activos correspondientes a ese día.
+ * @returns El nuevo nivel de vida asegurado en el rango de [0, 100] mediante clamp.
+ */
+export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult[]): number {
+  if (habitos.length === 0) {
+    return vidaActual;
+  }
+
+  let deltaTotal = 0;
+
+  for (const habit of habitos) {
+    let delta = 0;
+
+    switch (habit.prioridad) {
+      case Priority.ESSENTIAL:
+      case 'ESSENTIAL':
+        delta = 20;
+        break;
+      case Priority.NORMAL:
+      case 'NORMAL':
+        delta = 10;
+        break;
+      case Priority.FLEXIBLE:
+      case 'FLEXIBLE':
+        delta = 5;
+        break;
+      default:
+        delta = 0;
+    }
+
+    if (habit.completado) {
+      deltaTotal += delta;
+    } else {
+      deltaTotal -= delta;
+    }
+  }
+
+  const nuevaVida = vidaActual + deltaTotal;
+  
+  // Clamp [0, 100]
+  return Math.max(0, Math.min(100, nuevaVida));
+}
+

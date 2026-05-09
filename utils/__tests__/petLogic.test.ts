@@ -1,5 +1,5 @@
-import { petAssetResolver, getPetState } from '../petLogic';
-import { PetState } from '../../types';
+import { petAssetResolver, getPetState, applyHealthDelta, HabitCheckInResult } from '../petLogic';
+import { PetState, Priority } from '../../types';
 
 describe('petLogic', () => {
   describe('getPetState', () => {
@@ -90,6 +90,65 @@ describe('petLogic', () => {
       const asset = petAssetResolver('UNKNOWN_STATE');
       expect(asset).toBeDefined();
       expect(asset.type).toBe('emoji');
+    });
+  });
+
+  describe('applyHealthDelta', () => {
+    it('should return the current life if habits array is empty', () => {
+      expect(applyHealthDelta(50, [])).toBe(50);
+      expect(applyHealthDelta(100, [])).toBe(100);
+      expect(applyHealthDelta(0, [])).toBe(0);
+    });
+
+    it('should apply positive deltas for completed habits correctly', () => {
+      const habitos: HabitCheckInResult[] = [
+        { id: '1', prioridad: Priority.ESSENTIAL, completado: true }, // +20
+        { id: '2', prioridad: Priority.NORMAL, completado: true },    // +10
+        { id: '3', prioridad: Priority.FLEXIBLE, completado: true }   // +5
+      ];
+      // 50 + 20 + 10 + 5 = 85
+      expect(applyHealthDelta(50, habitos)).toBe(85);
+    });
+
+    it('should apply negative deltas for failed habits correctly', () => {
+      const habitos: HabitCheckInResult[] = [
+        { id: '1', prioridad: Priority.ESSENTIAL, completado: false }, // -20
+        { id: '2', prioridad: Priority.NORMAL, completado: false },    // -10
+        { id: '3', prioridad: Priority.FLEXIBLE, completado: false }   // -5
+      ];
+      // 80 - 20 - 10 - 5 = 45
+      expect(applyHealthDelta(80, habitos)).toBe(45);
+    });
+
+    it('should mix positive and negative deltas correctly', () => {
+      const habitos: HabitCheckInResult[] = [
+        { id: '1', prioridad: Priority.ESSENTIAL, completado: true },  // +20
+        { id: '2', prioridad: Priority.NORMAL, completado: false },    // -10
+      ];
+      // 50 + 20 - 10 = 60
+      expect(applyHealthDelta(50, habitos)).toBe(60);
+    });
+
+    it('should clamp the final health strictly to [0, 100]', () => {
+      const habitosMax: HabitCheckInResult[] = [
+        { id: '1', prioridad: Priority.ESSENTIAL, completado: true }, // +20
+      ];
+      // 90 + 20 = 110 -> 100
+      expect(applyHealthDelta(90, habitosMax)).toBe(100);
+
+      const habitosMin: HabitCheckInResult[] = [
+        { id: '1', prioridad: Priority.ESSENTIAL, completado: false }, // -20
+      ];
+      // 10 - 20 = -10 -> 0
+      expect(applyHealthDelta(10, habitosMin)).toBe(0);
+    });
+
+    it('should handle missing or invalid priority by defaulting to 0 delta', () => {
+      const habitos: HabitCheckInResult[] = [
+        { id: '1', prioridad: 'UNKNOWN_PRIORITY', completado: true },
+      ];
+      // 50 + 0 = 50
+      expect(applyHealthDelta(50, habitos)).toBe(50);
     });
   });
 });
