@@ -113,6 +113,7 @@ export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult
         delta = 5;
         break;
       default:
+        console.warn(`Prioridad desconocida o no definida para el hábito ${habit.id}: ${habit.prioridad}`);
         delta = 0;
     }
 

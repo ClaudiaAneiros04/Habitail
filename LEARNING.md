@@ -540,3 +540,19 @@ Para garantizar la disponibilidad visual de la app en cualquier momento:
 | **Diferencias de rendering Emojis (iOS vs Android)** | Los emojis varían en estilo y saturación (3D en Apple, plano en Android/Google). | **Solución:** Se han seleccionado colores de fondo pasteles universales que armonizan con ambas familias de emojis. Se recomienda no usar sombras internas en los contenedores de placeholders para evitar choques visuales. |
 | **Licencias restrictivas (Uso no comercial)** | Algunos assets de itch.io/lospec pueden prohibir uso comercial o requerir atribución estricta. | **Protocolo:** Todos los assets externos DEBEN listarse en `assets/LICENSE.md`. En caso de duda o licencia NC (No Comercial), se mantendrá el fallback de emoji o se buscarán alternativas CC0. |
 | **Fallo de carga o Asset inexistente** | Un `require` a un archivo físico inexistente rompe el build de Metro. | **Prevención:** El sistema de "doble vía" con `USE_IMAGE_ASSETS` actúa como un disyuntor (circuit breaker). Si se activa, se garantiza que cada `PetState` obligatorio tiene un puntero válido o un fallback defensivo. |
+
+---
+
+# Lógica de Negocio — Fase 5: Lógica de la Mascota (`petLogic.ts`)
+
+## Casos Borde Documentados y Resoluciones
+
+Durante la implementación de `getPetState` y `applyHealthDelta`, se abordaron los siguientes escenarios:
+
+| Caso Borde | Comportamiento Implementado |
+| :--- | :--- |
+| **Vida baja (`vida = 0`) con check-ins exitosos** | Al aplicar `applyHealthDelta(0, [...completados])`, la suma de deltas positivos levanta la vida por encima de 0, y el `clamp` natural permite la recuperación. La mascota no se queda bloqueada en `absent`. |
+| **Vida máxima (`vida = 100`) con exceso de éxito** | Las rachas perfectas generan deltas positivos que superarían los 100 HP. La función clampa estrictamente el techo máximo en `100`, evitando valores imposibles como `120`. |
+| **Orden de check-ins mixto** | Al procesar arrays con prioridades dispares (ej. `[Esencial Fallido (-20), Flexible Completado (+5)]`), la lógica suma linealmente un delta neto total antes de sumar a la vida base y aplicar el clamp. El orden de los elementos en el array no altera el resultado final. |
+| **Hábitos sin prioridad o prioridad corrupta** | Si llega un hábito con una prioridad no listada en el enum, se ignora su impacto (`delta = 0`) y se lanza un `console.warn` en consola para evitar fallos silenciosos o NaN, garantizando la pureza matemática de la función. |
+| **Hábito no realizado / sin log explícito** | Por regla de negocio, un hábito programado que no haya sido completado asume `completado: false` por defecto en la capa de datos. `applyHealthDelta` penaliza este estado aplicando la penalización íntegra según su prioridad, sin interpretarlo como neutral. |
