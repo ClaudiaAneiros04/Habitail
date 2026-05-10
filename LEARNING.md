@@ -581,3 +581,13 @@ WHERE fecha = ? AND completado = 1 AND habitId IN (...)
 **Por qué es ultra-eficiente:**
 - El índice compuesto `idx_habit_logs_habit_fecha (habitId, fecha)` es utilizado a la perfección. SQLite realiza N búsquedas rápidas (donde N es el número de IDs en la cláusula IN) usando la clave primaria compuesta del índice.
 - Devuelve únicamente los IDs de los hábitos que SÍ se completaron. El filtrado final para descubrir los "incumplidos" se hace mediante una simple diferencia de conjuntos (`Set`) en TypeScript. Esto evita traer logs enteros a memoria.
+
+## 3. Casos Borde y Decisiones de Diseño
+
+| Caso Borde | Resolución / Comportamiento |
+| :--- | :--- |
+| **Zona Horaria (Medianoche)** | El job utiliza `format(new Date(), 'yyyy-MM-dd')` y `startOfYesterday()`. Si un usuario abre la app a las 00:01 AM, "ayer" se resuelve correctamente como el día calendario anterior en hora local, asegurando que la penalización se aplique sobre el día que acaba de terminar. |
+| **Hábito Semanal / Inactivo** | Se utiliza `frequencyEngine.getHabitsForToday(habits, yesterday)`. Si ayer el hábito no estaba programado (ej: racha de L-V y ayer fue domingo), el motor lo excluye de la lista de "esperados" y no se genera penalización. |
+| **App sin abrir varios días** | **Decisión de Diseño:** El job solo penaliza por "ayer". No es acumulativo. Si el usuario no abre la app en una semana, solo recibirá la penalización del último día incumplido. Esto evita que la mascota muera repentinamente por un periodo de ausencia largo, incentivando el retorno sin ser excesivamente punitivo. |
+| **Primera apertura / Sin hábitos** | Si `lastPenaltyAppliedDate` es `null`, el job se ejecuta por primera vez. Si no hay hábitos activos ayer, el delta es `0` y simplemente se registra la fecha de hoy. No se lanzan errores por arrays vacíos. |
+| **Vida ya en 0** | Si la mascota ya está en estado `ABSENT` (vida=0), el job registra igualmente la ejecución para hoy pero omite el cálculo de logs y la aplicación de deltas, evitando procesos innecesarios y notificaciones redundantes. |
