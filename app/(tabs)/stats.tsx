@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: Theme.spacing.md,
-    paddingTop: Theme.spacing.md,
+    paddingTop: 48,
     paddingBottom: Theme.spacing.xl,
   },
   headerTextContainer: {
