@@ -43,6 +43,7 @@ export interface User {
   fechaRegistro: string; // From ER
   puntos: number; // From ER
   onboardingCompleted: boolean; // From Frontend
+  lastPenaltyAppliedDate?: string; // App Init Job
 }
 
 export interface Pet {

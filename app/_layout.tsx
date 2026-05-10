@@ -6,9 +6,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../constants/colors';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDb } from '../storage/database';
+import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
 import '../i18n';
 
 export default function RootLayout() {
+  useDailyPenaltyJob();
   /**
    * Bloquea el renderizado de las pantallas hasta que la base de datos esté
    * completamente inicializada (tablas creadas). Esto elimina la condición de

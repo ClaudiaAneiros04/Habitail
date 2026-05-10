@@ -45,6 +45,11 @@ export interface ILogRepository {
   getHeatmapGlobal(userId: string, fromDate: string, toDate: string): Promise<HeatmapRawRow[]>;
   getLogsForRangeGlobal(userId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
   getAll(): Promise<HabitLog[]>;
+  /**
+   * Identifica qué hábitos de la lista proporcionada no tienen log completado en la fecha indicada.
+   * Evita cargar todos los logs en memoria iterando en JavaScript.
+   */
+  getMissedHabitsForDate(date: string, habits: import('../types').Habit[]): Promise<import('../types').Habit[]>;
 }
 
 /**
@@ -327,5 +332,29 @@ export class LogRepository implements ILogRepository {
     const db = await getDb();
     const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs');
     return rows.map(this.mapRowToLog);
+  }
+
+  /**
+   * Consulta los hábitos que no fueron completados en la fecha dada.
+   * Un hábito cuenta como incumplido si no tiene un log en la fecha o si el log tiene completado=0.
+   */
+  async getMissedHabitsForDate(date: string, habits: import('../types').Habit[]): Promise<import('../types').Habit[]> {
+    if (habits.length === 0) return [];
+    
+    const db = await getDb();
+    const habitIds = habits.map(h => h.id);
+    const placeholders = habitIds.map(() => '?').join(',');
+    
+    // Obtenemos los IDs de los hábitos que SÍ tienen un log completado en esta fecha
+    const rows = await db.getAllAsync<{habitId: string}>(
+      `SELECT habitId FROM habit_logs 
+       WHERE fecha = ? AND completado = 1 AND habitId IN (${placeholders})`,
+      [date, ...habitIds]
+    );
+    
+    const completedIds = new Set(rows.map(r => r.habitId));
+    
+    // Retornamos los hábitos que NO están en el set de completados
+    return habits.filter(h => !completedIds.has(h.id));
   }
 }

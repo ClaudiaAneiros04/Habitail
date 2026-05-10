@@ -130,3 +130,34 @@ export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult
   return Math.max(0, Math.min(100, nuevaVida));
 }
 
+/**
+ * Calcula el delta negativo total de los hábitos incumplidos del día anterior.
+ * Función pura. Prioridad: Esencial = -20, Normal = -10, Flexible = -5.
+ * 
+ * @param missedHabits - Lista de hábitos que no fueron completados.
+ * @returns El delta negativo total (siempre <= 0).
+ */
+export function calculatePenaltyDelta(missedHabits: import('../types').Habit[]): number {
+  let delta = 0;
+  for (const habit of missedHabits) {
+    switch (habit.nivelPrioridad) {
+      case Priority.ESSENTIAL:
+      case 'ESSENTIAL':
+        delta -= 20;
+        break;
+      case Priority.NORMAL:
+      case 'NORMAL':
+        delta -= 10;
+        break;
+      case Priority.FLEXIBLE:
+      case 'FLEXIBLE':
+        delta -= 5;
+        break;
+      default:
+        console.warn(`Prioridad desconocida o no definida para el hábito ${habit.id}: ${habit.nivelPrioridad}`);
+        break;
+    }
+  }
+  return delta;
+}
+

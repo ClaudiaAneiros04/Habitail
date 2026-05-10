@@ -556,3 +556,28 @@ Durante la implementación de `getPetState` y `applyHealthDelta`, se abordaron l
 | **Orden de check-ins mixto** | Al procesar arrays con prioridades dispares (ej. `[Esencial Fallido (-20), Flexible Completado (+5)]`), la lógica suma linealmente un delta neto total antes de sumar a la vida base y aplicar el clamp. El orden de los elementos en el array no altera el resultado final. |
 | **Hábitos sin prioridad o prioridad corrupta** | Si llega un hábito con una prioridad no listada en el enum, se ignora su impacto (`delta = 0`) y se lanza un `console.warn` en consola para evitar fallos silenciosos o NaN, garantizando la pureza matemática de la función. |
 | **Hábito no realizado / sin log explícito** | Por regla de negocio, un hábito programado que no haya sido completado asume `completado: false` por defecto en la capa de datos. `applyHealthDelta` penaliza este estado aplicando la penalización íntegra según su prioridad, sin interpretarlo como neutral. |
+
+---
+
+# Lógica de Negocio — Fase 5: Job de Penalización Diaria
+
+## 1. Diseño del Job (`useDailyPenaltyJob`)
+Se implementó un orquestador silencioso que corre cada vez que la app arranca (`app/_layout.tsx`), evaluando si los hábitos del día anterior se incumplieron y aplicando la penalización correspondiente a la salud de la mascota.
+
+**Características de diseño:**
+- **Idempotencia**: Utiliza un registro `lastPenaltyAppliedDate` en el usuario para garantizar que no se apliquen penalizaciones dobles por el mismo día, sin importar cuántas veces se abra o cierre la app.
+- **Eficiencia en memoria**: No carga el historial para buscar fallos. Delega la búsqueda a `LogRepository.getMissedHabitsForDate`.
+- **Inmunidad a zona horaria**: Utiliza `startOfYesterday()` y formato `YYYY-MM-DD` local, asegurando que "ayer" tenga sentido semántico para el usuario en su zona horaria actual.
+- **Short-circuiting**: Si la mascota ya tiene 0 de vida, el job solo actualiza la fecha de ejecución y termina.
+
+## 2. Optimización de la Query de Incumplimientos
+La función `getMissedHabitsForDate(date, habits)` implementada en `LogRepository` utiliza el operador `IN` de SQLite para cruzar la lista de hábitos activos con los logs completados en una sola query:
+
+```sql
+SELECT habitId FROM habit_logs 
+WHERE fecha = ? AND completado = 1 AND habitId IN (...)
+```
+
+**Por qué es ultra-eficiente:**
+- El índice compuesto `idx_habit_logs_habit_fecha (habitId, fecha)` es utilizado a la perfección. SQLite realiza N búsquedas rápidas (donde N es el número de IDs en la cláusula IN) usando la clave primaria compuesta del índice.
+- Devuelve únicamente los IDs de los hábitos que SÍ se completaron. El filtrado final para descubrir los "incumplidos" se hace mediante una simple diferencia de conjuntos (`Set`) en TypeScript. Esto evita traer logs enteros a memoria.

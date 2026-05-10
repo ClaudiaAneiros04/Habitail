@@ -22,7 +22,8 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
           avatar TEXT,
           fechaRegistro TEXT NOT NULL,
           puntos INTEGER NOT NULL DEFAULT 0,
-          onboardingCompleted INTEGER NOT NULL DEFAULT 0
+          onboardingCompleted INTEGER NOT NULL DEFAULT 0,
+          lastPenaltyAppliedDate TEXT
         );
 
         CREATE TABLE IF NOT EXISTS pets (
@@ -93,6 +94,14 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
         -- de toda la tabla habit_logs para localizar los registros de un usuario.
         CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
       `);
+
+      // Migración manual segura para añadir la columna en instalaciones existentes
+      try {
+        await db.execAsync("ALTER TABLE users ADD COLUMN lastPenaltyAppliedDate TEXT;");
+      } catch (e) {
+        // Ignorar el error si la columna ya existe
+      }
+
       return db;
     })();
   }
