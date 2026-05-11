@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 48,
     paddingBottom: 16,
   },
   backButton: { padding: 8, backgroundColor: Colors.surface, borderRadius: 12 },

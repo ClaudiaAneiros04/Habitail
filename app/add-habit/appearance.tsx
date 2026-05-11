@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 16,
+    paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16,
   },
   backButton: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
