@@ -12,6 +12,7 @@ import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
 import { MiniPet } from '../../components/Pet/MiniPet';
 import { usePetStore } from '../../store/usePetStore';
+import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
 
 // Native Date Helpers
 /**
@@ -92,6 +93,7 @@ export default function HomeScreen() {
   const deleteLog = useLogStore((state) => state.deleteLog);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
   const pet = usePetStore((state) => state.pet);
+  const { markComplete, markIncomplete } = useHabitCheckIn();
 
   // Inicialización de la app
   useEffect(() => {
@@ -187,25 +189,22 @@ export default function HomeScreen() {
     const logId = `${habit.id}_${dateStr}`;
 
     if (isCurrentlyCompleted) {
-      // El usuario DESMARCA: eliminamos el registro de la DB.
-      // Semántica: "sin registro" (NONE) en lugar de "incumplido" (FAILED).
-      // Actualización optimista: quitamos el log del mapa local.
+      // El usuario DESMARCA: eliminamos el registro de la DB usando el hook de gamificación
       setCompletedHabitsObj(prev => {
         const next = { ...prev };
         delete next[habit.id];
         return next;
       });
       try {
-        await deleteLog(logId);
+        await markIncomplete(habit.id, selectedDate);
       } catch (error) {
-        console.error('Failed to delete log', error);
-        // Revertir optimismo: restaurar el log anterior
+        console.error('Failed to mark incomplete', error);
         if (currentLog) {
           setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: currentLog }));
         }
       }
     } else {
-      // El usuario MARCA como completado: guardamos un log con completado:true.
+      // El usuario MARCA como completado: guardamos usando el hook de gamificación
       const newLog: HabitLog = {
         id: logId,
         habitId: habit.id,
@@ -214,13 +213,11 @@ export default function HomeScreen() {
         completado: true,
         timestampRegistro: new Date().toISOString(),
       };
-      // Actualización optimista
       setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: newLog }));
       try {
-        await addLog(newLog);
+        await markComplete(habit.id, selectedDate);
       } catch (error) {
-        console.error('Failed to save log', error);
-        // Revertir optimismo si falla
+        console.error('Failed to mark complete', error);
         setCompletedHabitsObj(prev => {
           const reverted = { ...prev };
           if (currentLog) {
@@ -232,7 +229,7 @@ export default function HomeScreen() {
         });
       }
     }
-  }, [completedHabitsObj, selectedDate, addLog, deleteLog]);
+  }, [completedHabitsObj, selectedDate, markComplete, markIncomplete]);
 
   /**
    * Genera el saludo de la cabecera en base a si es mañana, tarde o noche 

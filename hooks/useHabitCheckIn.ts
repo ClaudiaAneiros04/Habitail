@@ -123,7 +123,7 @@ export const useHabitCheckIn = () => {
     const newLog: HabitLog = {
       id: generateLogId(habitId, fecha),
       habitId,
-      userId: 'current-user', // Pendiente integracion con context/store real de usuario
+      userId: user?.id || 'default-user',
       fecha: formatISO(fecha),
       completado: true,
       timestampRegistro: formatISO(new Date())
@@ -186,7 +186,7 @@ export const useHabitCheckIn = () => {
     const newLog: HabitLog = {
       id: generateLogId(habitId, fecha),
       habitId,
-      userId: 'current-user',
+      userId: user?.id || 'default-user',
       fecha: formatISO(fecha),
       completado: false, // Refleja explícitamente el cambio de estado
       timestampRegistro: formatISO(new Date())
