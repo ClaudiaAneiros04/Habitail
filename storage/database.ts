@@ -87,6 +87,13 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
           FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS user_badges (
+          userId TEXT NOT NULL,
+          badgeId TEXT NOT NULL,
+          PRIMARY KEY (userId, badgeId),
+          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+        );
+
         CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fecha);
 
         -- Índice para consultas globales (heatmap/stats por userId sin habitId concreto).

@@ -6,6 +6,9 @@ import { useHabitStore } from '../store/useHabitStore';
 import { HabitLog } from '../types';
 import { formatISO, startOfDay, parseISO } from 'date-fns';
 import { getHabitsForToday } from '../utils/frequencyEngine';
+import { useUserStore } from '../store/useUserStore';
+import { calcPointsDelta } from '../utils/pointsEngine';
+import { evaluateBadges } from '../utils/badgeEngine';
 
 /**
  * Hook principal y modular para gestionar el Check-In (completar/desmarcar) de los hábitos.
@@ -18,9 +21,10 @@ import { getHabitsForToday } from '../utils/frequencyEngine';
  * - Lógica de avance y recompensas (Bounce effect y Confetti).
  */
 export const useHabitCheckIn = () => {
-  const { logs, addLog } = useLogStore();
+  const { logs, addLog, deleteLog } = useLogStore();
   const { updateHealth } = usePetStore();
   const { habits } = useHabitStore();
+  const { user, updatePoints, addBadges } = useUserStore();
 
   /**
    * Valor animado expuesto para que el frontend lo pueda inyectar en propiedades de estilo
@@ -131,7 +135,23 @@ export const useHabitCheckIn = () => {
     // 4. Actualizamos la gamificación (+10 de salud por completar la tarea)
     await updateHealth(10);
 
-    // 5. Verificamos el requerimiento 'All Tasks Done'
+    // 5. Asignación de puntos y evaluación de insignias
+    const habit = habits.find(h => h.id === habitId);
+    if (habit) {
+      const points = calcPointsDelta(habit);
+      await updatePoints(points);
+
+      if (user) {
+        // Necesitamos asegurar que los logs pasados a evaluateBadges incluyen el que acabamos de agregar
+        const allLogs = [...logs, newLog];
+        const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
+        if (newEarnedBadges.length > 0) {
+          await addBadges(newEarnedBadges);
+        }
+      }
+    }
+
+    // 6. Verificamos el requerimiento 'All Tasks Done'
     const todayHabits = getHabitsForToday(habits, fecha);
     let shouldLaunchConfetti = false;
 
@@ -146,7 +166,7 @@ export const useHabitCheckIn = () => {
     }
 
     return { shouldLaunchConfetti };
-  }, [addLog, getStatusForDay, updateHealth, habits]);
+  }, [addLog, getStatusForDay, updateHealth, habits, updatePoints, user, logs, addBadges]);
 
   /**
    * Desmarca un hábito (lo marca como incompleto) para una fecha dada.
@@ -173,12 +193,26 @@ export const useHabitCheckIn = () => {
     };
 
     // 3. Persistimos el cambio de estado en el histórico
-    await addLog(newLog);
+    // Según aprendizajes, desmarcar elimina el registro. Si addLog reemplaza, lo dejamos como tal, 
+    // pero idealmente deberíamos borrar. Usaremos addLog con completado: false por ahora
+    // a menos que deleteLog esté disponible.
+    if (deleteLog) {
+      await deleteLog(generateLogId(habitId, fecha));
+    } else {
+      await addLog(newLog);
+    }
 
     // 4. Actualizamos la gamificación a modo de penalización suave (-5 de salud)
     await updateHealth(-5);
 
-  }, [addLog, getStatusForDay, updateHealth]);
+    // 5. Descontar puntos por deshacer el check-in
+    const habit = habits.find(h => h.id === habitId);
+    if (habit) {
+      const points = calcPointsDelta(habit);
+      await updatePoints(-points);
+    }
+
+  }, [addLog, deleteLog, getStatusForDay, updateHealth, habits, updatePoints]);
 
   // Exponemos la Interfaz limpia para el Desarrollador de Frontend
   return {

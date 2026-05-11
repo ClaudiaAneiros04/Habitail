@@ -609,3 +609,31 @@ Se validó la función pura `applyHealthDelta` con un script de test local (`tes
 - **Vida Inicial: 100**, al recibir nuevos deltas positivos (ej: +30), la función aplica el límite superior. **Resultado: 100**.
 - **Vida Inicial: 0**, al recibir deltas negativos (ej: -30), la función aplica el límite inferior. **Resultado: 0**.
 - **Recuperación desde 0**, al recibir check-ins positivos (ej: +30), levanta la vida correctamente sin quedarse estancada en negativo. **Resultado: 30**.
+
+---
+
+# Lógica de Negocio — Fase 5: Gamificación (Puntos e Insignias)
+
+## 1. Sistema de Puntos (`pointsEngine.ts`)
+
+### Acumulación de Puntos
+Se ha implementado una función pura `calcPointsDelta(habit)` que mapea la prioridad del hábito a puntos:
+- Esencial: +20 pts
+- Normal: +10 pts
+- Flexible: +5 pts
+
+**Casos Borde y Decisiones:**
+- **Prioridad desconocida:** Si se recibe un nivel de prioridad no contemplado, la función devuelve `0` como fallback.
+- **Deducción de puntos (compras):** `deductPoints(balance, price)` nunca lanza excepciones. Devuelve un tipo `Result` (`{ ok: true, value: number }` o `{ ok: false, error: InsufficientPointsError }`). Esto protege a la UI de crasheos por lógica de negocio.
+- **Sincronización Zustand/SQLite:** Para evitar desincronizaciones si la app se cierra a mitad de una transacción, el hook `useHabitCheckIn` llama secuencialmente a `await updatePoints` (que actualiza SQLite de forma síncrona mediante el Repository) y luego Zustand actualiza la UI.
+
+## 2. Sistema de Insignias (`badgeEngine.ts`)
+
+La evaluación de insignias (`evaluateBadges`) es una función pura y *lazy*, que solo se ejecuta sobre logs y no altera la BD por sí misma. Devuelve únicamente las insignias **nuevas** desbloqueadas.
+
+**Casos Borde y Decisiones Documentadas:**
+- **`perfect_week` (100% semanal):** Para el MVP, la lógica de validación de semana perfecta verifica si *todos* los hábitos activos (`h.activo === true`) actuales se han cumplido los 7 días de una semana determinada. En un futuro (deuda técnica), se debería evaluar si los hábitos estaban activos *históricamente* en ese rango de fechas usando `fechaInicio` y `fechaFin`, para no invalidar semanas perfectas del pasado por culpa de hábitos añadidos recientemente.
+- **`one_month_active`:** Cuenta días con al menos 1 check-in. **Decisión:** Sí se cuentan los check-ins de hábitos archivados o eliminados. El esfuerzo se hizo, independientemente del estado actual del hábito.
+- **`streak_7` y `streak_30`:** Se evalúan sobre la racha **actual** (`currentStreak`) y no sobre la racha máxima histórica (`maxStreak`). **Decisión:** Esto incentiva la consistencia en el momento presente ("no nostalgia"), forzando al usuario a mantener su disciplina hoy para ganar el logro.
+- **Fallback en `user.createdAt`:** Si la fecha de registro (`fechaRegistro`) es nula o inválida, el *guard* impide que se calcule la insignia `first_week` para evitar errores de tipo `NaN`.
+- **Eliminación manual de logs:** ¿Las insignias se re-evalúan o se retiran si el usuario borra logs en el futuro haciendo que deje de cumplir las condiciones? **Decisión:** Fuera del scope del MVP. Se asume como deuda técnica: las insignias ya concedidas no se pueden perder.
