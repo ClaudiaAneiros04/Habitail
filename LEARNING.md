@@ -637,3 +637,34 @@ La evaluación de insignias (`evaluateBadges`) es una función pura y *lazy*, qu
 - **`streak_7` y `streak_30`:** Se evalúan sobre la racha **actual** (`currentStreak`) y no sobre la racha máxima histórica (`maxStreak`). **Decisión:** Esto incentiva la consistencia en el momento presente ("no nostalgia"), forzando al usuario a mantener su disciplina hoy para ganar el logro.
 - **Fallback en `user.createdAt`:** Si la fecha de registro (`fechaRegistro`) es nula o inválida, el *guard* impide que se calcule la insignia `first_week` para evitar errores de tipo `NaN`.
 - **Eliminación manual de logs:** ¿Las insignias se re-evalúan o se retiran si el usuario borra logs en el futuro haciendo que deje de cumplir las condiciones? **Decisión:** Fuera del scope del MVP. Se asume como deuda técnica: las insignias ya concedidas no se pueden perder.
+
+---
+
+# Post-Merge Fixes — Fase 5: Integración Lógica & Frontend
+
+Tras el merge de las ramas `logic_fase5` (Motores de gamificación) y `frontend_fase5` (Tienda e Inventario), se realizaron los siguientes ajustes críticos para asegurar la integridad del sistema:
+
+## 1. Discrepancia en el Flujo de Check-in
+- **Error:** La UI (`app/(tabs)/index.tsx`) ignoraba por completo la lógica de gamificación.
+- **Ubicación:** `HomeScreen` -> `handleToggleHabit`.
+- **Causa:** La pantalla principal utilizaba una función local que llamaba directamente a `useLogStore`, puenteando la capa de negocio que calcula puntos e insignias.
+- **Solución:** Se refactorizó la UI para utilizar el hook `useHabitCheckIn`. Ahora, cada check-in activa la cadena completa: Persistencia -> Salud Mascota -> Puntos -> Evaluación de Logros.
+
+## 2. Inconsistencia de Usuario (Hardcoding)
+- **Error:** Los registros de logs y gamificación no se asociaban al usuario real.
+- **Ubicación:** `hooks/useHabitCheckIn.ts`.
+- **Causa:** Se utilizaba un string estático `'current-user'` como fallback temporal.
+- **Solución:** Se integró `useUserStore` dentro del hook para extraer dinámicamente el `user.id`. Se mantiene `'default-user'` solo como red de seguridad.
+
+## 3. Conflicto de Esquema en `UserRepository`
+- **Error:** Fallo en la persistencia del objeto `User` al intentar guardar 8 parámetros en una tabla que ahora requería 9 (tras añadir `inventario`).
+- **Ubicación:** `storage/UserRepository.ts` -> `save()`.
+- **Causa:** Desarrollo en paralelo; la rama de lógica añadió `lastPenaltyAppliedDate` y la de frontend añadió `inventario`. El merge inicial no unificó la sentencia `INSERT OR REPLACE`.
+- **Solución:** Se unificó la query SQL y el mapeo de objetos para soportar el esquema completo de 9 columnas, asegurando que `get()` y `save()` manejen ambos dominios de datos.
+
+## 4. Degradación del Entorno de Tests
+- **Error:** Imposibilidad de ejecutar tests de hooks tras la actualización a React 19.
+- **Ubicación:** `hooks/__tests__/useDailyPenaltyJob.test.ts`.
+- **Causa:** `@testing-library/react-hooks` es incompatible con React 18/19 (requiere peer dependencies antiguas).
+- **Solución:** Migración a `@testing-library/react` (que incluye `renderHook` nativamente) y uso de `--legacy-peer-deps` para estabilizar el entorno de Jest en Expo.
+
