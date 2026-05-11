@@ -7,6 +7,7 @@ interface PetStore {
   updateHealth: (delta: number) => Promise<void>;
   levelUp: () => Promise<void>;
   loadPet: () => Promise<void>;
+  updatePet: (updates: Partial<Pet>) => Promise<void>;
 }
 
 const getPetState = (vida: number): PetState => {
@@ -28,7 +29,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
     const updatedPet = {
       ...pet,
       vida: nuevaVida,
-      state: getPetState(nuevaVida),
+      estadoActual: getPetState(nuevaVida),
     };
     await petRepo.save(updatedPet);
     set({ pet: updatedPet });
@@ -36,7 +37,12 @@ export const usePetStore = create<PetStore>((set, get) => ({
   levelUp: async () => {
     const { pet } = get();
     if (!pet) return;
-    const updatedPet = { ...pet, nivel: pet.nivel + 1, xp: 0 };
+    const updatedPet = { 
+      ...pet, 
+      nivel: pet.nivel + 1, 
+      xp: 0,
+      xpParaSiguienteNivel: Math.floor(pet.xpParaSiguienteNivel * 1.5) // Ejemplo: incremento de dificultad
+    };
     await petRepo.save(updatedPet);
     set({ pet: updatedPet });
   },
@@ -44,7 +50,29 @@ export const usePetStore = create<PetStore>((set, get) => ({
     const pet = await petRepo.get();
     if (pet) {
       set({ pet });
+    } else {
+      // Mascota por defecto
+      const defaultPet: Pet = {
+        id: 'default-pet-1',
+        userId: 'local-user', // asumiendo single-user offline
+        vida: 100,
+        nivel: 1,
+        xp: 0,
+        xpParaSiguienteNivel: 100,
+        estadoActual: PetState.HAPPY,
+        skinEquipada: 'default-cat',
+        accesorios: []
+      };
+      await petRepo.save(defaultPet);
+      set({ pet: defaultPet });
     }
+  },
+  updatePet: async (updates) => {
+    const { pet } = get();
+    if (!pet) return;
+    const updatedPet = { ...pet, ...updates };
+    await petRepo.save(updatedPet);
+    set({ pet: updatedPet });
   },
 }));
 

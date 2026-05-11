@@ -10,6 +10,8 @@ import { getHabitsForToday } from '../../utils/frequencyEngine';
 
 import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
+import { MiniPet } from '../../components/Pet/MiniPet';
+import { usePetStore } from '../../store/usePetStore';
 
 // Native Date Helpers
 /**
@@ -89,6 +91,7 @@ export default function HomeScreen() {
   const addLog = useLogStore((state) => state.addLog);
   const deleteLog = useLogStore((state) => state.deleteLog);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
+  const pet = usePetStore((state) => state.pet);
 
   // Inicialización de la app
   useEffect(() => {
@@ -272,13 +275,19 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       {/* Cabecera */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{getGreeting()}</Text>
-          <Text style={styles.dateText}>
-            {formatDateLocally(selectedDate)}
-          </Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.dateText}>
+              {formatDateLocally(selectedDate)}
+            </Text>
+          </View>
+          
+          {/* Avatar de la mascota (MiniPet) */}
+          <MiniPet />
         </View>
       </View>
+
 
       {/* Selector de Fecha */}
       <View style={styles.dateSelector}>
@@ -362,6 +371,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 48,
     paddingBottom: 10,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   greeting: {
     fontSize: 28,

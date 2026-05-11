@@ -26,16 +26,17 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
           lastPenaltyAppliedDate TEXT
         );
 
+        DROP TABLE IF EXISTS pets;
         CREATE TABLE IF NOT EXISTS pets (
           id TEXT PRIMARY KEY NOT NULL,
           userId TEXT NOT NULL,
           vida INTEGER NOT NULL DEFAULT 100,
           nivel INTEGER NOT NULL DEFAULT 1,
-          skinActiva TEXT NOT NULL,
-          skinsDesbloqueadas TEXT NOT NULL,
-          accesorios TEXT NOT NULL,
           xp INTEGER NOT NULL DEFAULT 0,
-          state TEXT NOT NULL,
+          xpParaSiguienteNivel INTEGER NOT NULL DEFAULT 100,
+          estadoActual TEXT NOT NULL,
+          skinEquipada TEXT NOT NULL,
+          accesorios TEXT NOT NULL,
           FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
         );
 
@@ -101,13 +102,14 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
         -- de toda la tabla habit_logs para localizar los registros de un usuario.
         CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
       `);
-
-      // Migración manual segura para añadir la columna en instalaciones existentes
+      // Migraciones manuales seguras
       try {
         await db.execAsync("ALTER TABLE users ADD COLUMN lastPenaltyAppliedDate TEXT;");
-      } catch (e) {
-        // Ignorar el error si la columna ya existe
-      }
+      } catch (e) {}
+
+      try {
+        await db.execAsync("ALTER TABLE users ADD COLUMN inventario TEXT;");
+      } catch (e) {}
 
       return db;
     })();
