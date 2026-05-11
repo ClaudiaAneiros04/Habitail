@@ -591,3 +591,21 @@ WHERE fecha = ? AND completado = 1 AND habitId IN (...)
 | **App sin abrir varios días** | **Decisión de Diseño:** El job solo penaliza por "ayer". No es acumulativo. Si el usuario no abre la app en una semana, solo recibirá la penalización del último día incumplido. Esto evita que la mascota muera repentinamente por un periodo de ausencia largo, incentivando el retorno sin ser excesivamente punitivo. |
 | **Primera apertura / Sin hábitos** | Si `lastPenaltyAppliedDate` es `null`, el job se ejecuta por primera vez. Si no hay hábitos activos ayer, el delta es `0` y simplemente se registra la fecha de hoy. No se lanzan errores por arrays vacíos. |
 | **Vida ya en 0** | Si la mascota ya está en estado `ABSENT` (vida=0), el job registra igualmente la ejecución para hoy pero omite el cálculo de logs y la aplicación de deltas, evitando procesos innecesarios y notificaciones redundantes. |
+
+## 4. Fórmula Final y Decisiones Acordadas
+
+Para responder a las preguntas clave sobre la gamificación de la mascota:
+
+- **Fórmula final (Aditiva por hábito)**: La penalización y recompensa es *por hábito*, no una tarifa plana diaria.
+  - Esencial: ±20 HP
+  - Normal: ±10 HP
+  - Flexible: ±5 HP
+  Esto significa que el esfuerzo importa. Fallar 3 hábitos esenciales resta 60 HP. Cumplir 1 esencial y 1 normal suma 30 HP. Se ha implementado un estricto *clamp* matemático que asegura que la vida nunca baje de 0 ni supere 100.
+- **¿La penalización es diaria o por hábito incumplido?**: Como se explica en la fórmula, la penalización es **por cada hábito incumplido**, sumando todas las penalizaciones en un delta total negativo. Esto hace que cada pequeña victoria cuente y cada fallo pese proporcionalmente.
+- **¿Cuántos días sin abrir la app para que 'se vaya'?**: Actualmente, la app solo evalúa el "día anterior" para no ser tan destructiva si el usuario olvida abrirla un fin de semana (penalización no acumulativa). Sin embargo, se define la regla de **Ausencia Prolongada**: Si el usuario no abre la app por **3 días consecutivos o más**, se considera un abandono. En este caso, la mascota perderá toda su vida y pasará directamente a estado `ABSENT` (vida = 0).
+
+### Prueba de Estrés (Datos Extremos)
+Se validó la función pura `applyHealthDelta` con un script de test local (`test-pet.ts`):
+- **Vida Inicial: 100**, al recibir nuevos deltas positivos (ej: +30), la función aplica el límite superior. **Resultado: 100**.
+- **Vida Inicial: 0**, al recibir deltas negativos (ej: -30), la función aplica el límite inferior. **Resultado: 0**.
+- **Recuperación desde 0**, al recibir check-ins positivos (ej: +30), levanta la vida correctamente sin quedarse estancada en negativo. **Resultado: 30**.
