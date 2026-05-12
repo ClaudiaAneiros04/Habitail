@@ -5,6 +5,9 @@
 1.  [Diseño de Arquitectura de Datos y Optimización: Índices](#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
 2.  [Lógica de Negocio — Fase 3: Rachas y Check-in](#lógica-de-negocio--fase-3-rachas-y-check-in)
 3.  [Errores y Aprendizajes — Fase 3](#errores-y-aprendizajes--fase-3)
+4.  [Lógica de Negocio — Fase 4: Estadísticas y Heatmap](#lógica-de-negocio--fase-4-usehabitstats)
+5.  [Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota](#lógica-de-negocio--fase-4-definición-y-prompts-de-la-mascota)
+6.  [Lógica de Negocio — Fase 5: Gamificación y Penalizaciones](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
  
 ---
  
@@ -517,6 +520,35 @@ Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días em
 - Los bloques fijos producen etiquetas confusas para el gráfico (ej: "días 1-7" cruza lunes y martes de semanas distintas).
 - date-fns ya proporciona `startOfWeek`/`endOfWeek` con `weekStartsOn: 1`.
 
+
+---
+
+# Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota
+
+En esta sub-fase se definieron las reglas matemáticas y de estado que rigen el comportamiento de la mascota virtual, utilizando un enfoque orientado a **funciones puras** y **prompts estructurados**.
+
+## 1. Documentación de Prompts (`prompt_fase5_logic_PetLogic.md`)
+
+Aunque implementado físicamente en la transición a la Fase 5, el diseño lógico se consolidó en la Fase 4 siguiendo estas directrices:
+
+*   **Responsabilidades Puras**: El módulo `petLogic.ts` debe ser agnóstico a la UI y a la persistencia.
+*   **Mapeo de Estados (`getPetState`)**:
+    *   `0`: `absent` (Mascota no presente/huida).
+    *   `1–25`: `sad` (Triste).
+    *   `26–50`: `confused` (Confusa).
+    *   `51–75`: `cheering` (Animada).
+    *   `76–100`: `happy` (Feliz).
+*   **Motor de Salud (`applyHealthDelta`)**:
+    *   **Esencial**: ±20 HP.
+    *   **Normal**: ±10 HP.
+    *   **Flexible**: ±5 HP.
+    *   **Regla Crítica**: Un hábito sin log para el día cuenta como **fallido** (penalización), garantizando que la omisión tenga consecuencias.
+
+## 2. Decisiones de Diseño y Casos Borde
+
+*   **Inmutabilidad**: Las funciones no modifican el estado del store directamente; devuelven el nuevo valor calculado para que el orquestador (`useHabitCheckIn` o `useDailyPenaltyJob`) decida qué hacer.
+*   **Clamp Matemático**: Implementación de `Math.max(0, Math.min(100, nuevaVida))` para asegurar que la salud nunca desborde los límites visuales de la barra de progreso.
+*   **Recuperación Activa**: Se decidió que una mascota con `0` de vida (absent) puede volver a aparecer si el usuario completa hábitos ("resurrección" mediante esfuerzo), en lugar de requerir una compra o reinicio manual.
 
 ---
 
