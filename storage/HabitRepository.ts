@@ -1,5 +1,6 @@
 import { Habit } from '../types';
 import { getDb } from './database';
+import { HabitRow } from '../db/schema';
 
 export interface IHabitRepository {
   get(): Promise<Habit[]>;
@@ -10,23 +11,26 @@ export interface IHabitRepository {
 }
 
 export class HabitRepository implements IHabitRepository {
-  private mapRowToHabit(row: any): Habit {
+  private mapRowToHabit(row: HabitRow): Habit {
     return {
       ...row,
+      descripcion: row.descripcion || undefined,
+      horaRecordatorio: row.horaRecordatorio || undefined,
+      fechaFin: row.fechaFin || undefined,
       diasSemana: JSON.parse(row.diasSemana),
       activo: Boolean(row.activo),
-    };
+    } as Habit;
   }
 
   async get(): Promise<Habit[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<any>('SELECT * FROM habits');
-    return rows.map(this.mapRowToHabit);
+    const rows = await db.getAllAsync<HabitRow>('SELECT * FROM habits');
+    return rows.map(row => this.mapRowToHabit(row));
   }
 
   async getById(id: string): Promise<Habit | null> {
     const db = await getDb();
-    const row = await db.getFirstAsync<any>('SELECT * FROM habits WHERE id = ?', [id]);
+    const row = await db.getFirstAsync<HabitRow>('SELECT * FROM habits WHERE id = ?', [id]);
     return row ? this.mapRowToHabit(row) : null;
   }
 

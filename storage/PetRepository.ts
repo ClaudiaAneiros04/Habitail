@@ -1,5 +1,6 @@
-import { getDb } from './database';
 import { Pet, PetState } from '../types';
+import { getDb } from './database';
+import { PetRow } from '../db/schema';
 
 export interface IPetRepository {
   get(): Promise<Pet | null>;
@@ -7,7 +8,7 @@ export interface IPetRepository {
 }
 
 export class PetRepository implements IPetRepository {
-  private mapRowToPet(row: any): Pet {
+  private mapRowToPet(row: PetRow): Pet {
     return {
       id: row.id,
       userId: row.userId,
@@ -23,7 +24,7 @@ export class PetRepository implements IPetRepository {
 
   async get(): Promise<Pet | null> {
     const db = await getDb();
-    const row = await db.getFirstAsync<any>('SELECT * FROM pets LIMIT 1');
+    const row = await db.getFirstAsync<PetRow>('SELECT * FROM pets LIMIT 1');
     return row ? this.mapRowToPet(row) : null;
   }
 

@@ -8,108 +8,15 @@ import * as SQLite from 'expo-sqlite';
  */
 const globalDb = globalThis as any;
 
+import { CREATE_TABLES_SQL } from '../db/schema';
+
 export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
   if (!globalDb._dbPromise) {
     globalDb._dbPromise = (async () => {
       const db = await SQLite.openDatabaseAsync('habitail.db');
-      await db.execAsync(`
-        PRAGMA journal_mode = WAL;
-
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY NOT NULL,
-          username TEXT NOT NULL,
-          email TEXT,
-          avatar TEXT,
-          fechaRegistro TEXT NOT NULL,
-          puntos INTEGER NOT NULL DEFAULT 0,
-          onboardingCompleted INTEGER NOT NULL DEFAULT 0,
-          lastPenaltyAppliedDate TEXT
-        );
-
-        DROP TABLE IF EXISTS pets;
-        CREATE TABLE IF NOT EXISTS pets (
-          id TEXT PRIMARY KEY NOT NULL,
-          userId TEXT NOT NULL,
-          vida INTEGER NOT NULL DEFAULT 100,
-          nivel INTEGER NOT NULL DEFAULT 1,
-          xp INTEGER NOT NULL DEFAULT 0,
-          xpParaSiguienteNivel INTEGER NOT NULL DEFAULT 100,
-          estadoActual TEXT NOT NULL,
-          skinEquipada TEXT NOT NULL,
-          accesorios TEXT NOT NULL,
-          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS habits (
-          id TEXT PRIMARY KEY NOT NULL,
-          userId TEXT NOT NULL,
-          nombre TEXT NOT NULL,
-          descripcion TEXT,
-          categoria TEXT NOT NULL,
-          icono TEXT NOT NULL,
-          colorHex TEXT NOT NULL,
-          frecuencia TEXT NOT NULL,
-          diasSemana TEXT NOT NULL,
-          horaRecordatorio TEXT,
-          tipoVerificacion TEXT NOT NULL,
-          nivelPrioridad TEXT NOT NULL,
-          fechaInicio TEXT NOT NULL,
-          fechaFin TEXT,
-          activo INTEGER NOT NULL,
-          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS habit_logs (
-          id TEXT PRIMARY KEY NOT NULL,
-          habitId TEXT NOT NULL,
-          userId TEXT NOT NULL,
-          fecha TEXT NOT NULL,
-          completado INTEGER NOT NULL,
-          valor REAL,
-          nota TEXT,
-          timestampRegistro TEXT NOT NULL,
-          FOREIGN KEY (habitId) REFERENCES habits (id) ON DELETE CASCADE,
-          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS suggested_habits (
-          id TEXT PRIMARY KEY NOT NULL,
-          nombre TEXT NOT NULL,
-          categoria TEXT NOT NULL,
-          icono TEXT NOT NULL,
-          descripcion TEXT NOT NULL,
-          locale TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS user_interests (
-          id TEXT PRIMARY KEY NOT NULL,
-          userId TEXT NOT NULL,
-          categoria TEXT NOT NULL,
-          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS user_badges (
-          userId TEXT NOT NULL,
-          badgeId TEXT NOT NULL,
-          PRIMARY KEY (userId, badgeId),
-          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fecha);
-
-        -- Índice para consultas globales (heatmap/stats por userId sin habitId concreto).
-        -- Sin este índice, getHeatmapGlobal y getGlobalStatsByPeriod harían full scan
-        -- de toda la tabla habit_logs para localizar los registros de un usuario.
-        CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
-      `);
-      // Migraciones manuales seguras
-      try {
-        await db.execAsync("ALTER TABLE users ADD COLUMN lastPenaltyAppliedDate TEXT;");
-      } catch (e) {}
-
-      try {
-        await db.execAsync("ALTER TABLE users ADD COLUMN inventario TEXT;");
-      } catch (e) {}
+      
+      // Ejecutar la creación del esquema unificado desde db/schema.ts
+      await db.execAsync(CREATE_TABLES_SQL);
 
       return db;
     })();

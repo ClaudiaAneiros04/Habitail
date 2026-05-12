@@ -700,3 +700,33 @@ Tras el merge de las ramas `logic_fase5` (Motores de gamificación) y `frontend_
 - **Causa:** `@testing-library/react-hooks` es incompatible con React 18/19 (requiere peer dependencies antiguas).
 - **Solución:** Migración a `@testing-library/react` (que incluye `renderHook` nativamente) y uso de `--legacy-peer-deps` para estabilizar el entorno de Jest en Expo.
 
+
+---
+
+# Lógica de Negocio — Alineación de Contratos (Tipos vs. Schema)
+
+## 1. El Problema: Divergencia Histórica
+Desde la Fase 1, existía una desconexión entre la definición de los objetos de dominio en `types/index.ts` y la estructura real de las tablas en SQLite (gestionada mediante strings SQL dispersos). Esto provocaba:
+- Uso excesivo de `any` en los repositorios.
+- Campos faltantes en las interfaces (ej: `badges` en `User`).
+- Ambigüedad en la representación de booleanos (`0/1` en DB vs `boolean` en TS) y arrays (`JSON string` en DB vs `array` en TS).
+
+## 2. La Solución: `db/schema.ts` como Fuente de Verdad
+Se ha consolidado un **Contrato Único** mediante la creación de `db/schema.ts`, que centraliza:
+- **`TABLE_NAMES`**: Nombres de tablas como constantes para evitar errores tipográficos.
+- **`CREATE_TABLES_SQL`**: Un único string DDL que define todo el esquema, consumido por `storage/database.ts`.
+- **`Row Types`**: Interfaces que describen exactamente cómo se almacenan los datos (ej: `HabitRow` usa `activo: number` y `diasSemana: string`).
+
+## 3. Alineación con `types/index.ts` (Dominio)
+La interfaz de dominio en `types/index.ts` se ha actualizado para ser el reflejo ideal del negocio, mientras que los repositorios ahora realizan el mapeo explícito de `Row` -> `Domain` usando tipos fuertes en lugar de `any`.
+
+**Beneficios inmediatos:**
+- **Seguridad de Tipos**: El compilador detecta si un repositorio intenta acceder a un campo que no existe en la tabla.
+- **Documentación Viva**: Cualquier cambio en el esquema debe realizarse en `db/schema.ts`, actualizando automáticamente tanto la creación de la BD como los tipos de las filas.
+- **Claridad en la Persistencia**: Se han resuelto divergencias como el campo `badges` de `User`, que ahora está presente tanto en el flujo de insignias como en la interfaz de usuario.
+
+## 4. Convenciones de Mapeo
+Para mantener la coherencia, se siguen estas reglas en los Repositorios:
+- **Booleanos**: `0/1` en DB <-> `boolean` en TS (usando `Number(row.val) === 1` para lectura robusta).
+- **Arrays**: `JSON string` en DB <-> `T[]` en TS (usando `JSON.parse` / `JSON.stringify`).
+- **Opcionales**: `NULL` en DB <-> `undefined` en TS (usando `|| undefined` o chequeos de `null`).

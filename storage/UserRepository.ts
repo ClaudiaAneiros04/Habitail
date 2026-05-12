@@ -1,5 +1,6 @@
 import { getDb } from './database';
 import { User } from '../types';
+import { UserRow } from '../db/schema';
 
 export interface IUserRepository {
   get(): Promise<User | null>;
@@ -11,7 +12,7 @@ export interface IUserRepository {
 export class UserRepository implements IUserRepository {
   async get(): Promise<User | null> {
     const db = await getDb();
-    const row = await db.getFirstAsync<any>('SELECT * FROM users LIMIT 1');
+    const row = await db.getFirstAsync<UserRow>('SELECT * FROM users LIMIT 1');
     if (!row) return null;
     // Fetch badges
     const badgesRows = await db.getAllAsync<{badgeId: string}>('SELECT badgeId FROM user_badges WHERE userId = ?', [row.id]);
@@ -26,12 +27,12 @@ export class UserRepository implements IUserRepository {
     return {
       id: row.id,
       username: row.username,
-      email: row.email,
-      avatar: row.avatar,
+      email: row.email || undefined,
+      avatar: row.avatar || undefined,
       fechaRegistro: row.fechaRegistro,
       puntos: row.puntos,
       onboardingCompleted: Boolean(row.onboardingCompleted),
-      lastPenaltyAppliedDate: row.lastPenaltyAppliedDate,
+      lastPenaltyAppliedDate: row.lastPenaltyAppliedDate || undefined,
       badges,
       inventario,
     } as User;

@@ -45,6 +45,7 @@ export interface User {
   onboardingCompleted: boolean; // From Frontend
   lastPenaltyAppliedDate?: string; // App Init Job
   inventario?: string[]; // IDs de items comprados
+  badges?: string[]; // IDs de insignias desbloqueadas
 }
 
 export interface Pet {

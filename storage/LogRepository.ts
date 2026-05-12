@@ -1,5 +1,6 @@
 import { HabitLog } from '../types';
 import { getDb } from './database';
+import { HabitLogRow } from '../db/schema';
 
 /**
  * Resultado compacto que devuelven las queries de estadísticas.
@@ -82,9 +83,11 @@ export class LogRepository implements ILogRepository {
    * Se usa Number() para normalizar cualquier tipo (0, 1, "0", "1", true, false)
    * antes de la comparación estricta.
    */
-  private mapRowToLog(row: any): HabitLog {
+  private mapRowToLog(row: HabitLogRow): HabitLog {
     return {
       ...row,
+      valor: row.valor !== null ? row.valor : undefined,
+      nota: row.nota !== null ? row.nota : undefined,
       completado: Number(row.completado) === 1,
     };
   }
@@ -110,8 +113,8 @@ export class LogRepository implements ILogRepository {
 
   async getByHabit(habitId: string): Promise<HabitLog[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE habitId = ?', [habitId]);
-    return rows.map(this.mapRowToLog);
+    const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs WHERE habitId = ?', [habitId]);
+    return rows.map(row => this.mapRowToLog(row));
   }
 
   /**
@@ -127,8 +130,8 @@ export class LogRepository implements ILogRepository {
 
   async getByDate(fecha: string): Promise<HabitLog[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs WHERE fecha = ?', [fecha]);
-    return rows.map(this.mapRowToLog);
+    const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs WHERE fecha = ?', [fecha]);
+    return rows.map(row => this.mapRowToLog(row));
   }
 
   /**
@@ -321,17 +324,17 @@ export class LogRepository implements ILogRepository {
 
   async getLogsForRangeGlobal(userId: string, fromDate: string, toDate: string): Promise<HabitLog[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync<HabitLogRow>(
       'SELECT * FROM habit_logs WHERE userId = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha ASC',
       [userId, fromDate, toDate]
     );
-    return rows.map(this.mapRowToLog);
+    return rows.map(row => this.mapRowToLog(row));
   }
 
   async getAll(): Promise<HabitLog[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<any>('SELECT * FROM habit_logs');
-    return rows.map(this.mapRowToLog);
+    const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs');
+    return rows.map(row => this.mapRowToLog(row));
   }
 
   /**
