@@ -47,6 +47,15 @@ Para ejecutar este proyecto correctamente, asegúrate de cumplir con los siguien
 3.  **Simuladores (Opcional)**: Android Studio (para Android) o Xcode (para iOS) si prefieres ejecutar en emuladores locales.
 4.  **Cuentas**: Una cuenta de Expo es recomendada para facilitar la sincronización.
 
+## 📱 Dispositivos Compatibles
+
+Habitail está diseñada para funcionar de manera fluida en las siguientes plataformas:
+
+*   **Android**: Dispositivos con Android 7.0 (API 24) o superior.
+*   **iOS**: iPhone y iPad con iOS 13.0 o superior.
+*   **Web**: Navegadores modernos (Chrome, Safari, Firefox, Edge) con diseño totalmente responsivo.
+*   **PWA**: Soporte para instalación como aplicación web progresiva para una experiencia similar a la nativa en escritorio.
+
 ## 📂 Estructura de Carpetas
 
 A continuación, un resumen de la organización del código:
