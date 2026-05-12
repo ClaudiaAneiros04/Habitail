@@ -9,6 +9,22 @@
 *   **Historial Detallado**: Un calendario interactivo que te permite auditar tu desempeño pasado y entender tus patrones de comportamiento.
 *   **Rendimiento Nativo**: Construido sobre Expo y React Native, utilizando SQLite para una persistencia de datos local ultra rápida y segura.
 
+## 🏛️ Decisiones de Arquitectura
+
+Para garantizar la robustez y escalabilidad de Habitail, el proyecto se basa en tres pilares arquitectónicos:
+
+### 1. Repository Pattern
+La lógica de acceso a datos está desacoplada mediante repositorios, facilitando el mantenimiento y permitiendo optimizaciones de consultas SQL (como índices compuestos) de forma centralizada.
+- [Detalles en la Memoria de Datos](./LEARNING.md#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
+
+### 2. Motor de Frecuencias
+Un motor de lógica pura que abstrae el cálculo de rachas y la programación de hábitos. Esto permite que la UI sea reactiva a reglas de negocio complejas sin duplicar lógica en los componentes.
+- [Detalles en la Memoria del Motor](./LEARNING.md#1-motor-de-cálculo-de-rachas-streakcalculatorts)
+
+### 3. Fórmula de Vida
+El sistema de gamificación utiliza una fórmula matemática ponderada por la prioridad de los hábitos (Esencial, Normal, Flexible) para calcular el impacto en la salud de la mascota.
+- [Detalles en la Memoria de Gamificación](./LEARNING.md#4-fórmula-final-y-decisiones-acordadas)
+
 ## 🚀 Ejecución del Proyecto
 
 Sigue estos comandos para iniciar la aplicación en diferentes plataformas:
