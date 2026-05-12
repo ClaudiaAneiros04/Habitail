@@ -8,6 +8,7 @@
 4.  [Lógica de Negocio — Fase 4: Estadísticas y Heatmap](#lógica-de-negocio--fase-4-usehabitstats)
 5.  [Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota](#lógica-de-negocio--fase-4-definición-y-prompts-de-la-mascota)
 6.  [Lógica de Negocio — Fase 5: Gamificación y Penalizaciones](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
+7.  [Gestión de Dependencias — Incidente de Revert en Fase 4](#gestión-de-dependencias--incidente-de-revert-en-fase-4)
  
 ---
  
@@ -730,3 +731,23 @@ Para mantener la coherencia, se siguen estas reglas en los Repositorios:
 - **Booleanos**: `0/1` en DB <-> `boolean` en TS (usando `Number(row.val) === 1` para lectura robusta).
 - **Arrays**: `JSON string` en DB <-> `T[]` en TS (usando `JSON.parse` / `JSON.stringify`).
 - **Opcionales**: `NULL` en DB <-> `undefined` en TS (usando `|| undefined` o chequeos de `null`).
+
+---
+
+# Gestión de Dependencias — Incidente de Revert en Fase 4
+
+## 1. El Incidente: Merge de `logic_fase4`
+Durante la integración de la rama `logic_fase4`, se produjo una rotura crítica de dependencias que impedía el arranque de la aplicación. El problema se originó por actualizaciones automáticas de paquetes que entraron en conflicto con el entorno de ejecución de Expo.
+
+- **Commit de Corrección**: `Revert dependency upgrades to match master state` (con −3,299 líneas).
+- **Impacto**: Se tuvo que realizar un revert manual ("a pelo") de las versiones en `package.json` y `package-lock.json` para volver al estado estable de la rama `master`.
+- **Lección**: Las actualizaciones masivas de dependencias durante un merge de lógica de negocio introducen demasiadas variables de error simultáneas, dificultando el debugging.
+
+## 2. Regla Acordada para Futuras Actualizaciones (Fase 5+)
+Para evitar que este incidente se repita en la Fase 5 y posteriores, se establece el siguiente protocolo obligatorio para cualquier cambio en dependencias:
+
+1.  **Aislamiento**: Cualquier actualización de dependencias debe realizarse en una **rama propia y dedicada** (ej: `fix/dependency-upgrade`), nunca como parte de una rama de feature de lógica.
+2.  **Validación en Entorno Real**: No basta con que el empaquetador compile. Se debe probar físicamente en **Expo Go** (o el entorno de desarrollo destino) para asegurar que no hay errores de runtime.
+3.  **Merge Condicional**: Solo se permite el merge a la rama principal si se demuestra que la aplicación es estable y todas las funcionalidades críticas (especialmente base de datos y UI) operan correctamente.
+4.  **Sincronización**: Tras un merge de este tipo, todos los colaboradores deben ejecutar `npm install` o `npx expo install` inmediatamente para evitar inconsistencias locales.
+
