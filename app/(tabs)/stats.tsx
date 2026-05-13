@@ -92,7 +92,10 @@ export default function StatsScreen() {
     const habit = habits.find(h => h.id === selectedHabitId);
     if (!habit) return [];
 
-    return aggregateChartData(logs, habit, period as 'weekly' | 'monthly');
+    // Para el modo 'total', el agregador de barras por ahora muestra el mes actual
+    // ya que no tenemos un agregador anual de barras.
+    const aggregateMode = (period === 'total') ? 'monthly' : period;
+    return aggregateChartData(logs, habit, aggregateMode as 'weekly' | 'monthly');
   }, [logs, selectedHabitId, habits, period]);
 
   // Nombre del hábito para el selector
@@ -145,7 +148,7 @@ export default function StatsScreen() {
             </View>
           ) : (
             <BarChartComponent 
-              mode={period as 'weekly' | 'monthly'} 
+              mode={period} 
               data={chartData} 
             />
           )}
@@ -167,7 +170,7 @@ export default function StatsScreen() {
             </View>
             <View style={styles.row}>
               <StatCard 
-                title="Tasa Periodo" 
+                title={period === 'total' ? "Tasa Total" : "Tasa Periodo"} 
                 value={isStatsLoading ? "..." : `${completionRate.toFixed(1)}%`} 
               />
               <StatCard 

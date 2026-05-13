@@ -125,22 +125,26 @@ export const useHabitStats = ({
 
       if (habitId) {
         // ── Modo individual: estadísticas para un hábito concreto ──────────
-
-        // a) Query SQL agregada: solo contadores, sin filas en memoria.
-        const periodStats = await logRepo.getStatsByPeriod(habitId, fromDate, toDate);
-
-        // b) Logs del periodo para calcular rachas.
-        //    getLogsForRange usa el índice compuesto (habitId, fecha) → O(log N).
-        const logs = await logRepo.getLogsForRange(habitId, fromDate, toDate);
-
-        // c) Objeto Habit completo (necesario para frecuencia en calculateCurrentStreak).
+        
+        // Fetch habit first to know its start date
         const habit = await habitRepo.getById(habitId);
-
         if (!habit) {
-          // El hábito no existe (fue eliminado). Retornamos stats vacíos.
           setData(cacheKey, EMPTY_STATS);
           return;
         }
+
+        // Adjust fromDate for 'total' period to avoid huge denominators
+        let effectiveFrom = fromDate;
+        if (period === 'total' && habit.fechaInicio) {
+          // Usar la fecha de inicio del hábito o 1970, lo que sea más reciente (aunque fechaInicio siempre será > 1970)
+          effectiveFrom = habit.fechaInicio;
+        }
+
+        // a) Query SQL agregada: solo contadores, sin filas en memoria.
+        const periodStats = await logRepo.getStatsByPeriod(habitId, effectiveFrom, toDate);
+
+        // b) Logs del periodo para calcular rachas.
+        const logs = await logRepo.getLogsForRange(habitId, effectiveFrom, toDate);
 
         const result = computeStats(periodStats, logs, habit);
         setData(cacheKey, result);
@@ -149,11 +153,14 @@ export const useHabitStats = ({
         // ── Modo global: estadísticas de todos los hábitos del usuario ─────
 
         if (!userId) {
-          // Sin userId no podemos hacer la query global. Es un error de integración.
           setError(cacheKey, 'useHabitStats: userId es requerido en modo global (habitId no definido).');
           return;
         }
 
+        // TODO: En modo global 'total', podríamos buscar el primer log o el primer hábito
+        // para ajustar fromDate. Por ahora mantenemos 1970 para evitar complejidad extra,
+        // pero totalDays será incorrecto para el porcentaje global total.
+        
         // a) Query SQL agregada global: cuenta combinaciones (día × hábito) únicas.
         const periodStats = await logRepo.getGlobalStatsByPeriod(userId, fromDate, toDate);
 

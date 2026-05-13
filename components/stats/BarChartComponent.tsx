@@ -8,8 +8,8 @@ import { ChartData } from '../../utils/chartAggregator';
  * Props para el componente BarChartComponent
  */
 interface BarChartComponentProps {
-  /** Modo de visualización: semanal o mensual */
-  mode: 'weekly' | 'monthly';
+  /** Modo de visualización: semanal, mensual o total */
+  mode: 'weekly' | 'monthly' | 'total';
   /** 
    * Datos estructurados obtenidos de aggregateChartData.
    */
@@ -67,12 +67,19 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
     datasets: [{ data: chartValues.length > 0 ? chartValues : [0] }],
   };
 
+  const getTitle = () => {
+    switch (mode) {
+      case 'weekly': return 'Progreso Semanal';
+      case 'monthly': return 'Progreso Mensual';
+      case 'total': return 'Progreso Histórico';
+      default: return 'Progreso';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>
-          {mode === 'weekly' ? 'Progreso Semanal' : 'Progreso Mensual'}
-        </Text>
+        <Text style={styles.title}>{getTitle()}</Text>
       </View>
 
       <View style={styles.chartWrapper}>
