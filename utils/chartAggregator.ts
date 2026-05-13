@@ -114,25 +114,28 @@ const isDayScheduled = (day: Date, habit: Habit): boolean => {
 const countDaysInPeriod = (
   days: Date[],
   logs: HabitLog[],
-  habit: Habit,
+  habitOrHabits: Habit | Habit[],
 ): { total: number; completed: number } => {
-  // Set de fechas completadas en formato YYYY-MM-DD → deduplicación automática
-  const completedSet = new Set(
-    logs
-      .filter(l => l.completado && l.habitId === habit.id)
-      .map(l => format(startOfDay(parseISO(l.fecha)), 'yyyy-MM-dd')),
-  );
+  const habits = Array.isArray(habitOrHabits) ? habitOrHabits : [habitOrHabits];
+  let totalAll = 0;
+  let completedAll = 0;
 
-  let total = 0;
-  let completed = 0;
+  for (const habit of habits) {
+    // Set de fechas completadas en formato YYYY-MM-DD → deduplicación automática
+    const completedSet = new Set(
+      logs
+        .filter(l => l.completado && l.habitId === habit.id)
+        .map(l => format(startOfDay(parseISO(l.fecha)), 'yyyy-MM-dd')),
+    );
 
-  for (const day of days) {
-    if (!isDayScheduled(day, habit)) continue;
-    total++;
-    if (completedSet.has(format(startOfDay(day), 'yyyy-MM-dd'))) completed++;
+    for (const day of days) {
+      if (!isDayScheduled(day, habit)) continue;
+      totalAll++;
+      if (completedSet.has(format(startOfDay(day), 'yyyy-MM-dd'))) completedAll++;
+    }
   }
 
-  return { total, completed };
+  return { total: totalAll, completed: completedAll };
 };
 
 /**
@@ -166,14 +169,14 @@ const computeRate = (completed: number, total: number): number => {
  */
 export const aggregateByWeek = (
   logs: HabitLog[],
-  habit: Habit,
+  habitOrHabits: Habit | Habit[],
   referenceDate: Date = new Date(),
 ): ChartData[] => {
   const weekStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
 
   return Array.from({ length: 7 }, (_, i) => {
     const day = addDays(weekStart, i);
-    const { total, completed } = countDaysInPeriod([day], logs, habit);
+    const { total, completed } = countDaysInPeriod([day], logs, habitOrHabits);
     return { label: DAY_LABELS[i], value: computeRate(completed, total), completed, total };
   });
 };
@@ -196,7 +199,7 @@ export const aggregateByWeek = (
  */
 export const aggregateByMonth = (
   logs: HabitLog[],
-  habit: Habit,
+  habitOrHabits: Habit | Habit[],
   referenceDate: Date = new Date(),
 ): ChartData[] => {
   const monthStart = startOfMonth(referenceDate);
@@ -212,7 +215,7 @@ export const aggregateByMonth = (
     const effectiveEnd   = min([weekEnd, monthEnd]);
 
     const days = eachDayOfInterval({ start: effectiveStart, end: effectiveEnd });
-    const { total, completed } = countDaysInPeriod(days, logs, habit);
+    const { total, completed } = countDaysInPeriod(days, logs, habitOrHabits);
 
     result.push({
       label: `Semana ${weekNum}`,
@@ -238,7 +241,7 @@ export const aggregateByMonth = (
  */
 export const aggregateByHistory = (
   logs: HabitLog[],
-  habit: Habit,
+  habitOrHabits: Habit | Habit[],
   referenceDate: Date = new Date(),
 ): ChartData[] => {
   const result: ChartData[] = [];
@@ -250,7 +253,7 @@ export const aggregateByHistory = (
     const monthEnd = endOfMonth(monthTarget);
 
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const { total, completed } = countDaysInPeriod(days, logs, habit);
+    const { total, completed } = countDaysInPeriod(days, logs, habitOrHabits);
 
     result.push({
       label: monthLabels[monthTarget.getMonth()],
@@ -274,17 +277,17 @@ export const aggregateByHistory = (
  */
 export const aggregateChartData = (
   logs: HabitLog[],
-  habit: Habit,
+  habitOrHabits: Habit | Habit[],
   mode: AggregateMode,
   referenceDate: Date = new Date(),
 ): ChartData[] => {
   switch (mode) {
     case 'weekly':
-      return aggregateByWeek(logs, habit, referenceDate);
+      return aggregateByWeek(logs, habitOrHabits, referenceDate);
     case 'monthly':
-      return aggregateByMonth(logs, habit, referenceDate);
+      return aggregateByMonth(logs, habitOrHabits, referenceDate);
     case 'total':
-      return aggregateByHistory(logs, habit, referenceDate);
+      return aggregateByHistory(logs, habitOrHabits, referenceDate);
     default:
       return [];
   }

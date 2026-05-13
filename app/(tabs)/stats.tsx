@@ -85,16 +85,16 @@ export default function StatsScreen() {
 
   // 3. Procesar datos para el BarChartComponent
   const chartData = useMemo(() => {
-    // Si no hay hábito seleccionado, el agregador actual solo soporta hábitos individuales.
-    // En vista global, mostramos un estado vacío o podríamos implementar un globalAggregator.
-    if (!selectedHabitId) return [];
+    // Si hay un hábito seleccionado, usamos ese. Si no, usamos todos los hábitos (vista global).
+    const targetHabits = selectedHabitId 
+      ? habits.find(h => h.id === selectedHabitId) 
+      : habits;
 
-    const habit = habits.find(h => h.id === selectedHabitId);
-    if (!habit) return [];
+    if (!targetHabits || (Array.isArray(targetHabits) && targetHabits.length === 0)) return [];
 
     // Para el modo 'total', el agregador ahora muestra el desglose por meses
     // de los últimos 6 meses.
-    return aggregateChartData(logs, habit, period);
+    return aggregateChartData(logs, targetHabits, period);
   }, [logs, selectedHabitId, habits, period]);
 
   // Nombre del hábito para el selector
