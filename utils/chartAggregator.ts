@@ -13,7 +13,7 @@
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   addDays, eachDayOfInterval, startOfDay, parseISO,
-  format, isBefore, isAfter, max, min,
+  format, isBefore, isAfter, max, min, subMonths
 } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
 
