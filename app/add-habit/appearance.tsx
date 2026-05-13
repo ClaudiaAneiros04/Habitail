@@ -53,24 +53,17 @@ export default function AppearanceScreen() {
 
   // Transición hacia el siguiente paso
   const handleNext = () => {
-    // Como no hay paso 3 interactivo implementado, guardamos directamente con defaults
-    addHabit({
-      userId: 'default-user',
-      nombre: nombreHabito,
-      descripcion: description,
-      categoria: params.categoria as string,
-      icono: selectedIcon,
-      colorHex: selectedColor,
-      frecuencia: Frequency.DAILY,
-      diasSemana: [0, 1, 2, 3, 4, 5, 6],
-      tipoVerificacion: VerificationType.BOOLEAN,
-      nivelPrioridad: Priority.NORMAL,
-      fechaInicio: new Date().toISOString(),
-      activo: true,
+    // Transición hacia el paso 3 (settings) pasando todos los datos acumulados
+    router.push({
+      pathname: '/add-habit/settings',
+      params: {
+        nombre: nombreHabito,
+        categoria: params.categoria as string,
+        descripcion: description,
+        icono: selectedIcon,
+        colorHex: selectedColor,
+      }
     });
-    
-    // Volver a la raíz
-    router.replace('/');
   };
 
   return (
@@ -168,8 +161,8 @@ export default function AppearanceScreen() {
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextText}>Guardar Hábito</Text>
-            <Ionicons name="checkmark" size={20} color="#FFF" />
+            <Text style={styles.nextText}>Siguiente</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
