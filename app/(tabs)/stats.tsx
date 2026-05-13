@@ -92,10 +92,9 @@ export default function StatsScreen() {
     const habit = habits.find(h => h.id === selectedHabitId);
     if (!habit) return [];
 
-    // Para el modo 'total', el agregador de barras por ahora muestra el mes actual
-    // ya que no tenemos un agregador anual de barras.
-    const aggregateMode = (period === 'total') ? 'monthly' : period;
-    return aggregateChartData(logs, habit, aggregateMode as 'weekly' | 'monthly');
+    // Para el modo 'total', el agregador ahora muestra el desglose por meses
+    // de los últimos 6 meses.
+    return aggregateChartData(logs, habit, period);
   }, [logs, selectedHabitId, habits, period]);
 
   // Nombre del hábito para el selector

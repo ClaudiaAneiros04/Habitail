@@ -21,14 +21,14 @@ import { Habit, HabitLog, Frequency } from '../types';
 // Tipos públicos
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AggregateMode = 'weekly' | 'monthly';
+export type AggregateMode = 'weekly' | 'monthly' | 'total';
 
 /**
  * Una barra del gráfico: puede representar un día (modo semanal)
  * o una semana del mes (modo mensual).
  */
 export type ChartData = {
-  /** Etiqueta del eje X. Ej: 'Lun', 'Semana 1'. */
+  /** Etiqueta del eje X. Ej: 'Lun', 'Semana 1', 'Ene'. */
   label: string;
   /** Tasa de cumplimiento 0–100 (redondeada a 1 decimal). */
   value: number;
@@ -229,12 +229,47 @@ export const aggregateByMonth = (
 };
 
 /**
- * Función de entrada única parametrizable por modo.
- * Delega a `aggregateByWeek` o `aggregateByMonth` según `mode`.
+ * Agrega logs por mes para los últimos 6 meses.
+ * Útil para la vista "Total" o "Histórica".
  *
  * @param logs          - Logs del hábito.
  * @param habit         - Hábito a representar.
- * @param mode          - 'weekly' → 7 barras diarias | 'monthly' → 4-5 barras semanales.
+ * @param referenceDate - Fecha de referencia (hoy).
+ */
+export const aggregateByHistory = (
+  logs: HabitLog[],
+  habit: Habit,
+  referenceDate: Date = new Date(),
+): ChartData[] => {
+  const result: ChartData[] = [];
+  const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  for (let i = 5; i >= 0; i--) {
+    const monthTarget = subMonths(referenceDate, i);
+    const monthStart = startOfMonth(monthTarget);
+    const monthEnd = endOfMonth(monthTarget);
+
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const { total, completed } = countDaysInPeriod(days, logs, habit);
+
+    result.push({
+      label: monthLabels[monthTarget.getMonth()],
+      value: computeRate(completed, total),
+      completed,
+      total,
+    });
+  }
+
+  return result;
+};
+
+/**
+ * Función de entrada única parametrizable por modo.
+ * Delega a `aggregateByWeek`, `aggregateByMonth` o `aggregateByHistory` según `mode`.
+ *
+ * @param logs          - Logs del hábito.
+ * @param habit         - Hábito a representar.
+ * @param mode          - 'weekly' | 'monthly' | 'total'.
  * @param referenceDate - Fecha de referencia (por defecto: hoy).
  */
 export const aggregateChartData = (
@@ -242,7 +277,15 @@ export const aggregateChartData = (
   habit: Habit,
   mode: AggregateMode,
   referenceDate: Date = new Date(),
-): ChartData[] =>
-  mode === 'weekly'
-    ? aggregateByWeek(logs, habit, referenceDate)
-    : aggregateByMonth(logs, habit, referenceDate);
+): ChartData[] => {
+  switch (mode) {
+    case 'weekly':
+      return aggregateByWeek(logs, habit, referenceDate);
+    case 'monthly':
+      return aggregateByMonth(logs, habit, referenceDate);
+    case 'total':
+      return aggregateByHistory(logs, habit, referenceDate);
+    default:
+      return [];
+  }
+};
