@@ -64,7 +64,12 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
 
   const barChartData = {
     labels: chartLabels,
-    datasets: [{ data: chartValues.length > 0 ? chartValues : [0] }],
+    datasets: [{ 
+      data: chartValues.length > 0 ? chartValues : [0],
+      colors: chartValues.length > 0 
+        ? chartValues.map(val => (opacity = 1) => val >= 100 ? `rgba(34, 197, 94, ${opacity})` : `rgba(99, 102, 241, ${opacity})`)
+        : [(opacity = 1) => `rgba(99, 102, 241, ${opacity})`]
+    }],
   };
 
   const getTitle = () => {
@@ -94,6 +99,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
           fromZero={true}
           showBarTops={false}
           withInnerLines={true}
+          withCustomBarColorFromData={true}
           segments={5}
           style={styles.chart}
         />
