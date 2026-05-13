@@ -117,11 +117,8 @@ export const useHeatmapData = ({
       } else {
         // ── Modo global: heatmap de todos los hábitos del usuario ─────────
         if (!userId) {
-          // Sin userId no se puede ejecutar la query global.
-          // Es un error de integración (el consumer olvidó pasar userId).
-          throw new Error(
-            'useHeatmapData: userId es requerido en modo global (habitId no definido).'
-          );
+          // Si no hay userId pero tampoco habitId, simplemente esperamos (podría estar cargando el usuario)
+          return;
         }
         // Query usa índice (userId, fecha): añadido en database.ts para esta query.
         rawRows = await logRepo.getHeatmapGlobal(userId, fromDate, toDate);

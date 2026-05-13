@@ -136,10 +136,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderColor: '#fee2e2',
+    backgroundColor: '#fef2f2', // Añadimos un fondo rojizo muy tenue para armonizar
+    borderWidth: 1,
   },
   errorText: {
     color: '#ef4444',
     fontSize: 14,
+    fontWeight: '500',
   },
   scrollContent: {
     paddingRight: Theme.spacing.md,

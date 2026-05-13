@@ -292,9 +292,10 @@ const styles = StyleSheet.create({
   },
   // Tinte rojizo sutil para ítems incumplidos: no punitivo, solo informativo.
   historyItemFailed: {
-    backgroundColor: 'rgba(251, 113, 133, 0.07)', // #FB7185 al 7% de opacidad
+    backgroundColor: '#FFF1F2', // Un rojo muy claro y sólido (Rose 50)
     borderWidth: 1,
-    borderColor: 'rgba(251, 113, 133, 0.20)',
+    borderColor: '#FFE4E6',     // Un borde ligeramente más oscuro (Rose 100)
+    shadowOpacity: 0.02,        // Reducimos la sombra para que no parezca que flota doblemente
   },
   leftPill: { flexDirection: 'row', alignItems: 'center' },
   iconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16 },

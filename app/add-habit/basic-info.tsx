@@ -13,12 +13,12 @@ import { Category } from '../../types';
 
 // Opciones de categoría predefinidas con colores e iconos curados
 const CATEGORY_DATA = [
-  { id: Category.SALUD, label: 'Salud', icon: 'medical', color: '#10b981' }, // Esmeralda
-  { id: Category.DEPORTE, label: 'Deporte', icon: 'barbell', color: '#3b82f6' }, // Azul
-  { id: Category.PRODUCTIVIDAD, label: 'Productividad', icon: 'briefcase', color: '#8b5cf6' }, // Violeta
-  { id: Category.BIENESTAR, label: 'Bienestar', icon: 'leaf', color: '#f59e0b' }, // Ámbar
-  { id: Category.FINANZAS, label: 'Finanzas', icon: 'wallet', color: '#ef4444' }, // Rojo
-  { id: Category.APRENDIZAJE, label: 'Aprendizaje', icon: 'book', color: '#ec4899' }, // Rosa
+  { id: Category.SALUD, label: 'Salud', icon: 'medical', color: '#10b981', lightColor: '#ecfdf5' },
+  { id: Category.DEPORTE, label: 'Deporte', icon: 'barbell', color: '#3b82f6', lightColor: '#eff6ff' },
+  { id: Category.PRODUCTIVIDAD, label: 'Productividad', icon: 'briefcase', color: '#8b5cf6', lightColor: '#f5f3ff' },
+  { id: Category.BIENESTAR, label: 'Bienestar', icon: 'leaf', color: '#f59e0b', lightColor: '#fffbeb' },
+  { id: Category.FINANZAS, label: 'Finanzas', icon: 'wallet', color: '#ef4444', lightColor: '#fef2f2' },
+  { id: Category.APRENDIZAJE, label: 'Aprendizaje', icon: 'book', color: '#ec4899', lightColor: '#fdf2f8' },
 ];
 
 export default function BasicInfoScreen() {
@@ -85,8 +85,8 @@ export default function BasicInfoScreen() {
                   key={cat.id}
                   style={[
                     styles.categoryCard,
-                    // Si el elemento está activo, renderiza un borde y opacidad sutil en el fondo usando la variante del color
-                    isSelected && { borderColor: cat.color, backgroundColor: cat.color + '1A' } 
+                    // Al seleccionar, usamos el color sólido claro para evitar conflictos con elevation en Android
+                    isSelected && { borderColor: cat.color, backgroundColor: cat.lightColor } 
                   ]}
                   onPress={() => setCategoria(cat.id)}
                   activeOpacity={0.7}
