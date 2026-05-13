@@ -21,7 +21,9 @@ interface BarChartComponentProps {
  * Utiliza react-native-chart-kit para la visualización.
  */
 export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data }) => {
-  const screenWidth = Dimensions.get('window').width - (Theme.spacing.md * 2) - 16;
+  // Calculamos el ancho exacto: 
+  // ScrollView (2 * md) + Contenedor (2 * md) = 4 * md. Le restamos 15px extra para poder desplazarlo a la derecha.
+  const screenWidth = Dimensions.get('window').width - (Theme.spacing.md * 4) - 15;
 
   // Extraemos labels y valores para el gráfico
   const chartLabels = data.map(d => d.label);
@@ -156,6 +158,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 16,
     paddingRight: 40,
+    marginLeft: 15, // Desplaza todo el bloque del gráfico 15px a la derecha para dar aire a los números
   },
   overlayContainer: {
     position: 'absolute',

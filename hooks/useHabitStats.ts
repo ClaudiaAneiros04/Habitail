@@ -126,14 +126,14 @@ export const useHabitStats = ({
       if (habitId) {
         // ── Modo individual: estadísticas para un hábito concreto ──────────
         
-        // Fetch habit first to know its start date
+        // Obtener el hábito primero para conocer su fecha de inicio
         const habit = await habitRepo.getById(habitId);
         if (!habit) {
           setData(cacheKey, EMPTY_STATS);
           return;
         }
 
-        // Adjust fromDate for 'total' period to avoid huge denominators
+        // Ajustar fromDate para el periodo 'total' para evitar denominadores gigantes
         let effectiveFrom = fromDate;
         if (period === 'total' && habit.fechaInicio) {
           // Usar la fecha de inicio del hábito o 1970, lo que sea más reciente (aunque fechaInicio siempre será > 1970)
