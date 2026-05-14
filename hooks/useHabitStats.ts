@@ -134,17 +134,27 @@ export const useHabitStats = ({
         }
 
         // Ajustar fromDate para el periodo 'total' para evitar denominadores gigantes
-        let effectiveFrom = fromDate;
+        let baseEffectiveFrom = fromDate;
         if (period === 'total' && habit.fechaInicio) {
-          // Usar la fecha de inicio del hábito o 1970, lo que sea más reciente (aunque fechaInicio siempre será > 1970)
-          effectiveFrom = habit.fechaInicio;
+          // Extraemos YYYY-MM-DD para compatibilidad lexicográfica en SQLite
+          baseEffectiveFrom = habit.fechaInicio.split('T')[0];
+        }
+
+        // b) Logs del periodo para calcular rachas.
+        // Siempre usamos fromDate (1970 para 'total') para capturar logs retroactivos (anteriores a la creación)
+        const logs = await logRepo.getLogsForRange(habitId, fromDate, toDate);
+
+        let effectiveFrom = baseEffectiveFrom;
+        if (period === 'total' && logs.length > 0) {
+          const oldestLogDate = logs[0].fecha.split('T')[0];
+          // Si el usuario registró un log antes de la fecha de inicio del hábito, ajustamos el inicio
+          if (oldestLogDate < effectiveFrom) {
+            effectiveFrom = oldestLogDate;
+          }
         }
 
         // a) Query SQL agregada: solo contadores, sin filas en memoria.
         const periodStats = await logRepo.getStatsByPeriod(habitId, effectiveFrom, toDate);
-
-        // b) Logs del periodo para calcular rachas.
-        const logs = await logRepo.getLogsForRange(habitId, effectiveFrom, toDate);
 
         const result = computeStats(periodStats, logs, habit);
         setData(cacheKey, result);
