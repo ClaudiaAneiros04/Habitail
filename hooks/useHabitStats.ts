@@ -186,10 +186,10 @@ export const useHabitStats = ({
     }
   }, [cacheKey, habitId, period, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Efecto principal: cargar datos al montar o cuando cambian las dependencias ──
+  // ── Efecto principal: cargar datos al montar o cuando cambian las dependencias o se limpia el caché ──
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, cacheEntry === undefined]);
 
   /**
    * Función de refresco pública: invalida el caché y lanza load() de nuevo.
