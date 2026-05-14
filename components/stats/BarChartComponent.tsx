@@ -36,9 +36,14 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
     const item = data[index];
     if (!item) return;
     
-    const detailText = item.total > 0 
-      ? `${item.completed}/${item.total} días completados`
-      : 'Sin hábitos programados';
+    let detailText = 'Sin programación';
+    if (item.total > 0) {
+      if (mode === 'weekly') {
+        detailText = `${item.completed}/${item.total} ${item.total === 1 ? 'hábito completado' : 'hábitos completados'}`;
+      } else {
+        detailText = `${item.completed}/${item.total} completados`;
+      }
+    }
 
     Alert.alert(
       'Detalle de Cumplimiento',
