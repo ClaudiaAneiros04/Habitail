@@ -54,7 +54,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
       // Mascota por defecto
       const defaultPet: Pet = {
         id: 'default-pet-1',
-        userId: 'local-user', // asumiendo single-user offline
+        userId: 'default-user', // asumiendo single-user offline
         vida: 100,
         nivel: 1,
         xp: 0,
@@ -76,5 +76,5 @@ export const usePetStore = create<PetStore>((set, get) => ({
   },
 }));
 
-// Hydration al iniciar
-usePetStore.getState().loadPet();
+// Hydration al iniciar - Comentado para usar carga secuencial en RootLayout
+// usePetStore.getState().loadPet();

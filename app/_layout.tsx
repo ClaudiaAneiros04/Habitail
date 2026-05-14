@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../constants/colors';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDb } from '../storage/database';
+import { useUserStore } from '../store/useUserStore';
+import { usePetStore } from '../store/usePetStore';
+import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
 import '../i18n';
 
@@ -20,9 +23,33 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    initDb()
-      .then(() => setDbReady(true))
-      .catch(console.error);
+    const initialize = async () => {
+      try {
+        // 1. Inicializar Base de Datos (Tablas)
+        await initDb();
+        
+        // 2. Carga secuencial de datos críticos para evitar colisiones de Foreign Keys
+        // Primero el usuario, ya que la mascota y los hábitos referencian su ID
+        await useUserStore.getState().loadUser();
+        
+        // Después la mascota
+        await usePetStore.getState().loadPet();
+        
+        // Finalmente los hábitos
+        await useHabitStore.getState().loadHabits();
+        
+        setDbReady(true);
+      } catch (error: any) {
+        console.error("Error durante la inicialización de la app:", error);
+        Alert.alert(
+          "Error de Inicialización",
+          "Hubo un problema al cargar los datos: " + (error?.message || "Error desconocido")
+        );
+        setDbReady(true);
+      }
+    };
+
+    initialize();
   }, []);
 
   if (!dbReady) {

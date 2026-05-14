@@ -13,9 +13,13 @@ import { CREATE_TABLES_SQL } from '../db/schema';
 export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
   if (!globalDb._dbPromise) {
     globalDb._dbPromise = (async () => {
-      const db = await SQLite.openDatabaseAsync('habitail.db');
+      const db = await SQLite.openDatabaseAsync('habitail_v2.db');
       
-      // Ejecutar la creación del esquema unificado desde db/schema.ts
+      // Ejecutar PRAGMAs por separado para mayor estabilidad en Android
+      await db.execAsync('PRAGMA journal_mode = WAL;');
+      await db.execAsync('PRAGMA foreign_keys = ON;'); // Habilitar explícitamente FK
+      
+      // Ejecutar la creación del esquema unificado
       await db.execAsync(CREATE_TABLES_SQL);
 
       return db;

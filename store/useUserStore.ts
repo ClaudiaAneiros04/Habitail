@@ -54,5 +54,5 @@ export const useUserStore = create<UserStore>((set, get) => ({
   },
 }));
 
-// Hydration al iniciar
-useUserStore.getState().loadUser();
+// Hydration al iniciar - Comentado para usar carga secuencial en RootLayout
+// useUserStore.getState().loadUser();
