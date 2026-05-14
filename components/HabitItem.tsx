@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Habit } from '../types';
@@ -21,6 +21,7 @@ interface HabitItemProps {
  */
 export default function HabitItem({ habit, completed, onToggle, streak }: HabitItemProps) {
   const checkScale = useRef(new Animated.Value(completed ? 1 : 0)).current;
+  const isFirstRender = useRef(true);
 
   // Usamos el nuevo hook centralizado
   const { currentStreak, refresh } = useHabitStats({ 
@@ -40,7 +41,12 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
     }).start();
     
     // Si completamos/descompletamos, invalidamos caché y recalculamos
-    refresh();
+    // Saltamos el primer render para evitar queries duplicadas al cargar la lista
+    if (!isFirstRender.current) {
+      refresh();
+    } else {
+      isFirstRender.current = false;
+    }
   }, [completed, checkScale, refresh]);
 
   const goToDetail = () => {
@@ -79,16 +85,25 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
         </View>
       </View>
       
-      <TouchableOpacity 
-        style={[styles.checkbox, completed && styles.checkboxCompleted]}
-        onPress={() => onToggle(habit.id)}
-        activeOpacity={0.6}
+      <Pressable 
+        style={({ pressed }) => [
+          styles.checkbox, 
+          completed && styles.checkboxCompleted,
+          pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+        ]}
+        onPress={(e) => {
+          // En Web, detenemos la propagación para que no se dispare el goToDetail del padre
+          if (Platform.OS === 'web') {
+            e.stopPropagation();
+          }
+          onToggle(habit.id);
+        }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <Animated.View style={{ transform: [{ scale: checkScale }], opacity: checkScale }}>
           <Ionicons name="checkmark" size={20} color="#FFF" />
         </Animated.View>
-      </TouchableOpacity>
+      </Pressable>
     </TouchableOpacity>
   );
 }

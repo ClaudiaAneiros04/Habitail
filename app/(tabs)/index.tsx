@@ -13,19 +13,9 @@ import ProgressBar from '../../components/ProgressBar';
 import { MiniPet } from '../../components/Pet/MiniPet';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
+import { formatDateDB, generateLogId } from '../../utils/dateUtils';
 
-// Native Date Helpers
-/**
- * Convierte un objeto Date nativo al string esperado por la DB (Formato: YYYY-MM-DD).
- * @param {Date} date - Fecha local a formatear.
- * @returns {string} Fecha en formato YYYY-MM-DD.
- */
-const formatDateDB = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
+// Native Date Helpers (Moved to utils/dateUtils.ts)
 
 /**
  * Compara dos fechas verificando que el año, mes y día coincidan, 
@@ -186,7 +176,7 @@ export default function HomeScreen() {
     const currentLog = completedHabitsObj[habit.id];
     const isCurrentlyCompleted = currentLog?.completado === true;
     const dateStr = formatDateDB(selectedDate);
-    const logId = `${habit.id}_${dateStr}`;
+    const logId = generateLogId(habit.id, selectedDate);
 
     if (isCurrentlyCompleted) {
       // El usuario DESMARCA: eliminamos el registro de la DB usando el hook de gamificación

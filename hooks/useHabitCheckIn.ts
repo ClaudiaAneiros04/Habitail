@@ -9,6 +9,7 @@ import { getHabitsForToday } from '../utils/frequencyEngine';
 import { useUserStore } from '../store/useUserStore';
 import { calcPointsDelta } from '../utils/pointsEngine';
 import { evaluateBadges } from '../utils/badgeEngine';
+import { formatDateDB, generateLogId } from '../utils/dateUtils';
 
 /**
  * Hook principal y modular para gestionar el Check-In (completar/desmarcar) de los hábitos.
@@ -34,15 +35,10 @@ export const useHabitCheckIn = () => {
 
   /**
    * Genera un ID determinista para el registro (log) de un día específico.
-   * Esto garantiza que si se vuelve a marcar/desmarcar en el mismo día, 
-   * se sobrescriba el log existente en lugar de generar duplicados en la base de datos.
-   * 
-   * @param habitId - El identificador del hábito.
-   * @param targetDate - La fecha objetivo del registro.
-   * @returns string - Un ID único determinista basado en el hábito y el inicio del día.
+   * Redirige a la utilidad centralizada para mantener consistencia.
    */
-  const generateLogId = (habitId: string, targetDate: Date): string => {
-    return `log_${habitId}_${startOfDay(targetDate).getTime()}`;
+  const getLogId = (habitId: string, targetDate: Date): string => {
+    return generateLogId(habitId, targetDate);
   };
 
   /**
@@ -55,13 +51,14 @@ export const useHabitCheckIn = () => {
    * @returns boolean - true si existe un registro y está completado, false en cualquier otro caso.
    */
   const getStatusForDay = useCallback((habitId: string, fecha: Date): boolean => {
-    const targetISO = startOfDay(fecha).toISOString();
+    const targetDateStr = formatDateDB(fecha);
     
     // Busca en el estado global el log que concuerde en fecha y ID de hábito
     const log = logs.find(l => {
       if (l.habitId !== habitId) return false;
-      const logISO = startOfDay(parseISO(l.fecha)).toISOString();
-      return logISO === targetISO;
+      // Normalizamos la fecha del log a YYYY-MM-DD para la comparación
+      const logDateStr = l.fecha.includes('T') ? formatDateDB(parseISO(l.fecha)) : l.fecha;
+      return logDateStr === targetDateStr;
     });
 
     return log ? log.completado : false;
@@ -121,10 +118,10 @@ export const useHabitCheckIn = () => {
 
     // 2. Crear la entidad de registro (log)
     const newLog: HabitLog = {
-      id: generateLogId(habitId, fecha),
+      id: getLogId(habitId, fecha),
       habitId,
       userId: user?.id || 'default-user',
-      fecha: formatISO(fecha),
+      fecha: formatDateDB(fecha),
       completado: true,
       timestampRegistro: formatISO(new Date())
     };
@@ -197,7 +194,7 @@ export const useHabitCheckIn = () => {
     // pero idealmente deberíamos borrar. Usaremos addLog con completado: false por ahora
     // a menos que deleteLog esté disponible.
     if (deleteLog) {
-      await deleteLog(generateLogId(habitId, fecha));
+      await deleteLog(getLogId(habitId, fecha));
     } else {
       await addLog(newLog);
     }
