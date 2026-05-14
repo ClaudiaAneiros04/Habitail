@@ -61,7 +61,7 @@ export const MiniPet = () => {
   return (
     <TouchableOpacity 
       style={styles.container} 
-      onPress={() => router.push('/pet' as any)}
+      onPress={() => router.push('/(tabs)/profile' as any)}
       activeOpacity={0.8}
     >
       {/* Contenedor de la cara con "Efecto Zoom" */}

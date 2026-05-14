@@ -1,13 +1,28 @@
-import { View, Text, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, SafeAreaView, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import PetDisplay from '../../components/Pet/PetDisplay';
+import { usePetStore } from '../../store/usePetStore';
 
 export default function ProfileScreen() {
+  const { pet } = usePetStore();
+
   return (
-    <View style={styles.container}>
-      <View style={styles.surface}>
-        <Text style={styles.title}>Mascota</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {/* Renderizamos el componente principal de la mascota */}
+        <PetDisplay pet={pet} />
+        
+        {/* Espacio para futuras interacciones (Tienda, Inventario, etc.) */}
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
+          <Text style={styles.infoText}>
+            ¡Completa tus hábitos diarios para mantener a tu mascota feliz y subir de nivel!
+          </Text>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -15,23 +30,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    padding: 16,
   },
-  surface: {
+  content: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  infoBox: {
+    flexDirection: 'row',
     backgroundColor: Colors.surface,
-    padding: 24,
+    marginHorizontal: 20,
+    marginTop: 20,
+    padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.primary + '10',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
     color: Colors.text,
+    opacity: 0.8,
+    lineHeight: 20,
   },
 });
