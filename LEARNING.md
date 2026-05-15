@@ -5,10 +5,15 @@
 1.  [Diseño de Arquitectura de Datos y Optimización: Índices](#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
 2.  [Lógica de Negocio — Fase 3: Rachas y Check-in](#lógica-de-negocio--fase-3-rachas-y-check-in)
 3.  [Errores y Aprendizajes — Fase 3](#errores-y-aprendizajes--fase-3)
-4.  [Lógica de Negocio — Fase 4: Estadísticas y Heatmap](#lógica-de-negocio--fase-4-usehabitstats)
+4.  [Lógica de Negocio — Fase 4: Estadísticas, Heatmap y Agregación](#lógica-de-negocio--fase-4-usehabitstats)
 5.  [Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota](#lógica-de-negocio--fase-4-definición-y-prompts-de-la-mascota)
-6.  [Lógica de Negocio — Fase 5: Gamificación y Penalizaciones](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
-7.  [Gestión de Dependencias — Incidente de Revert en Fase 4](#gestión-de-dependencias--incidente-de-revert-en-fase-4)
+6.  [Gestión de Dependencias — Incidente de Revert en Fase 4](#gestión-de-dependencias--incidente-de-revert-en-fase-4)
+7.  [Gestión de Assets — Fase 5: Fuentes y Recursos](#gestión-de-assets--fase-5-fuentes-y-recursos)
+8.  [Lógica de Negocio — Fase 5: Mascota y Gamificación](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
+9.  [Post-Merge Fixes — Fase 5: Integración y Alineación de Contratos](#post-merge-fixes--fase-5-integración-lógica--frontend)
+10. [Refactorización y Mejoras de Calidad: Estadísticas y Persistencia](#refactorización-y-mejoras-de-calidad-estadísticas-y-persistencia)
+
+
  
 ---
  
@@ -553,6 +558,26 @@ Aunque implementado físicamente en la transición a la Fase 5, el diseño lógi
 
 ---
 
+# Gestión de Dependencias — Incidente de Revert en Fase 4
+
+## 1. El Incidente: Merge de `logic_fase4`
+Durante la integración de la rama `logic_fase4`, se produjo una rotura crítica de dependencias que impedía el arranque de la aplicación. El problema se originó por actualizaciones automáticas de paquetes que entraron en conflicto con el entorno de ejecución de Expo.
+
+- **Commit de Corrección**: `Revert dependency upgrades to match master state` (con −3,299 líneas).
+- **Impacto**: Se tuvo que realizar un revert manual ("a pelo") de las versiones en `package.json` y `package-lock.json` para volver al estado estable de la rama `master`.
+- **Lección**: Las actualizaciones masivas de dependencias durante un merge de lógica de negocio introducen demasiadas variables de error simultáneas, dificultando el debugging.
+
+## 2. Regla Acordada para Futuras Actualizaciones (Fase 5+)
+Para evitar que este incidente se repita en la Fase 5 y posteriores, se establece el siguiente protocolo obligatorio para cualquier cambio en dependencias:
+
+1.  **Aislamiento**: Cualquier actualización de dependencias debe realizarse en una **rama propia y dedicada** (ej: `fix/dependency-upgrade`), nunca como parte de una rama de feature de lógica.
+2.  **Validación en Entorno Real**: No basta con que el empaquetador compile. Se debe probar físicamente en **Expo Go** (o el entorno de desarrollo destino) para asegurar que no hay errores de runtime.
+3.  **Merge Condicional**: Solo se permite el merge a la rama principal si se demuestra que la aplicación es estable y todas las funcionalidades críticas (especialmente base de datos y UI) operan correctamente.
+4.  **Sincronización**: Tras un merge de este tipo, todos los colaboradores deben ejecutar `npm install` o `npx expo install` inmediatamente para evitar inconsistencias locales.
+
+---
+
+
 # Gestión de Assets — Fase 5: Fuentes y Recursos
 
 ## 1. Implementación de petAssetResolver y Fallback Visual
@@ -732,22 +757,40 @@ Para mantener la coherencia, se siguen estas reglas en los Repositorios:
 - **Arrays**: `JSON string` en DB <-> `T[]` en TS (usando `JSON.parse` / `JSON.stringify`).
 - **Opcionales**: `NULL` en DB <-> `undefined` en TS (usando `|| undefined` o chequeos de `null`).
 
+
 ---
 
-# Gestión de Dependencias — Incidente de Revert en Fase 4
+# Refactorización y Mejoras de Calidad: Estadísticas y Persistencia
 
-## 1. El Incidente: Merge de `logic_fase4`
-Durante la integración de la rama `logic_fase4`, se produjo una rotura crítica de dependencias que impedía el arranque de la aplicación. El problema se originó por actualizaciones automáticas de paquetes que entraron en conflicto con el entorno de ejecución de Expo.
+## 1. Optimización del Caché de Estadísticas
+Se identificó un problema de inconsistencia visual donde los gráficos de racha y éxito no se actualizaban inmediatamente tras un check-in debido a la política de caché del `useStatsStore`.
 
-- **Commit de Corrección**: `Revert dependency upgrades to match master state` (con −3,299 líneas).
-- **Impacto**: Se tuvo que realizar un revert manual ("a pelo") de las versiones en `package.json` y `package-lock.json` para volver al estado estable de la rama `master`.
-- **Lección**: Las actualizaciones masivas de dependencias durante un merge de lógica de negocio introducen demasiadas variables de error simultáneas, dificultando el debugging.
+**Solución:**
+- Implementación de una **invalidación proactiva** en el hook `useHabitStats`. 
+- Se añadió un listener que observa los cambios en `logStore`. Al detectar un nuevo log o una eliminación, dispara automáticamente `refresh()`.
+- Esto elimina la necesidad de que el usuario navegue fuera y vuelva a entrar para ver reflejado su progreso, mejorando drásticamente la percepción de fluidez (UX).
 
-## 2. Regla Acordada para Futuras Actualizaciones (Fase 5+)
-Para evitar que este incidente se repita en la Fase 5 y posteriores, se establece el siguiente protocolo obligatorio para cualquier cambio en dependencias:
+## 2. Robustez en el Cálculo de Estadísticas (`chartAggregator.ts`)
+El motor de agregación fue refactorizado para soportar una visión global y corregir sesgos en periodos largos.
 
-1.  **Aislamiento**: Cualquier actualización de dependencias debe realizarse en una **rama propia y dedicada** (ej: `fix/dependency-upgrade`), nunca como parte de una rama de feature de lógica.
-2.  **Validación en Entorno Real**: No basta con que el empaquetador compile. Se debe probar físicamente en **Expo Go** (o el entorno de desarrollo destino) para asegurar que no hay errores de runtime.
-3.  **Merge Condicional**: Solo se permite el merge a la rama principal si se demuestra que la aplicación es estable y todas las funcionalidades críticas (especialmente base de datos y UI) operan correctamente.
-4.  **Sincronización**: Tras un merge de este tipo, todos los colaboradores deben ejecutar `npm install` o `npx expo install` inmediatamente para evitar inconsistencias locales.
+**Mejoras Clave:**
+- **Agregación por Meses (`aggregateByHistory`)**: Se implementó una lógica que itera los últimos 6 meses, calculando la tasa de éxito real basada en los días programados de cada mes.
+- **Soporte Multi-Hábito**: `countDaysInPeriod` ahora acepta tanto un solo hábito como un array de ellos, permitiendo que `BarChartComponent` muestre estadísticas agregadas de toda la cuenta del usuario (vista "Global").
+- **Deduplicación de Logs**: Se reforzó el uso de `Set<string>` con formato `YYYY-MM-DD` para asegurar que, incluso ante inconsistencias en la base de datos (múltiples registros el mismo día), el cálculo de cumplimiento sea siempre preciso.
+
+## 3. Evolución del Esquema: Base de Datos v2 y Android
+Para resolver problemas de inicialización y "loading infinito" en dispositivos Android reales (APK), se realizaron cambios estructurales en la capa de persistencia.
+
+**Cambios Técnicos:**
+- **Migración a v2**: El esquema de SQLite fue actualizado para consolidar todos los campos de gamificación y configuración de hábitos en una estructura más estable.
+- **Lazy Loading de Usuario**: Se corrigió un error en `useHeatmapData` donde la falta de un `userId` inicial (durante el splash screen) provocaba un fallo silencioso. Ahora el sistema maneja el ID opcionalmente y reintenta la carga una vez hidratado el `UserStore`.
+- **Limpieza de Inicialización**: Se centralizó la lógica de `initDb()` en un único punto de entrada en `app/_layout.tsx`, eliminando duplicidades que causaban bloqueos en el sistema de archivos (OPFS/SQLite).
+
+## 4. Refinamiento de la Interfaz de Gráficos
+Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente superior.
+
+- **Alertas Detalladas**: Al pulsar sobre una barra, el sistema ahora distingue entre "Sin programación" (días donde no tocaba hacer el hábito) y el desglose real de `completados/totales`.
+- **Ajustes de Layout**: Se añadieron márgenes dinámicos y offsets (`marginLeft: 15`) para evitar que las etiquetas del eje Y se corten en pantallas pequeñas.
+- **Traducción y Limpieza**: Se eliminaron comentarios residuales en inglés y se unificó la nomenclatura en español para mantener la consistencia en toda la documentación técnica del proyecto.
+
 
