@@ -10,6 +10,7 @@ import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
+import { registerNotificationCategories, setupNotificationListeners } from '../src/notifications/notificationService';
 import '../i18n';
 
 export default function RootLayout() {
@@ -25,6 +26,9 @@ export default function RootLayout() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        // 0. Inicializar notificaciones
+        await registerNotificationCategories();
+
         // 1. Inicializar Base de Datos (Tablas)
         await initDb();
         
@@ -50,6 +54,14 @@ export default function RootLayout() {
     };
 
     initialize();
+  }, []);
+
+  // Configurar listeners de notificaciones interactivos
+  useEffect(() => {
+    const cleanup = setupNotificationListeners();
+    return () => {
+      cleanup();
+    };
   }, []);
 
   if (!dbReady) {
