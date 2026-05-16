@@ -10,6 +10,7 @@ import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
+import { useOnboarding } from '../hooks/useOnboarding';
 import '../i18n';
 
 export default function RootLayout() {
@@ -52,6 +53,8 @@ export default function RootLayout() {
     initialize();
   }, []);
 
+  const { onboardingCompleted } = useOnboarding();
+
   if (!dbReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
@@ -65,7 +68,14 @@ export default function RootLayout() {
       <SafeAreaProvider style={{ backgroundColor: Colors.background }}>
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {!onboardingCompleted ? (
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          ) : (
+            <>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false }} />
+            </>
+          )}
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

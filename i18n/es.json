@@ -26,5 +26,33 @@
     "cancelar": "Cancelar",
     "eliminar": "Eliminar",
     "editar": "Editar"
+  },
+  "notifications": {
+    "permission": {
+      "title": "No te olvides de tus hábitos",
+      "description": "Sin notificaciones perderás tus recordatorios diarios y tu mascota podría echarte de menos",
+      "accept": "Activar notificaciones",
+      "deny": "Ahora no"
+    },
+    "banner": {
+      "denied": "Las notificaciones están desactivadas. Puedes activarlas en Ajustes",
+      "goToSettings": "Ir a Ajustes"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "¡Bienvenido a Habitail!",
+      "petNamePlaceholder": "Nombre de tu mascota",
+      "nextButton": "Siguiente"
+    },
+    "interests": {
+      "title": "¿Qué áreas te interesan?",
+      "nextButton": "Siguiente"
+    },
+    "habits": {
+      "title": "Elige tus primeros hábitos",
+      "emptyState": "No hay hábitos sugeridos para estas áreas.",
+      "startButton": "Empezar"
+    }
   }
 }

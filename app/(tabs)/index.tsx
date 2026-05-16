@@ -11,6 +11,7 @@ import { getHabitsForToday } from '../../utils/frequencyEngine';
 import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
 import { MiniPet } from '../../components/Pet/MiniPet';
+import { PermissionBanner } from '../../components/PermissionBanner';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
 import { formatDateDB, generateLogId } from '../../utils/dateUtils';
@@ -260,6 +261,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <PermissionBanner />
       {/* Cabecera */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
