@@ -16,6 +16,8 @@ export function ChipSelector({ label, selected, onPress }: Props) {
       style={[styles.container, selected && styles.selectedContainer]} 
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
     >
       {selected && <Ionicons name="checkmark" size={16} color={Colors.surface} style={styles.icon} />}
       <Text style={[styles.text, selected && styles.selectedText]}>{label}</Text>

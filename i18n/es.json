@@ -52,6 +52,7 @@
     "habits": {
       "title": "Elige tus primeros hábitos",
       "emptyState": "No hay hábitos sugeridos para estas áreas.",
+      "changeInterests": "Cambiar intereses",
       "startButton": "Empezar"
     }
   }

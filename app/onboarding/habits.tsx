@@ -64,6 +64,12 @@ export default function HabitsScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="leaf-outline" size={64} color={Theme.colors.inactive} />
             <Text style={styles.emptyText}>{t('onboarding.habits.emptyState')}</Text>
+            <TouchableOpacity 
+              style={styles.changeInterestsButton} 
+              onPress={() => router.back()}
+            >
+              <Text style={styles.changeInterestsText}>{t('onboarding.habits.changeInterests')}</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -133,6 +139,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Theme.colors.textSecondary,
     textAlign: 'center',
+  },
+  changeInterestsButton: {
+    marginTop: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.md,
+    borderRadius: 8,
+    backgroundColor: `${Colors.primary}10`,
+  },
+  changeInterestsText: {
+    color: Colors.primary,
+    fontWeight: '600',
+    fontSize: 16,
   },
   footer: {
     padding: Theme.spacing.lg,
