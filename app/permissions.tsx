@@ -10,7 +10,13 @@ import { Colors } from '../constants/colors';
 export default function NotificationPermissionScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { requestPermissions } = useNotificationPermission();
+  const { status, requestPermissions } = useNotificationPermission();
+
+  React.useEffect(() => {
+    if (status === 'granted') {
+      router.replace('/(tabs)');
+    }
+  }, [status]);
 
   const handleAccept = async () => {
     await requestPermissions();
