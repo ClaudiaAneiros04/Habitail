@@ -793,4 +793,34 @@ Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente
 - **Ajustes de Layout**: Se añadieron márgenes dinámicos y offsets (`marginLeft: 15`) para evitar que las etiquetas del eje Y se corten en pantallas pequeñas.
 - **Traducción y Limpieza**: Se eliminaron comentarios residuales en inglés y se unificó la nomenclatura en español para mantener la consistencia en toda la documentación técnica del proyecto.
 
+---
+
+# UI/UX y Casos Borde — Fase 6: Onboarding y Notificaciones
+
+Durante el desarrollo de la interfaz visual del flujo inicial y el sistema de permisos, se documentaron e implementaron resoluciones para los siguientes casos límite:
+
+## 1. Permisos concedidos y luego revocados desde Ajustes
+Si un usuario concede permisos de notificación pero semanas después los revoca directamente desde los ajustes nativos de su sistema operativo, el `requestPermissions()` inicial ya no es suficiente. 
+**Resolución**: Se implementó en el hook `useNotificationPermission` un listener de `AppState` que re-evalúa el status cada vez que la app entra en estado `active`. Esto asegura que el `PermissionBanner` reaccione y vuelva a aparecer alertando al usuario en caso de revocación externa.
+
+## 2. Onboarding interrumpido
+Si un usuario abandona la app a mitad del flujo (ej: llega a la selección de hábitos y cierra el proceso), ¿qué ocurre al volver a abrirla?
+**Resolución (MVP)**: El flujo completo se reinicia desde `WelcomeScreen`. La decisión técnica se fundamenta en que el estado del onboarding (`onboardingCompleted`) solo muta a `true` al pulsar el botón final *"Empezar"*. Como el input de la mascota y los intereses seleccionados no se guardan en el storage hasta el final de la transacción para mantener la atomicidad de los datos, reiniciar desde cero garantiza la integridad de las preferencias.
+
+## 3. Validación: Nombre de mascota "vacío"
+Un usuario podría introducir `«   »` (3 espacios). Técnicamente, cumple con la regla de longitud `length >= 2`.
+**Resolución**: Se aplica `.trim()` reactivamente al evaluar el estado `isValid` y antes de inyectar el parámetro en la navegación hacia la siguiente pantalla (`petName.trim()`). Esto impide que nombres formados únicamente por espacios vacíos habiliten el botón *"Siguiente"*.
+
+## 4. Empty State en OnboardingHabitsScreen
+Es teóricamente posible que las categorías elegidas por el usuario no devuelvan ningún hábito pre-sugerido en el MVP.
+**Resolución**: Se diseñó un `ListEmptyComponent` que muestra un icono sutil (`leaf-outline`), un mensaje explicativo y un CTA (Call to Action) explícito: *"Cambiar intereses"*. Este botón realiza un `router.back()` devolviendo al usuario a la pantalla anterior sin perder la coherencia del Stack Navigator, previniendo un estado de bloqueo.
+
+## 5. Pantalla de Permisos en Ecosistemas Android
+Existen discrepancias fundamentales en cómo iOS y Android manejan permisos de notificaciones:
+**Resolución**: La pantalla explicativa (`NotificationPermissionScreen`) fue diseñada para contextualizar al usuario antes del prompt nativo. Sin embargo, en **Android 12 o inferior**, los permisos de notificaciones están concedidos por defecto al instalar la app (API < 33). El hook `useNotificationPermission` maneja silenciosamente este caso, resolviendo el `status` como `granted` inmediatamente. Un `useEffect` en la UI detecta esto y realiza un "bypass" (redirección automática a `HomeScreen`), asegurando que el flujo no quede bloqueado con botones inoperantes en sistemas operativos más antiguos.
+
+## 6. Accesibilidad del ChipSelector
+Para garantizar que la selección de categorías sea utilizable por herramientas de lectura de pantalla (VoiceOver/TalkBack).
+**Resolución**: Se implementó explícitamente `accessibilityRole="checkbox"` y `accessibilityState={{ checked: selected }}` en el componente `ChipSelector`. Esto comunica semánticamente al SO que el botón actúa como un toggle binario y le transmite su estado actual, más allá de la retroalimentación puramente visual de los colores primarios.
+
 
