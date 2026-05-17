@@ -46,6 +46,7 @@ export interface User {
   lastPenaltyAppliedDate?: string; // App Init Job
   inventario?: string[]; // IDs de items comprados
   badges?: string[]; // IDs de insignias desbloqueadas
+  lastOpenedAt?: number; // Timestamp de la última vez que abrió la app (Fase 6)
 }
 
 export interface Pet {

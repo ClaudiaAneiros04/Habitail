@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Alert } from 'react-native';
+import { View, ActivityIndicator, Alert, AppState, AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,7 @@ import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
 import { registerNotificationCategories, setupNotificationListeners } from '../src/notifications/notificationService';
+import { handleAppForeground } from '../src/notifications/inactivityService';
 import '../i18n';
 
 export default function RootLayout() {
@@ -63,6 +64,26 @@ export default function RootLayout() {
       cleanup();
     };
   }, []);
+
+  // Listener para capturar el regreso al primer plano (foreground) y programar retención por inactividad
+  useEffect(() => {
+    if (!dbReady) return;
+
+    // Ejecución inicial al cargar la app por primera vez en esta sesión
+    handleAppForeground();
+
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('[RootLayout] App ha regresado a primer plano. Actualizando lastOpenedAt y reiniciando temporizador de inactividad.');
+        await handleAppForeground();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [dbReady]);
 
   if (!dbReady) {
     return (
