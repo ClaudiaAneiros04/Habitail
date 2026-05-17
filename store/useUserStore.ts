@@ -31,6 +31,16 @@ export const useUserStore = create<UserStore>((set, get) => ({
   },
   loadUser: async () => {
     let user = await userRepo.get();
+    
+    // Recuperar el flag onboardingCompleted desde AsyncStorage
+    let onboardingCompleted = false;
+    try {
+      const completedStr = await AsyncStorage.getItem('@onboarding_completed');
+      onboardingCompleted = completedStr === 'true';
+    } catch (e) {
+      console.warn('[UserStore] Error al cargar onboardingCompleted desde AsyncStorage:', e);
+    }
+
     if (!user) {
       // Crear usuario por defecto si no existe (Fase inicial/Demo)
       user = {
@@ -38,9 +48,12 @@ export const useUserStore = create<UserStore>((set, get) => ({
         username: 'Usuario',
         fechaRegistro: new Date().toISOString(),
         puntos: 0,
-        onboardingCompleted: true,
+        onboardingCompleted,
       };
       await userRepo.save(user);
+    } else {
+      // Mantener sincronizado el flag con AsyncStorage
+      user.onboardingCompleted = onboardingCompleted;
     }
     
     // Recuperar el último timestamp de apertura desde AsyncStorage

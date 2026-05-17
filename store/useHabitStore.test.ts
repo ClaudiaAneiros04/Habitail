@@ -13,7 +13,7 @@ describe('useHabitStore', () => {
     useHabitStore.setState({ habits: [] });
   });
 
-  it('debería añadir un hábito correctamente y asignarle un UUID v4', () => {
+  it('debería añadir un hábito correctamente y asignarle un UUID v4', async () => {
     // Preparamos los datos base del hábito (sin ID)
     const habitData: Omit<Habit, 'id'> = {
       userId: 'user-123',
@@ -31,7 +31,7 @@ describe('useHabitStore', () => {
     };
 
     // Añadimos el hábito mediante la función expuesta en el store
-    useHabitStore.getState().addHabit(habitData);
+    await useHabitStore.getState().addHabit(habitData);
 
     // Obtenemos el estado actualizado
     const state = useHabitStore.getState();

@@ -10,7 +10,18 @@ import { format } from 'date-fns';
 jest.mock('../../store/useUserStore');
 jest.mock('../../store/useHabitStore');
 jest.mock('../../store/usePetStore');
-jest.mock('../../storage/LogRepository');
+
+// Mock manual de LogRepository para interceptar el constructor a nivel de módulo
+jest.mock('../../storage/LogRepository', () => {
+  const mockGetMissed = jest.fn().mockResolvedValue([]);
+  return {
+    LogRepository: jest.fn().mockImplementation(() => {
+      return {
+        getMissedHabitsForDate: mockGetMissed,
+      };
+    }),
+  };
+});
 
 describe('useDailyPenaltyJob', () => {
   const todayString = format(new Date(), 'yyyy-MM-dd');
@@ -22,7 +33,14 @@ describe('useDailyPenaltyJob', () => {
   beforeEach(() => {
     mockUpdateUser = jest.fn();
     mockUpdateHealth = jest.fn();
-    mockGetMissedHabits = jest.fn();
+
+    // Obtener la instancia del mock creada a nivel de módulo y resetear el spy
+    const mockInstance = (LogRepository as any).mock.results[0]?.value || 
+                         (LogRepository as any).mock.instances[0];
+                         
+    mockGetMissedHabits = mockInstance?.getMissedHabitsForDate || jest.fn().mockResolvedValue([]);
+    mockGetMissedHabits.mockReset();
+    mockGetMissedHabits.mockResolvedValue([]); // Valor por defecto
 
     (useUserStore as any).mockReturnValue({
       user: { id: 'u1', lastPenaltyAppliedDate: null },
@@ -37,8 +55,6 @@ describe('useDailyPenaltyJob', () => {
       pet: { vida: 100 },
       updateHealth: mockUpdateHealth,
     });
-
-    (LogRepository as any).prototype.getMissedHabitsForDate = mockGetMissedHabits;
   });
 
   test('Job should not run if lastPenaltyAppliedDate === today', async () => {
