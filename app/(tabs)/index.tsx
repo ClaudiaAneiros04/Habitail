@@ -81,6 +81,7 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDayDate(new Date()));
   const [completedHabitsObj, setCompletedHabitsObj] = useState<Record<string, HabitLog>>({});
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [snoozedHabits, setSnoozedHabits] = useState<Record<string, Date>>({});
   
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -370,8 +371,8 @@ export default function HomeScreen() {
                 completed={completedHabitsObj[item.id]?.completado || false}
                 onToggle={(habitId) => handleToggleHabit(item)}
                 // TODO: Logic/Data debe exponer snoozedUntil en el store.
-                // Provisionalmente pasamos undefined (se documenta en LEARNING.md)
-                snoozedUntil={undefined}
+                // Provisionalmente usamos un estado local (se documenta en LEARNING.md)
+                snoozedUntil={snoozedHabits[item.id]}
               />
             )}
             ListEmptyComponent={

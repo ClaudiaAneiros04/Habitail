@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,26 @@ export default function HabitItem({ habit, completed, onToggle, streak, snoozedU
   const { t } = useTranslation();
   const checkScale = useRef(new Animated.Value(completed ? 1 : 0)).current;
   const isFirstRender = useRef(true);
+
+  const [isSnoozedVisible, setIsSnoozedVisible] = useState(false);
+
+  useEffect(() => {
+    if (snoozedUntil && !completed) {
+      const now = new Date();
+      const timeDiff = new Date(snoozedUntil).getTime() - now.getTime();
+      if (timeDiff > 0) {
+        setIsSnoozedVisible(true);
+        const timer = setTimeout(() => {
+          setIsSnoozedVisible(false);
+        }, timeDiff);
+        return () => clearTimeout(timer);
+      } else {
+        setIsSnoozedVisible(false);
+      }
+    } else {
+      setIsSnoozedVisible(false);
+    }
+  }, [snoozedUntil, completed]);
 
   // Usamos el nuevo hook centralizado
   const { currentStreak, refresh } = useHabitStats({ 
@@ -85,10 +105,10 @@ export default function HabitItem({ habit, completed, onToggle, streak, snoozedU
               </View>
             )}
             
-            {snoozedUntil && !completed && (
+            {isSnoozedVisible && !completed && (
               <View style={styles.snoozedBadge}>
-                <Ionicons name="alarm-outline" size={12} color={Colors.warning} />
-                <Text style={styles.snoozedText}>{t('home.snoozed')}</Text>
+                <Ionicons name="alarm-outline" size={12} color={Colors.accent} />
+                <Text style={styles.snoozedText}>{t('home.badge.snoozed')}</Text>
               </View>
             )}
           </View>
@@ -189,7 +209,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   snoozedBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)', // Warning color with opacity
+    backgroundColor: 'rgba(244, 63, 94, 0.1)', // Accent color with opacity
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -199,7 +219,7 @@ const styles = StyleSheet.create({
   },
   snoozedText: {
     fontSize: 12,
-    color: Colors.warning,
+    color: Colors.accent,
     fontWeight: '600',
     marginLeft: 4,
   },

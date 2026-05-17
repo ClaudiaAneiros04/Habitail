@@ -17,7 +17,9 @@
     "toast": {
       "habitCompleted": "✓ {{name}} completado"
     },
-    "snoozed": "Pospuesto"
+    "badge": {
+      "snoozed": "· 30 min"
+    }
   },
   "habits": {
     "empty": {
