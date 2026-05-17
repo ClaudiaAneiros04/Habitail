@@ -13,7 +13,11 @@
     },
     "progress": {
       "texto": "{{completados}} de {{total}} hábitos"
-    }
+    },
+    "toast": {
+      "habitCompleted": "✓ {{name}} completado"
+    },
+    "snoozed": "Pospuesto"
   },
   "habits": {
     "empty": {

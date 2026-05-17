@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Habit } from '../types';
 import { Colors } from '../constants/colors';
 import { useHabitStats } from '../hooks/useHabitStats';
@@ -14,12 +15,14 @@ interface HabitItemProps {
   completed: boolean;
   onToggle: (habitId: string) => void;
   streak?: number;
+  snoozedUntil?: Date | null;
 }
 
 /**
  * Renderiza la tarjeta individual para un hábito.
  */
-export default function HabitItem({ habit, completed, onToggle, streak }: HabitItemProps) {
+export default function HabitItem({ habit, completed, onToggle, streak, snoozedUntil }: HabitItemProps) {
+  const { t } = useTranslation();
   const checkScale = useRef(new Animated.Value(completed ? 1 : 0)).current;
   const isFirstRender = useRef(true);
 
@@ -79,6 +82,13 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
             {displayStreak > 0 && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
+              </View>
+            )}
+            
+            {snoozedUntil && !completed && (
+              <View style={styles.snoozedBadge}>
+                <Ionicons name="alarm-outline" size={12} color={Colors.warning} />
+                <Text style={styles.snoozedText}>{t('home.snoozed')}</Text>
               </View>
             )}
           </View>
@@ -177,6 +187,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.accent,
     fontWeight: '600',
+  },
+  snoozedBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)', // Warning color with opacity
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  snoozedText: {
+    fontSize: 12,
+    color: Colors.warning,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   checkbox: {
     width: 28,
