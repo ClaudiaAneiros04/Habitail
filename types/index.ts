@@ -76,6 +76,11 @@ export interface Habit {
   fechaInicio: string;
   fechaFin?: string;
   activo: boolean;
+
+  // English aliases / Gamification properties (Phase 6 Notifications requirement)
+  name?: string;
+  reminderTime?: string;
+  completedDays?: string[];
 }
 
 export interface HabitLog {

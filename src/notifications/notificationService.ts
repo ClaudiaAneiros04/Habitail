@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLogStore } from '../../store/useLogStore';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitStore } from '../../store/useHabitStore';
@@ -8,7 +9,7 @@ import { useStatsStore } from '../../store/useStatsStore';
 import { calcPointsDelta } from '../../utils/pointsEngine';
 import { evaluateBadges } from '../../utils/badgeEngine';
 import { generateLogId, formatDateDB } from '../../utils/dateUtils';
-import { HabitLog } from '../../types';
+import { HabitLog, Habit } from '../../types';
 
 // ============================================================================
 // Constants
@@ -210,16 +211,17 @@ async function handleSnoozeAction(
 // ============================================================================
 
 /**
- * Configura los listeners para detectar las respuestas a las notificaciones.
- * Esto captura cuando el usuario toca la notificación principal o uno de los botones de acción.
+ * Configura los listeners para detectar las respuestas y recepción de las notificaciones.
+ * Esto captura cuando el usuario recibe una notificación en primer plano o interactúa con ella.
  * 
- * @returns Una función de limpieza para remover el listener cuando el componente se desmonte.
+ * @returns Una función de limpieza para remover los listeners cuando el componente se desmonte.
  */
 export function setupNotificationListeners(): () => void {
   if (Platform.OS === 'web') {
     return () => {}; // No-op en web
   }
 
+  // Listener para capturar interacciones (cuando el usuario presiona botones o la notificación principal)
   const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
     const actionIdentifier = response.actionIdentifier;
     const notificationData = response.notification.request.content.data as unknown as HabitNotificationData;
@@ -229,6 +231,10 @@ export function setupNotificationListeners(): () => void {
       console.warn('[NotificationService] Acción recibida pero no se encontró un habitId en los datos.');
       return;
     }
+
+    // Registramos que se mostró/interactuó con la notificación hoy para cumplir la Regla de Oro
+    const todayStr = formatDateDB(new Date());
+    await AsyncStorage.setItem(`notification_last_sent_${habitId}`, todayStr);
 
     // Delegamos la lógica dependiendo de la acción presionada
     if (actionIdentifier === ACTION_DONE) {
@@ -245,8 +251,181 @@ export function setupNotificationListeners(): () => void {
     }
   });
 
+  // Listener para capturar notificaciones recibidas en primer plano (foreground)
+  const receivedListener = Notifications.addNotificationReceivedListener(async (notification) => {
+    const notificationData = notification.request.content.data as unknown as HabitNotificationData;
+    const habitId = notificationData?.habitId;
+    if (habitId) {
+      const todayStr = formatDateDB(new Date());
+      await AsyncStorage.setItem(`notification_last_sent_${habitId}`, todayStr);
+      console.log(`[NotificationService] Notificación recibida en primer plano para el hábito ${habitId}. Guardada fecha: ${todayStr}`);
+    }
+  });
+
   // Retornamos la función de limpieza
   return () => {
     responseListener.remove();
+    receivedListener.remove();
   };
+}
+
+// ============================================================================
+// Notification Scheduling and Management
+// ============================================================================
+
+/**
+ * Programa una notificación diaria para un hábito específico a la hora establecida en su configuración.
+ * Aplica la "Regla de Oro": no se envía ni se programa para hoy si el hábito ya fue completado
+ * hoy o si ya se envió una notificación para este hábito en el día actual. En esos casos,
+ * se programa para iniciar el día de mañana de forma segura.
+ * 
+ * @param habit Objeto hábito que contiene la configuración del recordatorio.
+ */
+export async function scheduleHabitReminder(habit: Habit): Promise<void> {
+  if (Platform.OS === 'web') {
+    console.log('[NotificationService] Notificaciones nativas no soportadas en web. Omitiendo programación.');
+    return;
+  }
+
+  // Obtenemos la hora de recordatorio (admite el campo en español o el alias en inglés)
+  const reminderTime = habit.horaRecordatorio || habit.reminderTime;
+
+  if (!habit.activo) {
+    console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" está inactivo. Omitiendo recordatorio.`);
+    return;
+  }
+
+  if (!reminderTime) {
+    console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" no tiene hora de recordatorio. Omitiendo.`);
+    return;
+  }
+
+  try {
+    const [hourStr, minuteStr] = reminderTime.split(':');
+    const hours = parseInt(hourStr, 10);
+    const minutes = parseInt(minuteStr, 10);
+
+    if (isNaN(hours) || isNaN(minutes)) {
+      console.warn(`[NotificationService] Formato de hora de recordatorio inválido ("${reminderTime}") para el hábito ${habit.id}.`);
+      return;
+    }
+
+    const todayStr = formatDateDB(new Date());
+
+    // 1. REGLA DE ORO - Validación A: ¿Ya se completó el hábito hoy?
+    // Buscamos en el almacén de logs global y también en el campo opcional completedDays.
+    const logs = useLogStore.getState().logs;
+    const isCompletedTodayInLogs = logs.some(
+      (log) => log.habitId === habit.id && log.fecha === todayStr && log.completado
+    );
+    const isCompletedTodayInProps = habit.completedDays?.includes(todayStr) || false;
+    const isAlreadyCompletedToday = isCompletedTodayInLogs || isCompletedTodayInProps;
+
+    // 2. REGLA DE ORO - Validación B: ¿Ya se envió la notificación hoy?
+    const lastSentKey = `notification_last_sent_${habit.id}`;
+    const lastSentDate = await AsyncStorage.getItem(lastSentKey);
+    const isAlreadySentToday = lastSentDate === todayStr;
+
+    // Cancelamos cualquier notificación previa para este hábito para evitar duplicados
+    await cancelHabitReminder(habit.id);
+
+    if (isAlreadyCompletedToday || isAlreadySentToday) {
+      console.log(
+        `[NotificationService] REGLA DE ORO: Saltando recordatorio de hoy para el hábito "${habit.nombre || habit.name}". ` +
+        `Motivo: Completado hoy = ${isAlreadyCompletedToday}, Notificado hoy = ${isAlreadySentToday}.`
+      );
+
+      // Si ya se cumplió la regla de oro para hoy, programamos un disparador único para MAÑANA a la misma hora.
+      // De esta forma, aseguramos que la primera notificación real le llegue mañana sin molestar hoy.
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(hours, minutes, 0, 0);
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: habit.id,
+        content: {
+          title: '¡Hora de tu hábito!',
+          body: `No olvides realizar tu hábito hoy: ${habit.nombre || habit.name}`,
+          categoryIdentifier: HABIT_REMINDER_CATEGORY,
+          data: { habitId: habit.id } as HabitNotificationData,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: tomorrow,
+        },
+      });
+
+      console.log(`[NotificationService] Recordatorio programado para mañana (${tomorrow.toLocaleString()}) para el hábito: ${habit.id}`);
+    } else {
+      // Programamos una notificación recurrente diaria normal
+      await Notifications.scheduleNotificationAsync({
+        identifier: habit.id,
+        content: {
+          title: '¡Hora de tu hábito!',
+          body: `Es momento de realizar tu hábito: ${habit.nombre || habit.name}`,
+          categoryIdentifier: HABIT_REMINDER_CATEGORY,
+          data: { habitId: habit.id } as HabitNotificationData,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          hour: hours,
+          minute: minutes,
+          repeats: true,
+        },
+      });
+
+      console.log(`[NotificationService] Recordatorio diario programado con éxito a las ${reminderTime} para el hábito: ${habit.id}`);
+    }
+  } catch (error) {
+    console.error(`[NotificationService] Error al programar recordatorio para el hábito ${habit.id}:`, error);
+  }
+}
+
+/**
+ * Elimina la notificación programada de un hábito específico usando su identificador.
+ * 
+ * @param habitId ID del hábito cuyo recordatorio se desea cancelar.
+ */
+export async function cancelHabitReminder(habitId: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    console.log('[NotificationService] Cancelar recordatorio no soportado en web.');
+    return;
+  }
+
+  try {
+    await Notifications.cancelScheduledNotificationAsync(habitId);
+    console.log(`[NotificationService] Recordatorio cancelado con éxito para el hábito: ${habitId}`);
+  } catch (error) {
+    console.error(`[NotificationService] Error al cancelar recordatorio para el hábito ${habitId}:`, error);
+  }
+}
+
+/**
+ * Cancela todas las notificaciones activas y vuelve a programarlas.
+ * Útil para cuando el usuario edita sus hábitos globales o inicia la aplicación.
+ * 
+ * @param habits Lista de todos los hábitos a reprogramar.
+ */
+export async function rescheduleAll(habits: Habit[]): Promise<void> {
+  if (Platform.OS === 'web') {
+    console.log('[NotificationService] Reprogramación no soportada en web.');
+    return;
+  }
+
+  console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios...');
+  try {
+    // 1. Cancelamos absolutamente todas las notificaciones programadas
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log('[NotificationService] Todas las notificaciones programadas han sido canceladas.');
+
+    // 2. Volvemos a programar recordatorios para cada hábito activo
+    for (const habit of habits) {
+      if (habit.activo) {
+        await scheduleHabitReminder(habit);
+      }
+    }
+    console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
+  } catch (error) {
+    console.error('[NotificationService] Error durante la reprogramación masiva:', error);
+  }
 }
