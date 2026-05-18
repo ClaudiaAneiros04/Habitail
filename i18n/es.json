@@ -47,8 +47,8 @@
   },
   "onboarding": {
     "welcome": {
-      "title": "¡Bienvenido a Habitail!",
-      "petNamePlaceholder": "Nombre de tu mascota",
+      "title": "¡Hola! Ponle nombre a tu mascota",
+      "placeholder": "Ej: Cosmo",
       "nextButton": "Siguiente"
     },
     "interests": {

@@ -47,8 +47,8 @@
   },
   "onboarding": {
     "welcome": {
-      "title": "Welcome to Habitail!",
-      "petNamePlaceholder": "Your pet's name",
+      "title": "Hi! Name your pet",
+      "placeholder": "Ex: Cosmo",
       "nextButton": "Next"
     },
     "interests": {
