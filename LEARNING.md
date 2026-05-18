@@ -16,6 +16,7 @@
 12. [Lógica de Negocio — Fase 6: Programación de Recordatorios y la Regla de Oro](#lógica-de-negocio--fase-6-programación-de-recordatorios-y-la-regla-de-oro)
 13. [Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota](#lógica-de-negocio--fase-6-retención-por-inactividad-de-la-mascota)
 14. [Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio--fase-6-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
+15. [Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos](#refactorización-del-schema-de-base-de-datos-deuda-simplificación-y-riesgos)
 
 
  
@@ -937,3 +938,23 @@ graph TD
 ```
 
 Este arranque secuencial garantiza que todos los esquemas e instancias de usuario existan físicamente en SQLite y Zustand antes de que las pantallas intenten consultar o pintar datos, previniendo estados de carga infinitos o crash repentinos.
+
+---
+
+# Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos
+
+## 1. Deuda Técnica Existente (Antes del Refactor)
+- **Divergencia entre Dominio y Persistencia**: Había una desconexión crítica entre las interfaces de TypeScript en [types/index.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/types/index.ts) y la estructura real de las tablas en SQLite.
+- **SQL DDL Disperso**: Las sentencias de creación de tablas (`CREATE TABLE`) estaban fragmentadas en strings literales dentro de los repositorios, dificultando cualquier evolución del esquema.
+- **Inconsistencia de Tipos (`any`)**: La ausencia de tipos intermedios para las filas de la base de datos obligaba a abusar del tipo `any` en los repositorios, anulando los beneficios de TypeScript.
+- **Conversión Compleja e Informal**: La conversión de booleanos (`0/1` en SQLite a `boolean` en JS) y de arrays (strings JSON a arrays nativos) se realizaba de manera ad-hoc en cada consulta, aumentando el riesgo de fallos silenciosos.
+
+## 2. Qué Quedó Simplificado (La Solución)
+- **Contrato Único como Fuente de Verdad (`db/schema.ts`)**: Toda la definición de la base de datos (nombres de tablas constantes `TABLE_NAMES`, el DDL de inicialización `CREATE_TABLES_SQL`, y tipos exactos de filas como `UserRow` y `HabitRow`) se centralizó en [db/schema.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/db/schema.ts).
+- **Mapeo Explícito y Tipado Fuerte**: Los repositorios ahora implementan un mapeo rígido y tipado de `Row` a `Domain` (entidades de negocio), aislando los detalles de SQLite de la lógica de negocio pura.
+- **Singleton de Conexión**: La apertura y creación de tablas se unificó en una sola función asíncrona singleton en [storage/database.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/storage/database.ts) que bloquea accesos concurrentes innecesarios (evitando el error de múltiples descriptores de acceso en web).
+
+## 3. Riesgos Cerrados y Mitigados
+- **Crashes por Incompatibilidad en Runtime**: Al añadir campos nuevos en paralelo (ej. `inventario` o `lastPenaltyAppliedDate`), el compilador de TypeScript detecta inmediatamente cualquier omisión en las consultas de guardado o lectura de los repositorios, evitando crasheos silenciosos en producción.
+- **Ausencia de Integridad Referencial**: Se habilitó explícitamente `PRAGMA foreign_keys = ON`, cerrando el riesgo de dejar registros huérfanos al eliminar usuarios (por ejemplo, previniendo inconsistencias de logs, hábitos o mascota).
+- **Gotchas de Coacción de Tipos**: Se eliminaron los fallos derivados del driver web/WASM de SQLite (`wa-sqlite`) al tratar valores devueltos como strings (ej: `Boolean("0") === true`), normalizando el mapeo de tipos primitivos.
