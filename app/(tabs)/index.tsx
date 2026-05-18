@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,9 +11,13 @@ import { getHabitsForToday } from '../../utils/frequencyEngine';
 import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
 import { MiniPet } from '../../components/Pet/MiniPet';
+import { PermissionBanner } from '../../components/PermissionBanner';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
 import { formatDateDB, generateLogId } from '../../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
+import { ToastConfirmation } from '../../components/ToastConfirmation';
+import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
 
 // Native Date Helpers (Moved to utils/dateUtils.ts)
 
@@ -77,6 +81,15 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDayDate(new Date()));
   const [completedHabitsObj, setCompletedHabitsObj] = useState<Record<string, HabitLog>>({});
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [snoozedHabits, setSnoozedHabits] = useState<Record<string, Date>>({});
+  
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevLogsRef = useRef<Record<string, HabitLog>>({});
+  const lastRefreshFromAppState = useRef(false);
+
+  const { t } = useTranslation();
 
   const allHabits = useHabitStore((state) => state.habits);
   const addLog = useLogStore((state) => state.addLog);
@@ -94,7 +107,24 @@ export default function HomeScreen() {
     hydrate();
   }, []);
 
-  // Cargar los logs cada vez que cambia la fecha seleccionada
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastVisible(false);
+    }, 2500);
+  }, []);
+
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  useAppStateRefresh(() => {
+    lastRefreshFromAppState.current = true;
+    setRefreshTrigger(prev => prev + 1);
+  });
+
+  // Cargar los logs cada vez que cambia la fecha seleccionada o AppState refresh
   useEffect(() => {
     let isMounted = true;
     const fetchLogs = async () => {
@@ -108,6 +138,20 @@ export default function HomeScreen() {
         logs.forEach(log => {
           logsMap[log.habitId] = log;
         });
+
+        if (lastRefreshFromAppState.current) {
+          const allHabitsList = useHabitStore.getState().habits;
+          const newlyCompletedLog = logs.find(log => log.completado && !prevLogsRef.current[log.habitId]?.completado);
+          if (newlyCompletedLog) {
+            const habitName = allHabitsList.find(h => h.id === newlyCompletedLog.habitId)?.nombre;
+            if (habitName) {
+              showToast(t('home.toast.habitCompleted', { name: habitName }));
+            }
+          }
+          lastRefreshFromAppState.current = false;
+        }
+
+        prevLogsRef.current = logsMap;
         setCompletedHabitsObj(logsMap);
       } catch (error) {
         console.error('Error fetching logs:', error);
@@ -118,7 +162,7 @@ export default function HomeScreen() {
     fetchLogs();
     
     return () => { isMounted = false; };
-  }, [selectedDate, getLogsForDay]);
+  }, [selectedDate, getLogsForDay, refreshTrigger, showToast, t]);
 
   // Selección de hábitos correspondientes al día seleccionado
   const habitsForDate = React.useMemo(() => {
@@ -260,6 +304,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <PermissionBanner />
       {/* Cabecera */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -325,6 +370,9 @@ export default function HomeScreen() {
                 habit={item}
                 completed={completedHabitsObj[item.id]?.completado || false}
                 onToggle={(habitId) => handleToggleHabit(item)}
+                // TODO: Logic/Data debe exponer snoozedUntil en el store.
+                // Provisionalmente usamos un estado local (se documenta en LEARNING.md)
+                snoozedUntil={snoozedHabits[item.id]}
               />
             )}
             ListEmptyComponent={
@@ -336,6 +384,7 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      <ToastConfirmation message={toastMessage} visible={toastVisible} />
     </SafeAreaView>
   );
 }

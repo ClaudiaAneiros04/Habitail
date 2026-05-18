@@ -13,6 +13,12 @@
     },
     "progress": {
       "texto": "{{completados}} of {{total}} habits"
+    },
+    "toast": {
+      "habitCompleted": "✓ {{name}} completed"
+    },
+    "badge": {
+      "snoozed": "· 30 min"
     }
   },
   "habits": {
@@ -25,6 +31,86 @@
     "guardar": "Save",
     "cancelar": "Cancel",
     "eliminar": "Delete",
-    "editar": "Edit"
+    "editar": "Edit",
+    "back": "Back"
+  },
+  "notifications": {
+    "permission": {
+      "title": "Don't forget your habits",
+      "description": "Without notifications you'll miss daily reminders and your pet might miss you",
+      "accept": "Enable notifications",
+      "deny": "Not now"
+    },
+    "banner": {
+      "denied": "Notifications are disabled. You can enable them in Settings",
+      "goToSettings": "Go to Settings"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Hi! Name your pet",
+      "placeholder": "Ex: Cosmo",
+      "nextButton": "Next"
+    },
+    "interests": {
+      "title": "What areas do you want to improve?",
+      "subtitle": "Choose at least one",
+      "nextButton": "Next",
+      "categories": {
+        "salud": "Health",
+        "deporte": "Exercise",
+        "productividad": "Productivity",
+        "bienestar": "Wellness",
+        "finanzas": "Finance",
+        "aprendizaje": "Learning"
+      }
+    },
+    "habits": {
+      "title": "Habits recommended for you",
+      "subtitle": "You can deselect the ones you're not interested in",
+      "emptyState": "We couldn't find suggestions for these areas.",
+      "changeInterests": "Change interests",
+      "startButton": "Start",
+      "selectedCount": "{{count}} of {{total}} selected"
+    }
+  },
+  "pet": {
+    "messages": {
+      "absent": [
+        "I'll be right here waiting, no matter what. // solo pantalla",
+        "I know you'll come back when you're ready. // solo pantalla",
+        "I'll keep your spot warm until you return. // solo pantalla",
+        "My love for you isn't going anywhere. // solo pantalla",
+        "Take all the time you need, friend. // solo pantalla"
+      ],
+      "sad": [
+        "I miss you so much, you know? 🥺",
+        "I'm really hoping we can play today. 💔",
+        "I could really use some company lately. 🌧️ // solo pantalla",
+        "Seeing you today would mean the world. 🌱",
+        "A hug from you would honestly make my day. 🫂"
+      ],
+      "confused": [
+        "What day is it? I totally lost track. 😵‍💫",
+        "I think I drifted off our schedule. 🐢 // solo pantalla",
+        "Our routine is a little topsy-turvy lately. 🎪",
+        "Should we do something or should I just nap? 🦦",
+        "I need a coffee, or just your attention. ☕"
+      ],
+      "cheering": [
+        "We're on the right track, I love this! ✨",
+        "You've got so much energy today, share it! ⚡",
+        "I love watching you shine every single day. 🌟 // solo pantalla",
+        "What a great rhythm we've got going! 🚀",
+        "You always manage to make me so proud. 💛"
+      ],
+      "happy": [
+        "We're unstoppable! What an amazing moment. 🎉",
+        "I feel on top of the world with you. 🌍✨ // solo pantalla",
+        "Our best version is shining brighter than ever! 💎",
+        "Couldn't be happier to be by your side. 🌻",
+        "We make an absolutely top-tier team! 🏆"
+      ]
+    }
   }
 }

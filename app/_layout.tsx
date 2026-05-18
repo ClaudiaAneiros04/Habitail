@@ -10,8 +10,6 @@ import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
-import { registerNotificationCategories, setupNotificationListeners } from '../src/notifications/notificationService';
-import { handleAppForeground } from '../src/notifications/inactivityService';
 import '../i18n';
 
 export default function RootLayout() {
@@ -32,17 +30,17 @@ export default function RootLayout() {
 
         // 1. Inicializar Base de Datos (Tablas)
         await initDb();
-        
+
         // 2. Carga secuencial de datos críticos para evitar colisiones de Foreign Keys
         // Primero el usuario, ya que la mascota y los hábitos referencian su ID
         await useUserStore.getState().loadUser();
-        
+
         // Después la mascota
         await usePetStore.getState().loadPet();
-        
+
         // Finalmente los hábitos
         await useHabitStore.getState().loadHabits();
-        
+
         setDbReady(true);
       } catch (error: any) {
         console.error("Error durante la inicialización de la app:", error);
@@ -57,34 +55,6 @@ export default function RootLayout() {
     initialize();
   }, []);
 
-  // Configurar listeners de notificaciones interactivos
-  useEffect(() => {
-    const cleanup = setupNotificationListeners();
-    return () => {
-      cleanup();
-    };
-  }, []);
-
-  // Listener para capturar el regreso al primer plano (foreground) y programar retención por inactividad
-  useEffect(() => {
-    if (!dbReady) return;
-
-    // Ejecución inicial al cargar la app por primera vez en esta sesión
-    handleAppForeground();
-
-    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        console.log('[RootLayout] App ha regresado a primer plano. Actualizando lastOpenedAt y reiniciando temporizador de inactividad.');
-        await handleAppForeground();
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => {
-      subscription.remove();
-    };
-  }, [dbReady]);
-
   if (!dbReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
@@ -98,7 +68,14 @@ export default function RootLayout() {
       <SafeAreaProvider style={{ backgroundColor: Colors.background }}>
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {!onboardingCompleted ? (
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          ) : (
+            <>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false }} />
+            </>
+          )}
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

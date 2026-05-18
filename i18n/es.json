@@ -13,6 +13,12 @@
     },
     "progress": {
       "texto": "{{completados}} de {{total}} hábitos"
+    },
+    "toast": {
+      "habitCompleted": "✓ {{name}} completado"
+    },
+    "badge": {
+      "snoozed": "· 30 min"
     }
   },
   "habits": {
@@ -25,6 +31,86 @@
     "guardar": "Guardar",
     "cancelar": "Cancelar",
     "eliminar": "Eliminar",
-    "editar": "Editar"
+    "editar": "Editar",
+    "back": "Atrás"
+  },
+  "notifications": {
+    "permission": {
+      "title": "No te olvides de tus hábitos",
+      "description": "Sin notificaciones perderás tus recordatorios diarios y tu mascota podría echarte de menos",
+      "accept": "Activar notificaciones",
+      "deny": "Ahora no"
+    },
+    "banner": {
+      "denied": "Las notificaciones están desactivadas. Puedes activarlas en Ajustes",
+      "goToSettings": "Ir a Ajustes"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "¡Hola! Ponle nombre a tu mascota",
+      "placeholder": "Ej: Cosmo",
+      "nextButton": "Siguiente"
+    },
+    "interests": {
+      "title": "¿Qué áreas quieres mejorar?",
+      "subtitle": "Elige al menos una",
+      "nextButton": "Siguiente",
+      "categories": {
+        "salud": "Salud",
+        "deporte": "Deporte",
+        "productividad": "Productividad",
+        "bienestar": "Bienestar",
+        "finanzas": "Finanzas",
+        "aprendizaje": "Aprendizaje"
+      }
+    },
+    "habits": {
+      "title": "Hábitos recomendados para ti",
+      "subtitle": "Puedes deseleccionar los que no te interesen",
+      "emptyState": "No encontramos sugerencias para estas áreas.",
+      "changeInterests": "Cambiar intereses",
+      "startButton": "Empezar",
+      "selectedCount": "{{count}} de {{total}} seleccionados"
+    }
+  },
+  "pet": {
+    "messages": {
+      "absent": [
+        "Te estaré esperando aquí, pase lo que pase. // solo pantalla",
+        "Sé que volverás cuando quieras hacerlo. // solo pantalla",
+        "Guardaré tu lugar hasta tu regreso. // solo pantalla",
+        "Mi cariño por ti no se agota. // solo pantalla",
+        "Tómate tu tiempo, yo no me muevo. // solo pantalla"
+      ],
+      "sad": [
+        "Te echo mucho de menos, ¿sabes? 🥺",
+        "Ojalá podamos jugar un ratito hoy. 💔",
+        "Me vendría muy bien algo de compañía. 🌧️ // solo pantalla",
+        "Sería genial verte hoy, aunque sea un segundo. 🌱",
+        "Un abrazo tuyo me daría mucha vida. 🫂"
+      ],
+      "confused": [
+        "¿Qué día es hoy? Ya perdí la cuenta. 😵‍💫",
+        "Creo que me despisté de nuestra rutina. 🐢 // solo pantalla",
+        "Nuestra agenda está un poco patas arriba. 🎪",
+        "¿Hacemos algo hoy o sigo durmiendo? 🦦",
+        "Necesito un café, o al menos tu atención. ☕"
+      ],
+      "cheering": [
+        "¡Vamos por buen camino, me encanta esto! ✨",
+        "Tienes muchísima energía hoy, ¡contágiamela! ⚡",
+        "Me encanta verte brillar así todos los días. 🌟 // solo pantalla",
+        "¡Qué buen ritmo llevamos últimamente! 🚀",
+        "Siempre consigues que sienta muchísimo orgullo. 💛"
+      ],
+      "happy": [
+        "¡Somos imparables! Qué momento tan increíble. 🎉",
+        "Me siento en la cima del mundo contigo. 🌍✨ // solo pantalla",
+        "¡Nuestra mejor versión está brillando con todo! 💎",
+        "No podría estar más feliz de acompañarte hoy. 🌻",
+        "¡Hacemos un equipo de primera categoría! 🏆"
+      ]
+    }
   }
 }

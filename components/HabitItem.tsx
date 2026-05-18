@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Habit } from '../types';
 import { Colors } from '../constants/colors';
 import { useHabitStats } from '../hooks/useHabitStats';
@@ -14,14 +15,36 @@ interface HabitItemProps {
   completed: boolean;
   onToggle: (habitId: string) => void;
   streak?: number;
+  snoozedUntil?: Date | null;
 }
 
 /**
  * Renderiza la tarjeta individual para un hábito.
  */
-export default function HabitItem({ habit, completed, onToggle, streak }: HabitItemProps) {
+export default function HabitItem({ habit, completed, onToggle, streak, snoozedUntil }: HabitItemProps) {
+  const { t } = useTranslation();
   const checkScale = useRef(new Animated.Value(completed ? 1 : 0)).current;
   const isFirstRender = useRef(true);
+
+  const [isSnoozedVisible, setIsSnoozedVisible] = useState(false);
+
+  useEffect(() => {
+    if (snoozedUntil && !completed) {
+      const now = new Date();
+      const timeDiff = new Date(snoozedUntil).getTime() - now.getTime();
+      if (timeDiff > 0) {
+        setIsSnoozedVisible(true);
+        const timer = setTimeout(() => {
+          setIsSnoozedVisible(false);
+        }, timeDiff);
+        return () => clearTimeout(timer);
+      } else {
+        setIsSnoozedVisible(false);
+      }
+    } else {
+      setIsSnoozedVisible(false);
+    }
+  }, [snoozedUntil, completed]);
 
   // Usamos el nuevo hook centralizado
   const { currentStreak, refresh } = useHabitStats({ 
@@ -79,6 +102,13 @@ export default function HabitItem({ habit, completed, onToggle, streak }: HabitI
             {displayStreak > 0 && (
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
+              </View>
+            )}
+            
+            {isSnoozedVisible && !completed && (
+              <View style={styles.snoozedBadge}>
+                <Ionicons name="alarm-outline" size={12} color={Colors.accent} />
+                <Text style={styles.snoozedText}>{t('home.badge.snoozed')}</Text>
               </View>
             )}
           </View>
@@ -177,6 +207,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.accent,
     fontWeight: '600',
+  },
+  snoozedBadge: {
+    backgroundColor: 'rgba(244, 63, 94, 0.1)', // Accent color with opacity
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  snoozedText: {
+    fontSize: 12,
+    color: Colors.accent,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   checkbox: {
     width: 28,
