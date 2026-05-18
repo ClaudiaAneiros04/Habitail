@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
-import { Stack } from 'expo-router';
-import { Category } from '../../types'; // Assuming Category exists, else just string
-import { Habit } from '../../types'; // Assuming Habit exists
+import { Stack, Redirect } from 'expo-router';
+import { Category } from '../../types';
+import { Habit } from '../../types';
+import { useOnboarding } from '../../hooks/useOnboarding';
 
 export interface OnboardingContextType {
   petName: string;
@@ -23,6 +24,21 @@ export const useOnboardingFlow = () => {
 };
 
 export default function OnboardingLayout() {
+  const { onboardingCompleted } = useOnboarding();
+
+  /**
+   * Guard de redirección: si el usuario accede a cualquier ruta /onboarding/*
+   * cuando ya ha completado el onboarding (ej. pulsando "atrás" en el navegador web,
+   * donde router.replace no limpia el historial de URLs), se redirige
+   * inmediatamente a /(tabs) sin renderizar ninguna pantalla del flujo.
+   *
+   * En iOS/Android nativo este caso no se da porque navigation.reset / router.replace
+   * sí eliminan el stack anterior, pero en web el history del navegador persiste.
+   */
+  if (onboardingCompleted) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   const [petName, setPetName] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [selectedHabits, setSelectedHabits] = useState<Habit[]>([]);
@@ -46,3 +62,4 @@ export default function OnboardingLayout() {
     </OnboardingContext.Provider>
   );
 }
+
