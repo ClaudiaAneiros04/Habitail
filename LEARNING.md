@@ -844,3 +844,74 @@ Durante la creación de los copys y la redacción de los mensajes de la mascota 
 - **Ausencia de soporte para comentarios en JSON:** Las reglas requerían marcar explícitamente ciertos mensajes con `// solo pantalla` en los archivos `es.json` y `en.json` para que fueran excluidos del pool de notificaciones. Dado que el estándar JSON no soporta comentarios estructurales (lanzaría un error de parseo), la solución técnica fue **inyectar la etiqueta al final de la propia cadena de texto** (ej: `"Mi cariño por ti no se agota. // solo pantalla"`). El equipo de lógica debe procesar estos strings con un `.includes('// solo pantalla')` para filtrarlos o limpiarlos mediante `.replace()` antes de mostrarlos.
 - **Tono contemplativo vs. Gancho para notificaciones:** Algunos mensajes eran muy efectivos en pantalla, pero como notificación push no incentivaban al usuario a abrir la app al carecer de un "hook" (gancho) en las primeras palabras. **Resolución:** Se realizó una purga de mensajes, marcando adicionalmente con `// solo pantalla` los textos más introspectivos (incluso en estados interactivos como *triste* o *feliz*) para garantizar que las notificaciones emitidas tengan un alto ratio de conversión y llamen directamente a la acción.
 - **Marcas de género en el idioma español:** Dado que el género de la mascota es definido por el usuario durante el Onboarding y el diseño no persiste esa variable en el idioma, construcciones iniciales como "Me siento solo" u "Estoy orgulloso" rompían la coherencia de identidad. **Resolución:** Se implementó UX Writing con perspectiva de género neutro, refactorizando las estructuras sintácticas para usar sustantivos abstractos, perífrasis e infinitivos (ej: "Me vendría muy bien algo de compañía" o "Siempre consigues que sienta muchísimo orgullo").
+
+## 11. Estado Compartido en el Stack de Onboarding
+Para mantener el flujo de Onboarding aislado y no contaminar el store global de Zustand con datos temporales (nombre de mascota, intereses, hábitos iniciales que podrían ser descartados si el usuario cierra la app a la mitad), se decidió utilizar un **Contexto de React local (`OnboardingContext`)**.
+**Resolución y Acuerdo Técnico**: El `OnboardingContext` se provee desde el `_layout.tsx` del `OnboardingNavigator`. Se optó por esta vía en lugar de los `params` de React Navigation porque, al ser un flujo lineal de 3 pasos, el contexto evita el trasiego de datos entre pantallas y centraliza la captura del estado temporal.
+
+## 12. Comportamiento del Onboarding en Landscape (Rotación)
+**Decisión Técnica**: Para las pantallas de onboarding, al tener elementos centrados verticalmente como el `KeyboardAvoidingView` y botones anclados al fondo, la rotación a landscape puede aplastar el contenido y dejar inaccesibles algunos controles en pantallas de menor tamaño. Por ahora, se ha delegado a `KeyboardAvoidingView` (con `behavior="padding"|"height"`) la responsabilidad de manejar el reflow del teclado, asegurando que el input y el botón siempre sean visibles incluso en modo horizontal. Si en el futuro el UI es insalvable en landscape, se bloqueará explícitamente a portrait en el manifest o en el _layout del onboarding.
+
+## 13. Diseño del ChipSelector: Props de Icono Opcionales
+**Decisión Técnica**: Se extendió el `ChipSelector` con una prop `icon?: keyof typeof Ionicons.glyphMap` para soportar iconos sin romper la compatibilidad con usos existentes. La prop es opcional deliberadamente: el componente sigue siendo agnóstico al dominio y no necesita conocer la existencia de categorías, hábitos ni sus iconos asociados. El mapeo icono↔categoría vive exclusivamente en `InterestsScreen`, donde se define `CATEGORY_CONFIG`. Se mantuvo la interfaz mínima (`label`, `icon`, `selected`, `onPress`) para que `ChipSelector` sea reutilizable en cualquier contexto de selección múltiple.
+
+## 14. Grid de 2 Columnas: Cálculo Dinámico de Ancho
+**Decisión Técnica**: En lugar de usar `width: '50%'` (que no descuenta márgenes y produce overflow horizontal), cada chip calcula su ancho en función de `useWindowDimensions().width`, descontando paddings laterales y márgenes del chip. Esto garantiza un grid uniforme de exactamente 2 columnas tanto en portrait como en landscape, adaptándose automáticamente a cualquier densidad de pantalla. La fórmula es: `chipWidth = (screenWidth - paddingLateral × 2 - margenChip × 4) / 2`.
+
+## 15. Animaciones Escalonadas en InterestsScreen
+**Decisión de Animación**: Se mantiene `type: 'spring'` con la misma curva que `WelcomeScreen` para coherencia perceptual entre las 3 pantallas del flujo. El escalonamiento dentro del grid de chips (50ms por chip en lugar de 100ms) es más rápido que el de los textos porque son elementos paralelos del mismo tipo visual — un escalonamiento más largo produciría una sensación de lentitud innecesaria. El delay base del grid (300ms) da tiempo al usuario para leer título y subtítulo antes de que aparezcan los controles interactuables.
+
+## 16. Migración Completa a OnboardingContext
+**Decisión Técnica**: Se refactorizaron las 3 pantallas del onboarding (`WelcomeScreen`, `InterestsScreen`, `HabitsScreen`) para que todas lean y escriban estado exclusivamente a través de `OnboardingContext`, eliminando el uso de `useLocalSearchParams` y `params` de navegación. Esto resuelve dos problemas: (1) los params se serializan a string, lo que obligaba a hacer `categories.split(',')` en `HabitsScreen` y perdía el tipado de `Category[]`; (2) al volver atrás con el botón del header, los params del screen anterior podían estar desincronizados con el estado real. Con el contexto, navegar hacia atrás preserva automáticamente todas las selecciones porque viven en el `_layout.tsx` padre del stack.
+
+## 17. Pre-selección de Hábitos con Guard de Referencia
+**Decisión Técnica**: Al entrar a `HabitsScreen`, todos los hábitos sugeridos vienen **pre-seleccionados**. Esto se implementa con un `useEffect` que observa `suggestedHabits` y un `useRef` que guarda la referencia anterior del array. La lógica solo pre-selecciona cuando la referencia cambia (es decir, cuando `useHabitLibrary` recalcula la lista porque las categorías cambiaron), evitando que un re-render sobreescriba las deselecciones manuales del usuario. Si el hook de librería es un stub que devuelve `[]`, el efecto no se dispara.
+
+## 18. Animación de Lista: `timing` en lugar de `spring`
+**Decisión de Animación**: En `HabitsScreen`, los items de la lista usan `type: 'timing'` con `duration: 300ms` en lugar de `spring`. Esto difiere deliberadamente de las pantallas 1 y 2 (que usan spring). La razón: cuando hay muchos elementos (potencialmente 8-10 hábitos), las animaciones spring acumuladas con delays largos producen una sensación de "gelatina" poco profesional. `timing` es más predecible y rápido para listas. El delay por item es de `60ms` con un máximo de `300ms` (5º item) para que el escalonamiento sea perceptible pero la lista sea usable rápidamente. El título y subtítulo sí mantienen `spring` para coherencia con el resto del flujo.
+
+## 19. Botón «Empezar» Siempre Activo
+**Decisión de UX**: El botón «Empezar» en `HabitsScreen` está siempre habilitado, incluso con 0 hábitos seleccionados. La razón: el usuario ya ha recorrido 2 pantallas de onboarding y bloquearle aquí por no seleccionar hábitos sería frustrante. Si no selecciona ninguno, `completeOnboarding` recibe un array vacío y la app arranca sin hábitos iniciales — el usuario puede añadirlos manualmente desde la pantalla principal. Esto prioriza la reducción de fricción sobre la completitud de datos del primer arranque.
+
+## 20. Diseño Visual de Items de Hábito: Tinte de Color de Categoría
+**Decisión de UI**: Cada item de hábito muestra su `icono` dentro de un contenedor con el `colorHex` del hábito como fondo al 15% de opacidad (`${colorHex}15`). Esto aporta identidad visual por categoría sin saturar la fila ni competir con el toggle de selección (que usa el color primario de la app). El mismo patrón de "tinte sobre fondo neutro" se usa en la app principal (`HabitItem`), manteniendo coherencia entre el onboarding y la experiencia post-setup.
+
+## 21. `router.replace` en Web vs Nativo (TC-H06)
+**Problema detectado en testing**: En iOS/Android, `router.replace('/(tabs)')` reemplaza el stack de navegación nativo, impidiendo que el botón atrás del sistema vuelva al onboarding. En **web**, `router.replace` traduce a `window.history.replaceState`, pero el historial previo del navegador sigue conteniendo las URLs `/onboarding/welcome`, `/onboarding/interests` y `/onboarding/habits`. Al pulsar el botón atrás del navegador, la URL volvía a una ruta de onboarding y el flujo se re-renderizaba.
+**Solución**: Se añadió un **guard de redirección** en `_layout.tsx` del onboarding: si `useOnboarding().onboardingCompleted === true`, el layout devuelve `<Redirect href="/(tabs)" />` sin renderizar el Provider ni las pantallas. Así, cualquier acceso a rutas `/onboarding/*` post-completado redirige instantáneamente a Home, tanto en web como en nativo.
+**Nota para iOS nativo**: Si en el futuro se detecta que el gesto de swipe-back de iOS permite volver al onboarding, se añadirá `gestureEnabled: false` en el `screenOptions` del Stack del onboarding.
+
+## 22. Onboarding Interrumpido a Mitad
+**Decisión de UX**: Si el usuario cierra la app durante el onboarding (ej. en la Pantalla 2, tras elegir categorías), al volver la app reinicia desde la Pantalla 1. Esto ocurre porque el flag `onboardingCompleted` solo se escribe en SQLite al pulsar «Empezar» en la Pantalla 3, y el estado temporal del flujo (`petName`, `selectedCategories`, `selectedHabits`) vive en un `OnboardingContext` local que se destruye con el proceso de la app.
+**Implicaciones**: El usuario pierde las selecciones parciales. Esto es aceptable porque: (1) el onboarding consta de solo 3 pantallas y tarda <30 segundos en completarse; (2) persistir estado parcial en SQLite/AsyncStorage añadiría complejidad de limpieza (¿cuándo borrar el borrador si el usuario reinstala?); (3) un reinicio limpio es más predecible para el usuario que recuperar un estado a medias que podría estar desactualizado.
+
+## 23. `useHabitLibrary` — Estado de Carga vs Sin Resultados
+**Decisión Técnica**: El hook `useHabitLibrary(selectedCategories)` es actualmente un stub síncrono que devuelve `{ suggestedHabits: [] }`. No expone un estado `isLoading`. La Pantalla 3 muestra el empty state inmediatamente sin distinguir entre "cargando" y "sin resultados". Cuando Logic/Data implemente el hook real con datos asíncronos, se deberá:
+1. Añadir `{ suggestedHabits, isLoading }` al tipo de retorno del hook.
+2. Mostrar un skeleton/spinner mientras `isLoading === true` en lugar del empty state.
+3. Solo mostrar el empty state cuando `isLoading === false && suggestedHabits.length === 0`.
+Esta deuda técnica está documentada pero no bloqueante para el MVP porque el hook eventualmente será síncrono (lee de una constante `habitLibrary` importada, no de red ni de BD).
+
+## 24. Nombre de Mascota con Emojis y Caracteres Especiales
+**Decisión Técnica**: La validación `petName.trim().length >= 2` usa `.length` nativo de JavaScript, que cuenta **unidades UTF-16**, no grafemas visibles. Esto tiene implicaciones:
+- `"🐉"` → `.length === 2` → **pasa la validación** (un emoji tiene 2 unidades UTF-16 = 1 surrogate pair), lo cual es correcto: el usuario ve 1 carácter pero la validación lo acepta.
+- `"🐉🔥"` → `.length === 4` → pasa también.
+- `"👨‍👩‍👧"` (familia ZWJ) → `.length === 8` → pasa, pero es visualmente 1 grafema.
+Se optó por `.length` en lugar de `[...str].length` (que cuenta code points, no grafemas) porque:
+1. Es más restrictivo por accidente — un emoji de 1 grafema ya tiene length ≥ 2, lo cual es un filtro razonable contra nombres absurdamente cortos.
+2. `Intl.Segmenter` (la forma correcta de contar grafemas) no está disponible en Hermes/JSC de React Native.
+3. El nombre de la mascota no tiene restricciones de formato: cualquier combinación de texto/emojis es un nombre válido siempre que tenga "sustancia" suficiente (≥ 2 UTF-16 units).
+
+## 25. Rotación de Pantalla Durante el Onboarding
+**Decisión Técnica**: El onboarding **no bloquea la rotación** en el MVP. Las tres pantallas usan layouts flexibles (`flex: 1`, `justifyContent: 'center'`) que adaptan el contenido razonablemente bien en landscape:
+- **WelcomeScreen**: `KeyboardAvoidingView` reposiciona el input y el botón sobre el teclado.
+- **InterestsScreen**: El grid de 2 columnas recalcula el ancho de los chips dinámicamente con `useWindowDimensions()`, adaptándose al ancho disponible.
+- **HabitsScreen**: La `FlatList` es scrollable por naturaleza, así que funciona bien en cualquier orientación.
+Si en el futuro se detectan problemas visuales graves en landscape en pantallas muy pequeñas (ej. iPhone SE 1ª gen en horizontal), se bloqueará la rotación usando `expo-screen-orientation` exclusivamente en el `_layout.tsx` del onboarding (`ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)`) y se restaurará en el `useEffect` de cleanup al desmontar el layout.
+
+## 26. Accesibilidad de `ChipSelector` — Implementación en el MVP
+**Decisión de Accesibilidad**: Los chips **sí implementan accesibilidad** desde el MVP. Cada `ChipSelector` tiene:
+- `accessibilityRole="checkbox"` — TalkBack/VoiceOver anuncia el chip como "casilla de verificación".
+- `accessibilityState={{ checked: selected }}` — el lector de pantalla anuncia "marcado" o "no marcado".
+- `accessibilityLabel={label}` — se lee el nombre de la categoría/hábito.
+Esta decisión se tomó porque añadir estos 3 props tiene coste cero de implementación y excluirlos crearía deuda técnica que a menudo nunca se paga. Los items de `HabitsScreen` tienen la misma configuración de accesibilidad (`accessibilityRole="checkbox"` + `accessibilityState` + `accessibilityLabel`).
