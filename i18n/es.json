@@ -65,36 +65,36 @@
   "pet": {
     "messages": {
       "absent": [
-        "Te estaré esperando aquí, pase lo que pase.",
-        "Sé que volverás cuando estés listo.",
-        "Guardaré tu lugar hasta tu regreso.",
-        "Mi cariño por ti no se agota.",
-        "Tómate tu tiempo, yo no me muevo."
+        "Te estaré esperando aquí, pase lo que pase. // solo pantalla",
+        "Sé que volverás cuando quieras hacerlo. // solo pantalla",
+        "Guardaré tu lugar hasta tu regreso. // solo pantalla",
+        "Mi cariño por ti no se agota. // solo pantalla",
+        "Tómate tu tiempo, yo no me muevo. // solo pantalla"
       ],
       "sad": [
         "Te echo mucho de menos, ¿sabes? 🥺",
-        "Ojalá podamos jugar juntos un ratito hoy. 💔",
-        "Me siento un poquito solo últimamente. 🌧️",
+        "Ojalá podamos jugar un ratito hoy. 💔",
+        "Me vendría muy bien algo de compañía. 🌧️ // solo pantalla",
         "Sería genial verte hoy, aunque sea un segundo. 🌱",
         "Un abrazo tuyo me daría mucha vida. 🫂"
       ],
       "confused": [
         "¿Qué día es hoy? Ya perdí la cuenta. 😵‍💫",
-        "Creo que me despisté de nuestra rutina. 🐢",
+        "Creo que me despisté de nuestra rutina. 🐢 // solo pantalla",
         "Nuestra agenda está un poco patas arriba. 🎪",
-        "¿Hacemos algo juntos o sigo durmiendo? 🦦",
+        "¿Hacemos algo hoy o sigo durmiendo? 🦦",
         "Necesito un café, o al menos tu atención. ☕"
       ],
       "cheering": [
         "¡Vamos por buen camino, me encanta esto! ✨",
         "Tienes muchísima energía hoy, ¡contágiamela! ⚡",
-        "Me encanta verte brillar así todos los días. 🌟",
+        "Me encanta verte brillar así todos los días. 🌟 // solo pantalla",
         "¡Qué buen ritmo llevamos últimamente! 🚀",
-        "Me haces sentir súper orgulloso siempre. 💛"
+        "Siempre consigues que sienta muchísimo orgullo. 💛"
       ],
       "happy": [
         "¡Somos imparables! Qué momento tan increíble. 🎉",
-        "Me siento en la cima del mundo contigo. 🌍✨",
+        "Me siento en la cima del mundo contigo. 🌍✨ // solo pantalla",
         "¡Nuestra mejor versión está brillando con todo! 💎",
         "No podría estar más feliz de acompañarte hoy. 🌻",
         "¡Hacemos un equipo de primera categoría! 🏆"
