@@ -66,10 +66,12 @@
       }
     },
     "habits": {
-      "title": "Choose your first habits",
-      "emptyState": "No suggested habits for these areas.",
+      "title": "Habits recommended for you",
+      "subtitle": "You can deselect the ones you're not interested in",
+      "emptyState": "We couldn't find suggestions for these areas.",
       "changeInterests": "Change interests",
-      "startButton": "Start"
+      "startButton": "Start",
+      "selectedCount": "{{count}} of {{total}} selected"
     }
   },
   "pet": {

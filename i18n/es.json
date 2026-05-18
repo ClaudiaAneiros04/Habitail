@@ -66,10 +66,12 @@
       }
     },
     "habits": {
-      "title": "Elige tus primeros hábitos",
-      "emptyState": "No hay hábitos sugeridos para estas áreas.",
+      "title": "Hábitos recomendados para ti",
+      "subtitle": "Puedes deseleccionar los que no te interesen",
+      "emptyState": "No encontramos sugerencias para estas áreas.",
       "changeInterests": "Cambiar intereses",
-      "startButton": "Empezar"
+      "startButton": "Empezar",
+      "selectedCount": "{{count}} de {{total}} seleccionados"
     }
   },
   "pet": {
