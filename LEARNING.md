@@ -12,6 +12,10 @@
 8.  [Lógica de Negocio — Fase 5: Mascota y Gamificación](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
 9.  [Post-Merge Fixes — Fase 5: Integración y Alineación de Contratos](#post-merge-fixes--fase-5-integración-lógica--frontend)
 10. [Refactorización y Mejoras de Calidad: Estadísticas y Persistencia](#refactorización-y-mejoras-de-calidad-estadísticas-y-persistencia)
+11. [Lógica de Negocio — Fase 6: Notificaciones Interactivas y Acciones en Segundo Plano](#lógica-de-negocio--fase-6-notificaciones-interactivas-y-acciones-en-segundo-plano)
+12. [Lógica de Negocio — Fase 6: Programación de Recordatorios y la Regla de Oro](#lógica-de-negocio--fase-6-programación-de-recordatorios-y-la-regla-de-oro)
+13. [Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota](#lógica-de-negocio--fase-6-retención-por-inactividad-de-la-mascota)
+14. [Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio--fase-6-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
 
 
  
@@ -793,4 +797,143 @@ Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente
 - **Ajustes de Layout**: Se añadieron márgenes dinámicos y offsets (`marginLeft: 15`) para evitar que las etiquetas del eje Y se corten en pantallas pequeñas.
 - **Traducción y Limpieza**: Se eliminaron comentarios residuales en inglés y se unificó la nomenclatura en español para mantener la consistencia en toda la documentación técnica del proyecto.
 
+---
 
+# Lógica de Negocio — Fase 6: Notificaciones Interactivas y Acciones en Segundo Plano
+
+En esta fase se diseñó e implementó un robusto sistema de **notificaciones nativas interactivas** utilizando `expo-notifications`, permitiendo a los usuarios interactuar de manera fluida y en tiempo real directamente desde la bandeja de entrada del sistema operativo.
+
+## 1. Configuración de Categoría y Acciones Nativas
+Se configuró una categoría única llamada `HABIT_REMINDER` con dos acciones principales que se ejecutan en segundo plano, maximizando la UX al evitar aperturas lentas o intrusivas del hilo principal del frontend:
+
+*   **Acción DONE ("Hecho")** (`ACTION_DONE`): Marca el hábito como completado de inmediato.
+*   **Acción SNOOZE ("Posponer")** (`ACTION_SNOOZE`): Pospone la alerta por 30 minutos.
+*   **Configuración en Segundo Plano**: Ambos botones están registrados con `opensAppToForeground: false`, lo que faculta al sistema operativo para invocar a nuestro servicio sin necesidad de abrir la interfaz gráfica de la aplicación.
+
+```ts
+await Notifications.setNotificationCategoryAsync(HABIT_REMINDER_CATEGORY, [
+  {
+    identifier: ACTION_DONE,
+    buttonTitle: 'Hecho',
+    options: { isDestructive: false, opensAppToForeground: false },
+  },
+  {
+    identifier: ACTION_SNOOZE,
+    buttonTitle: 'Posponer',
+    options: { isDestructive: false, opensAppToForeground: false },
+  },
+]);
+```
+
+## 2. Flujo Completo de Ejecución Asíncrona (DONE)
+Al ser pulsada la acción "Hecho", el servicio (`handleDoneAction`) se orquesta directamente con los almacenes globales de datos (`Zustand`) y la base de datos (`SQLite`), ejecutando las siguientes acciones de manera transaccional:
+
+1.  **Generación de Claves**: Genera un ID determinista (`generateLogId`) en base al `habitId` y la fecha de hoy.
+2.  **Validación de Duplicados**: Comprueba que el hábito no haya sido ya completado hoy.
+3.  **Persistencia del Log**: Crea e inserta un `HabitLog` con `completado: true` y fecha `YYYY-MM-DD` en SQLite llamando a `addLog()`.
+4.  **Gamificación Directa**:
+    *   Suma **+10 HP** de salud a la mascota virtual de forma inmediata a través del `petStore`.
+    *   Calcula los puntos ganados según la prioridad del hábito (`calcPointsDelta`) e incrementa el balance del usuario (`updatePoints`).
+    *   Invoca de manera perezosa a `evaluateBadges()` para otorgar logros e insignias nuevas al instante.
+5.  **Limpieza del Caché de UI**: Llama a `useStatsStore.getState().clearAll()` para invalidar de forma proactiva la caché en memoria. De este modo, en la próxima apertura de la app, los gráficos de estadísticas y el heatmap reflejarán el check-in instantáneamente.
+
+## 3. Lógica de Pospuesto (SNOOZE)
+Cuando el usuario decide posponer el hábito (`handleSnoozeAction`), el sistema responde de manera controlada y defensiva:
+
+*   **Control de Abuso**: Se limita a un máximo estricto de **1 pospuesto al día** por hábito (`snoozeCount < 1`).
+*   **Disparador por Intervalo**: Si no se ha superado el límite, se cancela la alerta actual y se programa una nueva de tipo `TIME_INTERVAL` para dentro de 1800 segundos (30 minutos) con un `snoozeCount` incrementado en la carga de datos (`data`).
+
+---
+
+# Lógica de Negocio — Fase 6: Programación de Recordatorios y la Regla de Oro
+
+La consistencia es vital en la formación de hábitos, pero las alertas repetitivas o imprecisas causan rechazo. Por ello, la programación de recordatorios individuales fue estructurada bajo directrices estrictas de validación.
+
+## 1. El Algoritmo de Programación y su Disparador
+La función `scheduleHabitReminder(habit: Habit)` lee la propiedad `horaRecordatorio` (por ejemplo `"08:30"`) y planifica un recordatorio recurrente de tipo `CALENDAR` con `repeats: true`.
+
+## 2. La Regla de Oro contra la Fatiga por Notificaciones
+Para salvaguardar la tranquilidad del usuario, antes de persistir o actualizar cualquier notificación, el sistema evalúa dos criterios:
+
+*   **Criterio A (Ya Completado)**: ¿El hábito ya ha sido marcado hoy? Se consulta el `logsStore` en tiempo real y la propiedad física `completedDays`. Si existe un log válido de éxito hoy, se activa la regla.
+*   **Criterio B (Ya Notificado)**: ¿Ya se emitió la alerta hoy? Cada vez que una notificación se despliega en primer plano (`addNotificationReceivedListener`) o se pulsa un botón interactivo (`addNotificationResponseReceivedListener`), se almacena la fecha `"YYYY-MM-DD"` actual en AsyncStorage con la clave `notification_last_sent_${habitId}`. Si el valor coincide con hoy, se activa la regla.
+
+### Comportamiento Defensivo (Short-Circuit a Mañana)
+Si se cumple el Criterio A o el Criterio B, **el recordatorio para hoy se descarta**. Sin embargo, para no perder el ciclo de notificaciones automáticas futuras, el sistema realiza una **reprogramación inteligente**:
+Agenda una alerta única de tipo `DATE` configurada exactamente para **MAÑANA** a la hora especificada. Esto asegura que la primera alerta real del siguiente día se reciba con éxito, sin importunar al usuario hoy.
+
+## 3. Administración y Reconfiguración Global
+*   **Cancelación**: `cancelHabitReminder(habitId)` cancela de forma aislada la alerta en el programador de Expo.
+*   **Reprogramación Masiva**: `rescheduleAll(habits)` cancela el total de alertas pendientes del dispositivo y vuelve a agendar todos los recordatorios activos uno a uno. Esta rutina se ejecuta cuando el usuario actualiza la lista de hábitos o cuando la aplicación arranca.
+
+---
+
+# Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota
+
+La mascota virtual es el pilar motivacional de Habitail. Su salud física sirve como reflejo del progreso del usuario, por lo que el sistema de notificaciones de inactividad se diseñó para reenganchar al usuario de forma no intrusiva mediante la gamificación.
+
+## 1. Mensajería Motivacional y Clamping de Estado
+El servicio `inactivityService.ts` analiza la salud (`vida`) y el `estadoActual` de la mascota para componer dinámicamente un mensaje de persuasión adaptado:
+
+| Rango HP | Estado Mascota | Título Notificación | Mensaje Motivacional (Cuerpo) |
+| :--- | :--- | :--- | :--- |
+| **HP = 0** | `ABSENT` | ¡Oh no! | Tu mascota se ha marchado debido a la inactividad. Vuelve para iniciar una nueva aventura. |
+| **HP <= 25** | `SAD` | ⚠️ ¡ALERTA! Tu mascota te necesita urgente | 😭 Tu mascota está muy triste y débil. ¡Si no vuelves hoy, podría marcharse para siempre! |
+| **HP <= 50** | `CONFUSED` | 👀 ¿Dónde has estado? | 🤔 Tu mascota se siente un poco sola y confundida. ¡Completa tus hábitos hoy para subir su ánimo! |
+| **HP <= 75** | `CHEERING` | 💪 ¡No te rindas ahora! | 😊 Tu mascota te extraña un poco, pero mantiene el ánimo. ¡Vuelve a registrar tus hábitos de hoy! |
+| **HP > 75** | `HAPPY` | ❤️ ¡Tu mascota te está esperando! | 🌟 Tu mascota está súper feliz y saludable. ¡Vuelve y mantén esa racha de hábitos ganadora! |
+
+## 2. Restricciones y Control Anti-Spam
+Para evitar penalizaciones severas de los sistemas de notificaciones móviles o malestar en el usuario:
+*   **Restricción de Mascota Ausente**: Si la salud es 0 (`ABSENT`), el servicio **cancela y omite** programar la alerta por inactividad. Una mascota huida no puede enviar recordatorios de inactividad.
+*   **Límite Estricto**: Máximo 1 alerta cada 48 horas.
+*   **Reseteo Automático**: Cualquier recordatorio de inactividad agendado previamente se cancela antes de crear el nuevo.
+
+## 3. Ciclo de Vida y Desplazamiento de la Ventana de 48 Horas
+El sistema se sincroniza con el ciclo de vida nativo (`AppState`) en `app/_layout.tsx`. Cada vez que la aplicación pasa del segundo plano a **primer plano (foreground)**:
+
+1.  **Evaluación de Inactividad Pasada**: Se lee el timestamp `lastOpenedAt` del store del usuario para determinar cuánto tiempo ha transcurrido.
+2.  **Registro de Actividad**: Llama a `updateLastOpenedAt()` para persistir el timestamp de hoy en el `UserRepository` de SQLite y en `AsyncStorage`.
+3.  **Desplazamiento del Cronómetro**: Llama a `scheduleInactivityReminder()`, el cual cancela la alerta anterior de inactividad y **programa una nueva para dentro de 48 horas** (`seconds: 172800`). De esta manera, mientras el usuario abra la app regularmente, la alerta se desplaza constantemente al futuro y nunca llega a dispararse.
+
+---
+
+# Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos
+
+El primer contacto con Habitail debe ser fluido, intuitivo y sentar las bases de la gamificación. Para lograrlo, se diseñó un sistema integrado de onboarding, inicialización de datos y enrutamiento protegido.
+
+## 1. Enrutamiento y Protección de Rutas con Expo Router
+El estado del onboarding se almacena de forma persistente en `AsyncStorage` mediante la clave `@onboarding_completed`. 
+
+El hook personalizado `useOnboardingNavigation` monitoriza en tiempo real los segmentos activos de la ruta (`useSegments`). Al iniciar la app o transicionar de pantalla:
+*   **Filtro A (Redirección a Onboarding)**: Si el flag es `false` y el usuario no se encuentra dentro del grupo `/onboarding`, es redirigido inmediatamente a `/onboarding` usando `router.replace()`, bloqueando el acceso a la app principal.
+*   **Filtro B (Redirección a App Principal)**: Si el flag es `true` y el usuario intenta acceder a `/onboarding`, es redirigido de inmediato a la Home `/(tabs)` para prevenir bucles.
+
+## 2. Librería de Hábitos y Auto-creación
+Al finalizar el onboarding, el usuario selecciona las categorías que le interesan (ej. SALUD, DEPORTE, PRODUCTIVIDAD). La función `completeOnboarding` ejecuta el proceso de inicialización:
+
+1.  **Filtrado Inteligente**: Cruza las categorías seleccionadas por el usuario con nuestra librería estática predefinida (`habitLibrary`).
+2.  **Instanciación Tipada**: Por cada hábito coincidente, crea un objeto de dominio `Habit` completo y fuertemente tipado:
+    *   Genera un ID único compatible con React Native mediante un algoritmo limpio de UUID v4.
+    *   Activa la frecuencia diaria completa (`diasSemana: [1, 2, 3, 4, 5, 6, 7]`).
+    *   Configura la hora sugerida del recordatorio a las `09:00` AM para maximizar el reenganche diario.
+    *   Mapea los colores, iconos y prioridad estipulados en la librería.
+3.  **Persistencia Directa**: Invoca a `habitStore.addHabit()`, persistiendo los hábitos en SQLite e hidratando reactivamente la UI de Zustand.
+4.  **Confirmación**: Guarda el flag `@onboarding_completed: "true"` en AsyncStorage y actualiza el UserStore local.
+
+## 3. Inicialización Secuencial de Datos en Layout Raíz
+Para eliminar fallos de inicialización o violaciones de claves foráneas en SQLite (especialmente notorios en dispositivos Android nativos), se implementó un orden de carga secuencial estricto en `app/_layout.tsx` que bloquea la interacción del usuario mediante un estado reactivo `dbReady`:
+
+```mermaid
+graph TD
+  Start([Arranque de la App]) --> RegisterNotis[1. Registrar Categorías Notificaciones]
+  RegisterNotis --> InitDB[2. Inicializar Tablas e Índices SQLite]
+  InitDB --> LoadUser[3. Cargar Usuario: Flag Onboarding y lastOpened]
+  LoadUser --> LoadPet[4. Cargar Mascota: Sincronización de FK]
+  LoadPet --> LoadHabits[5. Cargar Hábitos e Hidratar UI]
+  LoadHabits --> Ready{Establecer dbReady}
+  Ready -->|True| Render[Renderizar Stack Principal]
+  Ready -->|True| ActiveListeners[Activar setupNotificationListeners y handleAppForeground]
+```
+
+Este arranque secuencial garantiza que todos los esquemas e instancias de usuario existan físicamente en SQLite y Zustand antes de que las pantallas intenten consultar o pintar datos, previniendo estados de carga infinitos o crash repentinos.
