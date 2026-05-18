@@ -31,7 +31,8 @@
     "guardar": "Guardar",
     "cancelar": "Cancelar",
     "eliminar": "Eliminar",
-    "editar": "Editar"
+    "editar": "Editar",
+    "back": "Atrás"
   },
   "notifications": {
     "permission": {
@@ -52,8 +53,17 @@
       "nextButton": "Siguiente"
     },
     "interests": {
-      "title": "¿Qué áreas te interesan?",
-      "nextButton": "Siguiente"
+      "title": "¿Qué áreas quieres mejorar?",
+      "subtitle": "Elige al menos una",
+      "nextButton": "Siguiente",
+      "categories": {
+        "salud": "Salud",
+        "deporte": "Deporte",
+        "productividad": "Productividad",
+        "bienestar": "Bienestar",
+        "finanzas": "Finanzas",
+        "aprendizaje": "Aprendizaje"
+      }
     },
     "habits": {
       "title": "Elige tus primeros hábitos",

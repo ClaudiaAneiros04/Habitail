@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, Platform } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitLibrary } from '../../hooks/useHabitLibrary';
@@ -8,27 +8,31 @@ import { useOnboarding } from '../../hooks/useOnboarding';
 import { Theme } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
 import { Habit } from '../../types';
+import { useOnboardingFlow } from './_layout';
 
 export default function HabitsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { petName, categories } = useLocalSearchParams();
-  const catArray = (categories as string)?.split(',') || [];
-  
-  const { suggestedHabits } = useHabitLibrary(catArray);
+  const { petName, selectedCategories, selectedHabits, setSelectedHabits } = useOnboardingFlow();
+
+  const { suggestedHabits } = useHabitLibrary(selectedCategories);
   const { completeOnboarding } = useOnboarding();
-  const [selectedHabits, setSelectedHabits] = useState<Habit[]>([]);
 
   const toggleHabit = (habit: Habit) => {
-    setSelectedHabits(prev => 
-      prev.some(h => h.id === habit.id) 
-        ? prev.filter(h => h.id !== habit.id) 
-        : [...prev, habit]
+    setSelectedHabits(
+      selectedHabits.some(h => h.id === habit.id)
+        ? selectedHabits.filter(h => h.id !== habit.id)
+        : [...selectedHabits, habit]
     );
   };
 
   const handleStart = async () => {
-    await completeOnboarding(selectedHabits, petName as string);
+    await completeOnboarding(selectedHabits, petName);
+    /**
+     * Se usa router.replace en lugar de router.push para que
+     * el stack de onboarding no sea alcanzable con el botón atrás del sistema.
+     * Esto reemplaza el historial completo de navegación.
+     */
     router.replace('/(tabs)');
   };
 
@@ -51,7 +55,16 @@ export default function HabitsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header con botón atrás */}
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel={t('common.back')}
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back" size={24} color={Theme.colors.text} />
+        </TouchableOpacity>
         <Text style={styles.title}>{t('onboarding.habits.title')}</Text>
       </View>
       
@@ -89,9 +102,19 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.colors.background,
   },
   header: {
-    paddingHorizontal: Theme.spacing.lg,
-    paddingTop: Theme.spacing.xl,
+    paddingHorizontal: Theme.spacing.md,
+    paddingTop: Theme.spacing.md,
     paddingBottom: Theme.spacing.md,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Theme.colors.cardBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.md,
+    ...Theme.shadows.soft,
   },
   title: {
     fontSize: 28,

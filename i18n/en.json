@@ -31,7 +31,8 @@
     "guardar": "Save",
     "cancelar": "Cancel",
     "eliminar": "Delete",
-    "editar": "Edit"
+    "editar": "Edit",
+    "back": "Back"
   },
   "notifications": {
     "permission": {
@@ -52,8 +53,17 @@
       "nextButton": "Next"
     },
     "interests": {
-      "title": "What areas interest you?",
-      "nextButton": "Next"
+      "title": "What areas do you want to improve?",
+      "subtitle": "Choose at least one",
+      "nextButton": "Next",
+      "categories": {
+        "salud": "Health",
+        "deporte": "Exercise",
+        "productividad": "Productivity",
+        "bienestar": "Wellness",
+        "finanzas": "Finance",
+        "aprendizaje": "Learning"
+      }
     },
     "habits": {
       "title": "Choose your first habits",
