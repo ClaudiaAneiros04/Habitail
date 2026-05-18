@@ -61,5 +61,44 @@
       "changeInterests": "Change interests",
       "startButton": "Start"
     }
+  },
+  "pet": {
+    "messages": {
+      "absent": [
+        "I'll be right here waiting, no matter what.",
+        "I know you'll come back when you're ready.",
+        "I'll keep your spot warm until you return.",
+        "My love for you isn't going anywhere.",
+        "Take all the time you need, friend."
+      ],
+      "sad": [
+        "I miss you so much, you know? 🥺",
+        "I'm really hoping we can play today. 💔",
+        "Feeling a tiny bit lonely lately. 🌧️",
+        "Seeing you today would mean the world. 🌱",
+        "A hug from you would honestly make my day. 🫂"
+      ],
+      "confused": [
+        "What day is it? I totally lost track. 😵‍💫",
+        "I think I drifted off our schedule. 🐢",
+        "Our routine is a little topsy-turvy lately. 🎪",
+        "Should we do something or should I just nap? 🦦",
+        "I need a coffee, or just your attention. ☕"
+      ],
+      "cheering": [
+        "We're on the right track, I love this! ✨",
+        "You've got so much energy today, share it! ⚡",
+        "I love watching you shine every single day. 🌟",
+        "What a great rhythm we've got going! 🚀",
+        "You always make me so incredibly proud. 💛"
+      ],
+      "happy": [
+        "We're unstoppable! What an amazing moment. 🎉",
+        "I feel on top of the world with you. 🌍✨",
+        "Our best version is shining brighter than ever! 💎",
+        "Couldn't be happier to be by your side. 🌻",
+        "We make an absolutely top-tier team! 🏆"
+      ]
+    }
   }
 }

@@ -61,5 +61,44 @@
       "changeInterests": "Cambiar intereses",
       "startButton": "Empezar"
     }
+  },
+  "pet": {
+    "messages": {
+      "absent": [
+        "Te estaré esperando aquí, pase lo que pase.",
+        "Sé que volverás cuando estés listo.",
+        "Guardaré tu lugar hasta tu regreso.",
+        "Mi cariño por ti no se agota.",
+        "Tómate tu tiempo, yo no me muevo."
+      ],
+      "sad": [
+        "Te echo mucho de menos, ¿sabes? 🥺",
+        "Ojalá podamos jugar juntos un ratito hoy. 💔",
+        "Me siento un poquito solo últimamente. 🌧️",
+        "Sería genial verte hoy, aunque sea un segundo. 🌱",
+        "Un abrazo tuyo me daría mucha vida. 🫂"
+      ],
+      "confused": [
+        "¿Qué día es hoy? Ya perdí la cuenta. 😵‍💫",
+        "Creo que me despisté de nuestra rutina. 🐢",
+        "Nuestra agenda está un poco patas arriba. 🎪",
+        "¿Hacemos algo juntos o sigo durmiendo? 🦦",
+        "Necesito un café, o al menos tu atención. ☕"
+      ],
+      "cheering": [
+        "¡Vamos por buen camino, me encanta esto! ✨",
+        "Tienes muchísima energía hoy, ¡contágiamela! ⚡",
+        "Me encanta verte brillar así todos los días. 🌟",
+        "¡Qué buen ritmo llevamos últimamente! 🚀",
+        "Me haces sentir súper orgulloso siempre. 💛"
+      ],
+      "happy": [
+        "¡Somos imparables! Qué momento tan increíble. 🎉",
+        "Me siento en la cima del mundo contigo. 🌍✨",
+        "¡Nuestra mejor versión está brillando con todo! 💎",
+        "No podría estar más feliz de acompañarte hoy. 🌻",
+        "¡Hacemos un equipo de primera categoría! 🏆"
+      ]
+    }
   }
 }
