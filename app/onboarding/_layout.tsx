@@ -27,6 +27,14 @@ export default function OnboardingLayout() {
   const { onboardingCompleted } = useOnboarding();
 
   /**
+   * Todos los hooks deben llamarse antes de cualquier return condicional (regla de hooks de React).
+   * El guard de redirección se evalúa DESPUÉS de declarar el estado.
+   */
+  const [petName, setPetName] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const [selectedHabits, setSelectedHabits] = useState<Habit[]>([]);
+
+  /**
    * Guard de redirección: si el usuario accede a cualquier ruta /onboarding/*
    * cuando ya ha completado el onboarding (ej. pulsando "atrás" en el navegador web,
    * donde router.replace no limpia el historial de URLs), se redirige
@@ -38,10 +46,6 @@ export default function OnboardingLayout() {
   if (onboardingCompleted) {
     return <Redirect href="/(tabs)" />;
   }
-
-  const [petName, setPetName] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
-  const [selectedHabits, setSelectedHabits] = useState<Habit[]>([]);
 
   return (
     <OnboardingContext.Provider
@@ -62,4 +66,3 @@ export default function OnboardingLayout() {
     </OnboardingContext.Provider>
   );
 }
-

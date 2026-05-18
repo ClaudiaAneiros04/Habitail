@@ -16,7 +16,7 @@ import { useHabitLibrary } from '../../hooks/useHabitLibrary';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { Theme } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
-import { Habit } from '../../types';
+import { PredefinedHabit } from '../../data/habitLibrary';
 import { useOnboardingFlow } from './_layout';
 
 export default function HabitsScreen() {
@@ -37,19 +37,20 @@ export default function HabitsScreen() {
    * suggestedHabits es distinta (shallow), lo que ocurre cuando el hook
    * recalcula la lista.
    */
-  const prevSuggestedRef = useRef<Habit[]>([]);
+  const prevSuggestedRef = useRef<PredefinedHabit[]>([]);
   useEffect(() => {
     if (suggestedHabits.length > 0 && suggestedHabits !== prevSuggestedRef.current) {
-      setSelectedHabits([...suggestedHabits]);
+      setSelectedHabits([...suggestedHabits] as any);
       prevSuggestedRef.current = suggestedHabits;
     }
   }, [suggestedHabits, setSelectedHabits]);
 
-  const toggleHabit = (habit: Habit) => {
+  const toggleHabit = (habit: PredefinedHabit) => {
+    const current = selectedHabits as unknown as PredefinedHabit[];
     setSelectedHabits(
-      selectedHabits.some(h => h.id === habit.id)
-        ? selectedHabits.filter(h => h.id !== habit.id)
-        : [...selectedHabits, habit]
+      (current.some(h => h.nombre === habit.nombre)
+        ? current.filter(h => h.nombre !== habit.nombre)
+        : [...current, habit]) as any
     );
   };
 
@@ -64,8 +65,9 @@ export default function HabitsScreen() {
     router.replace('/(tabs)');
   };
 
-  const renderHabit = ({ item, index }: { item: Habit; index: number }) => {
-    const isSelected = selectedHabits.some(h => h.id === item.id);
+  const renderHabit = ({ item, index }: { item: PredefinedHabit; index: number }) => {
+    const current = selectedHabits as unknown as PredefinedHabit[];
+    const isSelected = current.some(h => h.nombre === item.nombre);
     return (
       /*
        * Animación por item: cada tarjeta entra con un fade-in + slide sutil.

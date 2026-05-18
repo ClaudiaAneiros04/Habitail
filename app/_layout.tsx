@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Alert, AppState, AppStateStatus } from 'react-native';
+import { View, ActivityIndicator, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,10 +10,12 @@ import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
+import { useOnboarding } from '../hooks/useOnboarding';
 import '../i18n';
 
 export default function RootLayout() {
   useDailyPenaltyJob();
+
   /**
    * Bloquea el renderizado de las pantallas hasta que la base de datos esté
    * completamente inicializada (tablas creadas). Esto elimina la condición de
@@ -25,9 +27,6 @@ export default function RootLayout() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        // 0. Inicializar notificaciones
-        await registerNotificationCategories();
-
         // 1. Inicializar Base de Datos (Tablas)
         await initDb();
 
@@ -43,10 +42,10 @@ export default function RootLayout() {
 
         setDbReady(true);
       } catch (error: any) {
-        console.error("Error durante la inicialización de la app:", error);
+        console.error('Error durante la inicialización de la app:', error);
         Alert.alert(
-          "Error de Inicialización",
-          "Hubo un problema al cargar los datos: " + (error?.message || "Error desconocido")
+          'Error de Inicialización',
+          'Hubo un problema al cargar los datos: ' + (error?.message || 'Error desconocido')
         );
         setDbReady(true);
       }
@@ -54,6 +53,8 @@ export default function RootLayout() {
 
     initialize();
   }, []);
+
+  const { onboardingCompleted } = useOnboarding();
 
   if (!dbReady) {
     return (
@@ -67,15 +68,19 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider style={{ backgroundColor: Colors.background }}>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          {!onboardingCompleted ? (
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          ) : (
-            <>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false }} />
-            </>
-          )}
+        {/*
+          Todos los Stack.Screen se declaran SIEMPRE para que expo-router los tenga
+          registrados. La guarda de navegación vive en cada _layout hijo:
+          - /onboarding/_layout.tsx → <Redirect href="/(tabs)"> si onboardingCompleted
+          - initialRouteName        → dirige al usuario a la ruta correcta al inicio
+        */}
+        <Stack
+          screenOptions={{ headerShown: false }}
+          initialRouteName={onboardingCompleted ? '(tabs)' : 'onboarding'}
+        >
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
