@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../types';
 import { HabitRepository } from '../storage/HabitRepository';
+import { scheduleHabitReminder, cancelHabitReminder } from '../notifications/notificationService';
 
 const habitRepo = new HabitRepository();
 
@@ -34,6 +35,12 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       habits: [...state.habits, newHabit],
     }));
     saveToStorage(get().habits);
+
+    // Programar recordatorio si está activo y tiene hora de recordatorio
+    const reminderTime = newHabit.horaRecordatorio || (newHabit as any).reminderTime;
+    if (newHabit.activo && reminderTime) {
+      await scheduleHabitReminder(newHabit);
+    }
   },
 
   updateHabit: async (id: string, updates: Partial<Habit>) => {
@@ -44,6 +51,17 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       ),
     }));
     saveToStorage(get().habits);
+
+    // Programar/actualizar o cancelar recordatorio
+    const updatedHabit = get().habits.find((h) => h.id === id);
+    if (updatedHabit) {
+      const reminderTime = updatedHabit.horaRecordatorio || (updatedHabit as any).reminderTime;
+      if (updatedHabit.activo && reminderTime) {
+        await scheduleHabitReminder(updatedHabit);
+      } else {
+        await cancelHabitReminder(id);
+      }
+    }
   },
 
   archiveHabit: async (id: string) => {
@@ -54,6 +72,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       ),
     }));
     saveToStorage(get().habits);
+
+    // Cancelar recordatorio programado al archivar
+    await cancelHabitReminder(id);
   },
 
   removeHabit: async (id: string) => {
@@ -63,6 +84,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       habits: state.habits.filter((h) => h.id !== id),
     }));
     saveToStorage(get().habits);
+
+    // Cancelar recordatorio programado al remover
+    await cancelHabitReminder(id);
   },
 
   loadHabits: async () => {

@@ -11,6 +11,8 @@ import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
 import { useOnboarding } from '../hooks/useOnboarding';
+import { registerNotificationCategories, setupNotificationListeners, rescheduleAll } from '../notifications/notificationService';
+import { handleAppForeground } from '../notifications/inactivityService';
 import '../i18n';
 
 export default function RootLayout() {
@@ -23,6 +25,27 @@ export default function RootLayout() {
    * la tabla `habit_logs`.
    */
   const [dbReady, setDbReady] = useState(false);
+
+  useEffect(() => {
+    // Configurar categorías y listeners de notificaciones interactivas
+    let cleanupListeners: (() => void) | undefined;
+    
+    const setupNotifications = async () => {
+      try {
+        await registerNotificationCategories();
+        cleanupListeners = setupNotificationListeners();
+      } catch (error) {
+        console.error('Error al configurar notificaciones en _layout.tsx:', error);
+      }
+    };
+    setupNotifications();
+
+    return () => {
+      if (cleanupListeners) {
+        cleanupListeners();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const initialize = async () => {
@@ -39,6 +62,11 @@ export default function RootLayout() {
 
         // Finalmente los hábitos
         await useHabitStore.getState().loadHabits();
+
+        // 3. Reprogramar recordatorios activos y manejar mascot inactivity
+        const habits = useHabitStore.getState().habits;
+        await rescheduleAll(habits);
+        await handleAppForeground();
 
         setDbReady(true);
       } catch (error: any) {
