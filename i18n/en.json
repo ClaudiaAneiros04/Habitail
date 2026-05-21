@@ -1,9 +1,11 @@
 {
   "tabs": {
     "hoy": "Today",
-    "habitos": "Habits",
-    "stats": "Statistics",
-    "mascota": "Pet"
+    "habitos": "My Habits",
+    "historial": "History",
+    "stats": "Stats",
+    "mascota": "Pet",
+    "tienda": "Shop"
   },
   "home": {
     "header": {
@@ -12,27 +14,79 @@
       "buenas_noches": "Good night"
     },
     "progress": {
-      "texto": "{{completados}} of {{total}} habits"
+      "texto": "{{completados}} of {{total}} habits",
+      "label": "Habits completed ({{completed}}/{{total}})"
     },
     "toast": {
       "habitCompleted": "✓ {{name}} completed"
     },
     "badge": {
       "snoozed": "· 30 min"
+    },
+    "empty": {
+      "no_habits": "No habits scheduled for this day."
     }
   },
   "habits": {
     "empty": {
       "titulo": "No habits yet",
-      "subtitulo": "Create your first habit to get started"
-    }
+      "subtitulo": "Create your first habit to get started",
+      "active_title": "You have no active habits.",
+      "active_subtitle": "Press the + button to create one!"
+    },
+    "archive": {
+      "title": "Archive Habit",
+      "confirm": "Are you sure you want to archive \"{{name}}\"?",
+      "action": "Archive"
+    },
+    "options": {
+      "title": "Options",
+      "message": "Manage habit: {{name}}"
+    },
+    "streak_one": "Streak: 1 day",
+    "streak_other": "Streak: {{count}} days"
   },
   "common": {
     "guardar": "Save",
     "cancelar": "Cancel",
     "eliminar": "Delete",
     "editar": "Edit",
-    "back": "Back"
+    "back": "Back",
+    "anadir": "Add",
+    "day_one": "1 day",
+    "day_other": "{{count}} days",
+    "daysShort": {
+      "lun": "Mon",
+      "mar": "Tue",
+      "mie": "Wed",
+      "jue": "Thu",
+      "vie": "Fri",
+      "sab": "Sat",
+      "dom": "Sun"
+    },
+    "monthsShort": {
+      "ene": "Jan",
+      "feb": "Feb",
+      "mar": "Mar",
+      "abr": "Apr",
+      "may": "May",
+      "jun": "Jun",
+      "jul": "Jul",
+      "ago": "Aug",
+      "sep": "Sep",
+      "oct": "Oct",
+      "nov": "Nov",
+      "dic": "Dec"
+    },
+    "daysLetter": {
+      "lun": "M",
+      "mar": "T",
+      "mie": "W",
+      "jue": "T",
+      "vie": "F",
+      "sab": "S",
+      "dom": "S"
+    }
   },
   "notifications": {
     "permission": {
@@ -75,6 +129,9 @@
     }
   },
   "pet": {
+    "loading": "Loading pet...",
+    "levelShort": "Lvl",
+    "xpLabel": "XP",
     "messages": {
       "absent": [
         "I'll be right here waiting, no matter what. // solo pantalla",
@@ -112,5 +169,188 @@
         "We make an absolutely top-tier team! 🏆"
       ]
     }
+  },
+  "categories": {
+    "salud": "Health",
+    "deporte": "Exercise",
+    "productividad": "Productivity",
+    "bienestar": "Wellness",
+    "finanzas": "Finance",
+    "aprendizaje": "Learning"
+  },
+  "addHabit": {
+    "wizard": {
+      "step": "{{step}}/{{total}}",
+      "next": "Next",
+      "save": "Save Habit"
+    },
+    "basicInfo": {
+      "question": "What habit do you want to build?",
+      "placeholder": "Ex. Drink water, Read 10 min...",
+      "errorLength": "The name must have at least 2 characters.",
+      "selectCategory": "Select a category"
+    },
+    "appearance": {
+      "defaultName": "Habit",
+      "previewTitle": "Preview",
+      "noDescription": "No description",
+      "colorLabel": "Habit color",
+      "iconLabel": "Representative icon",
+      "descriptionLabel": "Description (Optional)",
+      "descriptionPlaceholder": "Why do you want to keep this habit?"
+    },
+    "settings": {
+      "frequencyLabel": "Frequency",
+      "frequencies": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      },
+      "daySelectorLabel": "Which days do you want to do it?",
+      "priorityLabel": "Priority Level",
+      "priorityDescription": "This affects your virtual pet's health if you don't meet the habit.",
+      "priorities": {
+        "flexible": "Flexible",
+        "normal": "Normal",
+        "essential": "Essential",
+        "healthValue": "±{{points}} health"
+      },
+      "reminderLabel": "Reminder",
+      "reminderDescription": "Receive a daily notification.",
+      "mockReminderText": "* Default reminder time: 09:00 (configurable in future versions)."
+    }
+  },
+  "stats": {
+    "title": "Performance",
+    "subtitle": "Analyze your progress and stay consistent",
+    "habitSelector": {
+      "habit": "Habit",
+      "global": "Global View",
+      "visualizing": "Visualizing statistics for:"
+    },
+    "tabs": {
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "total": "Total"
+    },
+    "charts": {
+      "complianceAnalysis": "Compliance analysis",
+      "weekNum": "Week {{num}}",
+      "more": "More",
+      "less": "Less"
+    },
+    "metrics": {
+      "title": "Key Metrics",
+      "currentStreak": "Current Streak",
+      "maxStreak": "Max Streak",
+      "days_one": "1 day",
+      "days_other": "{{count}} days",
+      "totalRate": "Total Rate",
+      "periodRate": "Period Rate",
+      "status": "Status",
+      "statusExcellent": "Excellent",
+      "statusRegular": "Regular",
+      "statusImproveable": "Needs improvement"
+    }
+  },
+  "history": {
+    "title": "Historical Activity",
+    "empty": "No data found for this date."
+  },
+  "profile": {
+    "info_text": "Complete your daily habits to keep your pet happy and level up!"
+  },
+  "shop": {
+    "header": {
+      "points": "{{points}} pts"
+    },
+    "preview": {
+      "title": "Preview",
+      "skin": "Skin",
+      "accessories": "Accessories",
+      "default": "Default",
+      "none": "None"
+    },
+    "tabs": {
+      "skins": "Skins",
+      "accessories": "Accessories"
+    },
+    "actions": {
+      "equipped": "Equipped",
+      "equip": "Equip",
+      "buy": "Buy"
+    },
+    "alerts": {
+      "insufficient_points_title": "Insufficient points",
+      "insufficient_points_msg": "Keep completing habits to earn more points.",
+      "purchase_success_title": "Purchase successful!",
+      "purchase_success_msg": "You bought {{name}}.",
+      "equipped_title": "Equipped",
+      "equipped_msg": "You equipped {{name}}."
+    },
+    "items": {
+      "skin_default": "Orange Cat",
+      "skin_siamese": "Siamese",
+      "skin_black": "Panther",
+      "acc_glasses": "Sunglasses",
+      "acc_hat": "Magic Hat"
+    }
+  },
+  "habitDetails": {
+    "headerTitle": "Habit Details",
+    "statsSectionTitle": "Statistics",
+    "currentStreakLabel": "Current Streak",
+    "consecutiveDays_one": "1 consecutive day",
+    "consecutiveDays_other": "{{count}} consecutive days",
+    "bestStreakLabel": "Best Streak",
+    "totalSuccessLabel": "Total Success",
+    "infoSectionTitle": "Information",
+    "frequencyLabel": "Frequency:",
+    "reminderLabel": "Reminder Time:",
+    "priorityLabel": "Priority:",
+    "createdLabel": "Created:"
+  },
+  "habitLibrary": {
+    "headerTitle": "Ideas Library",
+    "all": "All",
+    "emptyText": "No ideas in this category.",
+    "presets": {
+      "1": {
+        "nombre": "Drink Water",
+        "descripcion": "Drink at least 2 liters of water daily."
+      },
+      "2": {
+        "nombre": "Walk 10k steps",
+        "descripcion": "Reach the daily walking goal."
+      },
+      "3": {
+        "nombre": "Read a book",
+        "descripcion": "Read for at least 15 minutes in silence."
+      },
+      "4": {
+        "nombre": "Weekly savings",
+        "descripcion": "Transfer money to the savings fund."
+      },
+      "5": {
+        "nombre": "Plan the day",
+        "descripcion": "Write down tasks first thing in the morning or at night."
+      },
+      "6": {
+        "nombre": "Meditate",
+        "descripcion": "5-10 min session of deep breathing."
+      },
+      "7": {
+        "nombre": "Sleep 8 hours",
+        "descripcion": "Unplug early and prioritize sleep."
+      },
+      "8": {
+        "nombre": "Learn a language",
+        "descripcion": "Complete 1 daily lesson on a language app."
+      }
+    }
+  },
+  "layout": {
+    "initErrorTitle": "Initialization Error",
+    "initErrorMessage": "There was a problem loading the data: "
   }
 }

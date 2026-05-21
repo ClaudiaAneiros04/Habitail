@@ -10,6 +10,7 @@ import { Colors } from '../../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Category } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // Opciones de categoría predefinidas con colores e iconos curados
 const CATEGORY_DATA = [
@@ -23,6 +24,7 @@ const CATEGORY_DATA = [
 
 export default function BasicInfoScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   
   // Estado local para los campos de este paso
   const [nombre, setNombre] = useState('');
@@ -52,7 +54,7 @@ export default function BasicInfoScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Nuevo Hábito (1/3)</Text>
+          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 1, total: 3, defaultValue: 'Nuevo Hábito (1/3)' })}</Text>
           <View style={{ width: 32 }} /> {/* Espaciador invisible para centrar título correctamente frente a la flacha */}
         </View>
 
@@ -61,10 +63,10 @@ export default function BasicInfoScreen() {
           <ProgressBar step={1} total={3} />
 
           {/* Sección Nombre del Hábito */}
-          <Text style={styles.label}>¿Qué hábito quieres construir?</Text>
+          <Text style={styles.label}>{t('addHabit.basicInfo.question')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Ej. Beber agua, Leer 10 min..."
+            placeholder={t('addHabit.basicInfo.placeholder')}
             placeholderTextColor={Colors.inactive}
             value={nombre}
             onChangeText={setNombre}
@@ -72,11 +74,11 @@ export default function BasicInfoScreen() {
           />
           {/* Mensaje de error dinámico e inline si la longitud está a medias (entre 0 y 1 char tras trim) */}
           {nombre.length > 0 && nombre.trim().length < 2 && (
-            <Text style={styles.errorText}>El nombre debe tener al menos 2 caracteres.</Text>
+            <Text style={styles.errorText}>{t('addHabit.basicInfo.errorLength')}</Text>
           )}
 
           {/* Sección Category Picker (Grid Selector) */}
-          <Text style={[styles.label, { marginTop: 32 }]}>Selecciona una categoría</Text>
+          <Text style={[styles.label, { marginTop: 32 }]}>{t('addHabit.basicInfo.selectCategory')}</Text>
           <View style={styles.grid}>
             {CATEGORY_DATA.map((cat) => {
               const isSelected = categoria === cat.id;
@@ -98,7 +100,7 @@ export default function BasicInfoScreen() {
                      styles.categoryLabel,
                      isSelected && { color: cat.color, fontWeight: 'bold' } // Colorea el label en estado activo también
                   ]}>
-                    {cat.label}
+                    {t('onboarding.interests.categories.' + cat.id.toLowerCase(), { defaultValue: cat.label })}
                   </Text>
                 </TouchableOpacity>
               );
@@ -113,7 +115,7 @@ export default function BasicInfoScreen() {
             onPress={handleNext}
             disabled={!isValid}
           >
-            <Text style={styles.nextText}>Siguiente</Text>
+            <Text style={styles.nextText}>{t('addHabit.wizard.next')}</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>

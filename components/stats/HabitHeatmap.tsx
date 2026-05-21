@@ -4,6 +4,7 @@ import { ContributionGraph } from 'react-native-chart-kit';
 import { Theme } from '../../constants/theme';
 import { useHeatmapData } from '../../hooks/useHeatmapData';
 import { useUserStore } from '../../store/useUserStore';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Props para HabitHeatmap
@@ -19,6 +20,7 @@ interface HabitHeatmapProps {
  * Consume el hook useHeatmapData para obtener la persistencia desde SQLite.
  */
 export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
+  const { t } = useTranslation();
   const { user } = useUserStore();
   const currentYear = new Date().getFullYear();
   
@@ -44,15 +46,15 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
   };
 
   const getMonthLabel = (monthIndex: number): string => {
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    return months[monthIndex];
+    const keys = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return t(`common.monthsShort.${keys[monthIndex]}`, { defaultValue: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][monthIndex] });
   };
 
   if (isLoading && data.length === 0) {
     return (
       <View style={[styles.card, styles.loadingContainer]}>
         <ActivityIndicator color={Theme.colors.primary} />
-        <Text style={styles.loadingText}>Cargando actividad...</Text>
+        <Text style={styles.loadingText}>{t('stats.charts.loadingActivity', { defaultValue: 'Cargando actividad...' })}</Text>
       </View>
     );
   }
@@ -60,14 +62,14 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
   if (error) {
     return (
       <View style={[styles.card, styles.errorContainer]}>
-        <Text style={styles.errorText}>Error al cargar datos de actividad</Text>
+        <Text style={styles.errorText}>{t('stats.charts.errorActivity', { defaultValue: 'Error al cargar datos de actividad' })}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Actividad Anual</Text>
+      <Text style={styles.sectionTitle}>{t('stats.charts.annualActivity', { defaultValue: 'Actividad Anual' })}</Text>
 
       <View style={styles.card}>
         <ScrollView
@@ -90,12 +92,12 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
         </ScrollView>
 
         <View style={styles.legendContainer}>
-          <Text style={styles.legendLabel}>Menos</Text>
+          <Text style={styles.legendLabel}>{t('stats.charts.less', { defaultValue: 'Menos' })}</Text>
           <View style={[styles.legendSquare, { backgroundColor: '#f1f5f9' }]} />
           <View style={[styles.legendSquare, { backgroundColor: 'rgba(99, 102, 241, 0.3)' }]} />
           <View style={[styles.legendSquare, { backgroundColor: 'rgba(99, 102, 241, 0.6)' }]} />
           <View style={[styles.legendSquare, { backgroundColor: 'rgba(99, 102, 241, 1)' }]} />
-          <Text style={styles.legendLabel}>Más</Text>
+          <Text style={styles.legendLabel}>{t('stats.charts.more', { defaultValue: 'Más' })}</Text>
         </View>
       </View>
     </View>

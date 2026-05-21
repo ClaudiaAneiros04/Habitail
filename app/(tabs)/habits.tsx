@@ -6,17 +6,20 @@ import { Habit } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 // Helper for UI
 const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }) => {
+  const { t } = useTranslation();
+
   // Swipe to archive with confirmation
   const archiveWithConfirmation = () => {
     Alert.alert(
-      "Archivar Hábito",
-      `¿Estás seguro que deseas archivar "${habit.nombre}"?`,
+      t('habits.archive.title'),
+      t('habits.archive.confirm', { name: habit.nombre }),
       [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Archivar", style: "destructive", onPress: onArchive }
+        { text: t('common.cancelar'), style: "cancel" },
+        { text: t('habits.archive.action'), style: "destructive", onPress: onArchive }
       ]
     );
   };
@@ -35,7 +38,7 @@ const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }
       <TouchableOpacity onPress={archiveWithConfirmation} style={styles.deleteAction}>
         <Animated.View style={[styles.actionContent, { transform: [{ scale }] }]}>
           <Ionicons name="archive" size={24} color="#FFF" />
-          <Text style={styles.actionText}>Archivar</Text>
+          <Text style={styles.actionText}>{t('habits.archive.action')}</Text>
         </Animated.View>
       </TouchableOpacity>
     );
@@ -43,12 +46,12 @@ const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }
 
   const onLongPress = () => {
     Alert.alert(
-      "Opciones",
-      `Gestionar hábito: ${habit.nombre}`,
+      t('habits.options.title'),
+      t('habits.options.message', { name: habit.nombre }),
       [
-        { text: "Editar", onPress: () => console.log('Editar', habit.id) },
-        { text: "Archivar", style: "destructive", onPress: archiveWithConfirmation },
-        { text: "Cancelar", style: "cancel" }
+        { text: t('common.editar'), onPress: () => console.log('Editar', habit.id) },
+        { text: t('habits.archive.action'), style: "destructive", onPress: archiveWithConfirmation },
+        { text: t('common.cancelar'), style: "cancel" }
       ]
     );
   };
@@ -73,18 +76,17 @@ const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }
 
         <View style={styles.habitInfo}>
           <Text style={styles.habitName}>{habit.nombre}</Text>
-          <Text style={styles.habitStreak}>🔥 Racha: {streak} días</Text>
+          <Text style={styles.habitStreak}>🔥 {t('habits.streak', { count: streak })}</Text>
         </View>
       </TouchableOpacity>
     </Swipeable>
   );
 };
-
-
 export default function HabitsScreen() {
   const habits = useHabitStore((state) => state.habits);
   const archiveHabit = useHabitStore((state) => state.archiveHabit);
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Group by Category
   const sections = useMemo(() => {
@@ -123,13 +125,15 @@ export default function HabitsScreen() {
         )}
         renderSectionHeader={({ section: { title } }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{title}</Text>
+            <Text style={styles.sectionTitle}>
+              {t('categories.' + title.toLowerCase(), { defaultValue: title })}
+            </Text>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No tienes hábitos activos.</Text>
-            <Text style={styles.emptySubText}>¡Presiona el botón + para crear uno!</Text>
+            <Text style={styles.emptyText}>{t('habits.empty.active_title')}</Text>
+            <Text style={styles.emptySubText}>{t('habits.empty.active_subtitle')}</Text>
           </View>
         }
         contentContainerStyle={styles.listContent}

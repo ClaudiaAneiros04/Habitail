@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions, Alert, TouchableOpacity } from 'rea
 import { BarChart } from 'react-native-chart-kit';
 import { Theme } from '../../constants/theme';
 import { ChartData } from '../../utils/chartAggregator';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Props para el componente BarChartComponent
@@ -21,6 +22,8 @@ interface BarChartComponentProps {
  * Utiliza react-native-chart-kit para la visualización.
  */
 export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data }) => {
+  const { t } = useTranslation();
+  
   // Calculamos el ancho exacto: 
   // ScrollView (2 * md) + Contenedor (2 * md) = 4 * md. Le restamos 15px extra para poder desplazarlo a la derecha.
   const screenWidth = Dimensions.get('window').width - (Theme.spacing.md * 4) - 15;
@@ -36,19 +39,21 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
     const item = data[index];
     if (!item) return;
     
-    let detailText = 'Sin programación';
+    let detailText = t('stats.charts.noSchedule', { defaultValue: 'Sin programación' });
     if (item.total > 0) {
       if (mode === 'weekly') {
-        detailText = `${item.completed}/${item.total} ${item.total === 1 ? 'hábito completado' : 'hábitos completados'}`;
+        detailText = item.total === 1 
+          ? t('stats.charts.completedOne', { completed: item.completed, total: item.total, defaultValue: `${item.completed}/${item.total} hábito completado` })
+          : t('stats.charts.completedMultiple', { completed: item.completed, total: item.total, defaultValue: `${item.completed}/${item.total} hábitos completados` });
       } else {
-        detailText = `${item.completed}/${item.total} completados`;
+        detailText = t('stats.charts.completedGeneral', { completed: item.completed, total: item.total, defaultValue: `${item.completed}/${item.total} completados` });
       }
     }
 
     Alert.alert(
-      'Detalle de Cumplimiento',
-      `${item.label}: ${item.value}% \n(${detailText})`,
-      [{ text: 'Entendido', style: 'default' }]
+      t('stats.charts.detailTitle', { defaultValue: 'Detalle de Cumplimiento' }),
+      t('stats.charts.detailValue', { label: item.label, value: item.value, detailText, defaultValue: `${item.label}: ${item.value}% \n(${detailText})` }),
+      [{ text: t('stats.charts.understood', { defaultValue: 'Entendido' }), style: 'default' }]
     );
   };
 
@@ -81,10 +86,10 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
 
   const getTitle = () => {
     switch (mode) {
-      case 'weekly': return 'Progreso Semanal';
-      case 'monthly': return 'Progreso Mensual';
-      case 'total': return 'Progreso Histórico';
-      default: return 'Progreso';
+      case 'weekly': return t('stats.charts.weeklyProgress', { defaultValue: 'Progreso Semanal' });
+      case 'monthly': return t('stats.charts.monthlyProgress', { defaultValue: 'Progreso Mensual' });
+      case 'total': return t('stats.charts.historicalProgress', { defaultValue: 'Progreso Histórico' });
+      default: return t('stats.charts.progress', { defaultValue: 'Progreso' });
     }
   };
 
@@ -128,7 +133,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ mode, data
       
       <View style={styles.legend}>
         <View style={[styles.dot, { backgroundColor: Theme.colors.primary }]} />
-        <Text style={styles.legendText}>Tasa de éxito (%)</Text>
+        <Text style={styles.legendText}>{t('stats.charts.successRate', { defaultValue: 'Tasa de éxito (%)' })}</Text>
       </View>
     </View>
   );

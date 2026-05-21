@@ -14,7 +14,7 @@ import { MiniPet } from '../../components/Pet/MiniPet';
 import { PermissionBanner } from '../../components/PermissionBanner';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
-import { formatDateDB, generateLogId } from '../../utils/dateUtils';
+import { formatDateDB, generateLogId, formatDateLocally, formatShortDate } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { ToastConfirmation } from '../../components/ToastConfirmation';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
@@ -49,23 +49,6 @@ const startOfDayDate = (date: Date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
-};
-
-/**
- * Formatea la fecha de manera amigable (ej: Lunes, 24 de Abril).
- */
-const formatDateLocally = (date: Date) => {
-  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]}`;
-};
-
-/**
- * Formato corto de fecha (ej: 24 Abril) para el selector de en medio.
- */
-const formatShortDate = (date: Date) => {
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`;
 };
 
 /**
@@ -271,9 +254,9 @@ export default function HomeScreen() {
    */
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Buenos días';
-    if (hour < 20) return 'Buenas tardes';
-    return 'Buenas noches';
+    if (hour < 12) return t('home.header.buenos_dias');
+    if (hour < 20) return t('home.header.buenas_tardes');
+    return t('home.header.buenas_noches');
   };
 
   /**
@@ -329,7 +312,7 @@ export default function HomeScreen() {
         
         <View style={styles.dateCenter}>
           <Text style={styles.dateCenterText}>
-            {isToday ? 'Hoy' : formatShortDate(selectedDate)}
+            {isToday ? t('tabs.hoy') : formatShortDate(selectedDate)}
           </Text>
         </View>
 
@@ -350,7 +333,7 @@ export default function HomeScreen() {
       <View style={styles.progressContainer}>
         <ProgressBar 
           progress={progress} 
-          label={`Hábitos completados (${completedCount}/${totalHabits})`} 
+          label={t('home.progress.label', { completed: completedCount, total: totalHabits })} 
         />
       </View>
 
@@ -378,7 +361,7 @@ export default function HomeScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="leaf-outline" size={48} color={Colors.inactive} />
-                <Text style={styles.emptyText}>No hay hábitos programados para este día.</Text>
+                <Text style={styles.emptyText}>{t('home.empty.no_habits')}</Text>
               </View>
             }
           />

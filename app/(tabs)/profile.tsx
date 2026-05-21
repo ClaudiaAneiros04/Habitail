@@ -4,9 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import PetDisplay from '../../components/Pet/PetDisplay';
 import { usePetStore } from '../../store/usePetStore';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen() {
   const { pet } = usePetStore();
+  const { t } = useTranslation();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -18,7 +20,7 @@ export default function ProfileScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
           <Text style={styles.infoText}>
-            ¡Completa tus hábitos diarios para mantener a tu mascota feliz y subir de nivel!
+            {t('profile.info_text')}
           </Text>
         </View>
       </View>

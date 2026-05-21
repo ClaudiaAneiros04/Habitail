@@ -101,7 +101,9 @@ export default function HabitItem({ habit, completed, onToggle, streak, snoozedU
             
             {displayStreak > 0 && (
               <View style={styles.streakBadge}>
-                <Text style={styles.streakText}>{`🔥 ${displayStreak} ${displayStreak === 1 ? 'día' : 'días'}`}</Text>
+                <Text style={styles.streakText}>
+                  {`🔥 ${t('common.day', { count: displayStreak, defaultValue: displayStreak === 1 ? '1 día' : `${displayStreak} días` })}`}
+                </Text>
               </View>
             )}
             

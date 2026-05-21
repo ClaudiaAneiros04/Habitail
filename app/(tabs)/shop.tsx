@@ -5,6 +5,7 @@ import { Colors } from '../../constants/colors';
 import { useUserStore } from '../../store/useUserStore';
 import { usePetStore } from '../../store/usePetStore';
 import { SHOP_ITEMS, ShopItem, ShopItemType } from '../../data/shopItems';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Pantalla de Tienda (ShopScreen)
@@ -13,6 +14,7 @@ import { SHOP_ITEMS, ShopItem, ShopItemType } from '../../data/shopItems';
 export default function ShopScreen() {
   const { user, updateUser } = useUserStore();
   const { pet, updatePet } = usePetStore();
+  const { t } = useTranslation();
   
   // Estado local para la pestaña seleccionada ('skin' o 'accessory')
   const [activeTab, setActiveTab] = useState<ShopItemType>('skin');
@@ -50,7 +52,7 @@ export default function ShopScreen() {
    */
   const handleBuy = async (item: ShopItem) => {
     if (puntos < item.price) {
-      Alert.alert('Puntos insuficientes', 'Sigue completando hábitos para ganar más puntos.');
+      Alert.alert(t('shop.alerts.insufficient_points_title'), t('shop.alerts.insufficient_points_msg'));
       return;
     }
     
@@ -61,7 +63,7 @@ export default function ShopScreen() {
       inventario: nuevoInventario
     });
     
-    Alert.alert('¡Compra exitosa!', `Has comprado ${item.name}.`);
+    Alert.alert(t('shop.alerts.purchase_success_title'), t('shop.alerts.purchase_success_msg', { name: t('shop.items.' + item.id, { defaultValue: item.name }) }));
   };
 
   /**
@@ -77,7 +79,7 @@ export default function ShopScreen() {
       // Por simplicidad en este modelo, asumimos 1 accesorio equipado a la vez.
       await updatePet({ accesorios: [item.id] });
     }
-    Alert.alert('Equipado', `Has equipado ${item.name}.`);
+    Alert.alert(t('shop.alerts.equipped_title'), t('shop.alerts.equipped_msg', { name: t('shop.items.' + item.id, { defaultValue: item.name }) }));
   };
 
   /**
@@ -111,7 +113,7 @@ export default function ShopScreen() {
           )}
         </View>
 
-        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.itemName} numberOfLines={1}>{t('shop.items.' + item.id, { defaultValue: item.name })}</Text>
         
         {!isOwned && (
           <Text style={[styles.itemPrice, isLocked && styles.itemPriceLocked]}>
@@ -123,14 +125,14 @@ export default function ShopScreen() {
           {isEquipped ? (
             <View style={styles.equippedBadge}>
               <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-              <Text style={styles.equippedText}>Equipado</Text>
+              <Text style={styles.equippedText}>{t('shop.actions.equipped')}</Text>
             </View>
           ) : isOwned ? (
             <TouchableOpacity 
               style={styles.equipButton} 
               onPress={() => handleEquip(item)}
             >
-              <Text style={styles.equipButtonText}>Equipar</Text>
+              <Text style={styles.equipButtonText}>{t('shop.actions.equip')}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
@@ -138,7 +140,7 @@ export default function ShopScreen() {
               onPress={() => handleBuy(item)}
               disabled={isLocked}
             >
-              <Text style={styles.buyButtonText}>Comprar</Text>
+              <Text style={styles.buyButtonText}>{t('shop.actions.buy')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -149,11 +151,18 @@ export default function ShopScreen() {
   // Nombres para mostrar en la previsualización
   const getPreviewName = (id: string | null, type: ShopItemType) => {
     if (!id) {
-      if (type === 'skin') return SHOP_ITEMS.find(i => i.id === skinEquipada)?.name || 'Default';
-      if (type === 'accessory' && accesoriosEquipados.length > 0) return SHOP_ITEMS.find(i => i.id === accesoriosEquipados[0])?.name || 'Ninguno';
-      return 'Ninguno';
+      if (type === 'skin') {
+        const activeSkin = SHOP_ITEMS.find(i => i.id === skinEquipada);
+        return activeSkin ? t('shop.items.' + activeSkin.id, { defaultValue: activeSkin.name }) : t('shop.preview.default');
+      }
+      if (type === 'accessory' && accesoriosEquipados.length > 0) {
+        const activeAcc = SHOP_ITEMS.find(i => i.id === accesoriosEquipados[0]);
+        return activeAcc ? t('shop.items.' + activeAcc.id, { defaultValue: activeAcc.name }) : t('shop.preview.none');
+      }
+      return t('shop.preview.none');
     }
-    return SHOP_ITEMS.find(i => i.id === id)?.name || '';
+    const targetItem = SHOP_ITEMS.find(i => i.id === id);
+    return targetItem ? t('shop.items.' + targetItem.id, { defaultValue: targetItem.name }) : '';
   };
 
   return (
@@ -162,20 +171,20 @@ export default function ShopScreen() {
       <View style={styles.header}>
         <View style={styles.pointsBadge}>
           <Ionicons name="star" size={24} color={Colors.warning} />
-          <Text style={styles.pointsText}>{puntos} pts</Text>
+          <Text style={styles.pointsText}>{t('shop.header.points', { points: puntos, defaultValue: `${puntos} pts` })}</Text>
         </View>
       </View>
 
       {/* Preview en tiempo real (Miniatura Central) */}
       <View style={styles.previewContainer}>
-        <Text style={styles.previewTitle}>Previsualización</Text>
+        <Text style={styles.previewTitle}>{t('shop.preview.title')}</Text>
         <View style={styles.previewBox}>
           {/* Aquí iría la composición real de la mascota con Image. */}
           {/* Como no tenemos assets reales ahora, mostramos texto con lo que se vería */}
           <Ionicons name="paw" size={60} color={Colors.primary} />
           <View style={styles.previewDetails}>
-            <Text style={styles.previewDetailText}>Skin: {getPreviewName(previewSkin, 'skin')}</Text>
-            <Text style={styles.previewDetailText}>Accesorios: {getPreviewName(previewAccessory, 'accessory')}</Text>
+            <Text style={styles.previewDetailText}>{t('shop.preview.skin')}: {getPreviewName(previewSkin, 'skin')}</Text>
+            <Text style={styles.previewDetailText}>{t('shop.preview.accessories')}: {getPreviewName(previewAccessory, 'accessory')}</Text>
           </View>
         </View>
       </View>
@@ -186,13 +195,13 @@ export default function ShopScreen() {
           style={[styles.tab, activeTab === 'skin' && styles.activeTab]}
           onPress={() => setActiveTab('skin')}
         >
-          <Text style={[styles.tabText, activeTab === 'skin' && styles.activeTabText]}>Pelajes</Text>
+          <Text style={[styles.tabText, activeTab === 'skin' && styles.activeTabText]}>{t('shop.tabs.skins')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'accessory' && styles.activeTab]}
           onPress={() => setActiveTab('accessory')}
         >
-          <Text style={[styles.tabText, activeTab === 'accessory' && styles.activeTabText]}>Accesorios</Text>
+          <Text style={[styles.tabText, activeTab === 'accessory' && styles.activeTabText]}>{t('shop.tabs.accessories')}</Text>
         </TouchableOpacity>
       </View>
 

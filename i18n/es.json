@@ -1,9 +1,11 @@
 {
   "tabs": {
     "hoy": "Hoy",
-    "habitos": "Hábitos",
+    "habitos": "Mis Hábitos",
+    "historial": "Historial",
     "stats": "Estadísticas",
-    "mascota": "Mascota"
+    "mascota": "Mascota",
+    "tienda": "Tienda"
   },
   "home": {
     "header": {
@@ -12,27 +14,79 @@
       "buenas_noches": "Buenas noches"
     },
     "progress": {
-      "texto": "{{completados}} de {{total}} hábitos"
+      "texto": "{{completados}} de {{total}} hábitos",
+      "label": "Hábitos completados ({{completed}}/{{total}})"
     },
     "toast": {
       "habitCompleted": "✓ {{name}} completado"
     },
     "badge": {
       "snoozed": "· 30 min"
+    },
+    "empty": {
+      "no_habits": "No hay hábitos programados para este día."
     }
   },
   "habits": {
     "empty": {
       "titulo": "Sin hábitos aún",
-      "subtitulo": "Crea tu primer hábito para empezar"
-    }
+      "subtitulo": "Crea tu primer hábito para empezar",
+      "active_title": "No tienes hábitos activos.",
+      "active_subtitle": "¡Presiona el botón + para crear uno!"
+    },
+    "archive": {
+      "title": "Archivar Hábito",
+      "confirm": "¿Estás seguro que deseas archivar \"{{name}}\"?",
+      "action": "Archivar"
+    },
+    "options": {
+      "title": "Opciones",
+      "message": "Gestionar hábito: {{name}}"
+    },
+    "streak_one": "Racha: 1 día",
+    "streak_other": "Racha: {{count}} días"
   },
   "common": {
     "guardar": "Guardar",
     "cancelar": "Cancelar",
     "eliminar": "Eliminar",
     "editar": "Editar",
-    "back": "Atrás"
+    "back": "Atrás",
+    "anadir": "Añadir",
+    "day_one": "1 día",
+    "day_other": "{{count}} días",
+    "daysShort": {
+      "lun": "Lun",
+      "mar": "Mar",
+      "mie": "Mié",
+      "jue": "Jue",
+      "vie": "Vie",
+      "sab": "Sáb",
+      "dom": "Dom"
+    },
+    "monthsShort": {
+      "ene": "Ene",
+      "feb": "Feb",
+      "mar": "Mar",
+      "abr": "Abr",
+      "may": "May",
+      "jun": "Jun",
+      "jul": "Jul",
+      "ago": "Ago",
+      "sep": "Sep",
+      "oct": "Oct",
+      "nov": "Nov",
+      "dic": "Dic"
+    },
+    "daysLetter": {
+      "lun": "L",
+      "mar": "M",
+      "mie": "X",
+      "jue": "J",
+      "vie": "V",
+      "sab": "S",
+      "dom": "D"
+    }
   },
   "notifications": {
     "permission": {
@@ -75,6 +129,9 @@
     }
   },
   "pet": {
+    "loading": "Cargando mascota...",
+    "levelShort": "Nvl",
+    "xpLabel": "XP",
     "messages": {
       "absent": [
         "Te estaré esperando aquí, pase lo que pase. // solo pantalla",
@@ -112,5 +169,188 @@
         "¡Hacemos un equipo de primera categoría! 🏆"
       ]
     }
+  },
+  "categories": {
+    "salud": "Salud",
+    "deporte": "Deporte",
+    "productividad": "Productividad",
+    "bienestar": "Bienestar",
+    "finanzas": "Finanzas",
+    "aprendizaje": "Aprendizaje"
+  },
+  "addHabit": {
+    "wizard": {
+      "step": "{{step}}/{{total}}",
+      "next": "Siguiente",
+      "save": "Guardar Hábito"
+    },
+    "basicInfo": {
+      "question": "¿Qué hábito quieres construir?",
+      "placeholder": "Ej. Beber agua, Leer 10 min...",
+      "errorLength": "El nombre debe tener al menos 2 caracteres.",
+      "selectCategory": "Selecciona una categoría"
+    },
+    "appearance": {
+      "defaultName": "Hábito",
+      "previewTitle": "Previsualización",
+      "noDescription": "Sin descripción",
+      "colorLabel": "Color del hábito",
+      "iconLabel": "Icono representativo",
+      "descriptionLabel": "Descripción (Opcional)",
+      "descriptionPlaceholder": "¿Por qué quieres cumplir este hábito?"
+    },
+    "settings": {
+      "frequencyLabel": "Frecuencia",
+      "frequencies": {
+        "daily": "Diaria",
+        "weekly": "Semanal",
+        "monthly": "Mensual"
+      },
+      "daySelectorLabel": "¿Qué días quieres realizarlo?",
+      "priorityLabel": "Nivel de Prioridad",
+      "priorityDescription": "Esto afecta la vida de tu mascota virtual si no cumples el hábito.",
+      "priorities": {
+        "flexible": "Flexible",
+        "normal": "Normal",
+        "essential": "Esencial",
+        "healthValue": "±{{points}} de vida"
+      },
+      "reminderLabel": "Recordatorio",
+      "reminderDescription": "Recibe una notificación diaria.",
+      "mockReminderText": "* Hora de recordatorio por defecto: 09:00 (configurable en futuras versiones)."
+    }
+  },
+  "stats": {
+    "title": "Rendimiento",
+    "subtitle": "Analiza tu progreso y mantén la constancia",
+    "habitSelector": {
+      "habit": "Hábito",
+      "global": "Vista Global",
+      "visualizing": "Visualizando estadísticas de:"
+    },
+    "tabs": {
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "total": "Total"
+    },
+    "charts": {
+      "complianceAnalysis": "Análisis de cumplimiento",
+      "weekNum": "Semana {{num}}",
+      "more": "Más",
+      "less": "Menos"
+    },
+    "metrics": {
+      "title": "Métricas clave",
+      "currentStreak": "Racha Actual",
+      "maxStreak": "Racha Máxima",
+      "days_one": "1 día",
+      "days_other": "{{count}} días",
+      "totalRate": "Tasa Total",
+      "periodRate": "Tasa Periodo",
+      "status": "Estado",
+      "statusExcellent": "Excelente",
+      "statusRegular": "Regular",
+      "statusImproveable": "Mejorable"
+    }
+  },
+  "history": {
+    "title": "Actividad Histórica",
+    "empty": "No hay datos para esta fecha de búsqueda."
+  },
+  "profile": {
+    "info_text": "¡Completa tus hábitos diarios para mantener a tu mascota feliz y subir de nivel!"
+  },
+  "shop": {
+    "header": {
+      "points": "{{points}} pts"
+    },
+    "preview": {
+      "title": "Previsualización",
+      "skin": "Skin",
+      "accessories": "Accesorios",
+      "default": "Default",
+      "none": "Ninguno"
+    },
+    "tabs": {
+      "skins": "Pelajes",
+      "accessories": "Accesorios"
+    },
+    "actions": {
+      "equipped": "Equipado",
+      "equip": "Equipar",
+      "buy": "Comprar"
+    },
+    "alerts": {
+      "insufficient_points_title": "Puntos insuficientes",
+      "insufficient_points_msg": "Sigue completando hábitos para ganar más puntos.",
+      "purchase_success_title": "¡Compra exitosa!",
+      "purchase_success_msg": "Has comprado {{name}}.",
+      "equipped_title": "Equipado",
+      "equipped_msg": "Has equipado {{name}}."
+    },
+    "items": {
+      "skin_default": "Gato Naranja",
+      "skin_siamese": "Siamés",
+      "skin_black": "Pantera",
+      "acc_glasses": "Gafas de Sol",
+      "acc_hat": "Sombrero Mágico"
+    }
+  },
+  "habitDetails": {
+    "headerTitle": "Detalles del Hábito",
+    "statsSectionTitle": "Estadísticas",
+    "currentStreakLabel": "Racha Actual",
+    "consecutiveDays_one": "1 día consecutivo",
+    "consecutiveDays_other": "{{count}} días consecutivos",
+    "bestStreakLabel": "Mejor Racha",
+    "totalSuccessLabel": "Éxito Total",
+    "infoSectionTitle": "Información",
+    "frequencyLabel": "Frecuencia:",
+    "reminderLabel": "Hora Recordatorio:",
+    "priorityLabel": "Prioridad:",
+    "createdLabel": "Creado:"
+  },
+  "habitLibrary": {
+    "headerTitle": "Librería de Ideas",
+    "all": "Todos",
+    "emptyText": "No hay ideas en esta categoría.",
+    "presets": {
+      "1": {
+        "nombre": "Beber Agua",
+        "descripcion": "Beber al menos 2 litros de agua diarios."
+      },
+      "2": {
+        "nombre": "Caminar 10k pasos",
+        "descripcion": "Alcanzar el objetivo diario de caminata."
+      },
+      "3": {
+        "nombre": "Leer un libro",
+        "descripcion": "Leer por lo menos 15 minutos en silencio."
+      },
+      "4": {
+        "nombre": "Ahorro semanal",
+        "descripcion": "Transferir dinero al fondo de ahorros."
+      },
+      "5": {
+        "nombre": "Planificar el día",
+        "descripcion": "Anotar tareas a primera hora o por la noche."
+      },
+      "6": {
+        "nombre": "Meditar",
+        "descripcion": "Sesión de 5-10 min de respiración profunda."
+      },
+      "7": {
+        "nombre": "Dormir 8 horas",
+        "descripcion": "Desconectar temprano y priorizar el sueño."
+      },
+      "8": {
+        "nombre": "Aprender idioma",
+        "descripcion": "Superar 1 lección diaria en una app de idiomas."
+      }
+    }
+  },
+  "layout": {
+    "initErrorTitle": "Error de Inicialización",
+    "initErrorMessage": "Hubo un problema al cargar los datos: "
   }
 }

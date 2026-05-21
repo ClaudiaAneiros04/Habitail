@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { PetState } from '../../types';
 import { Colors } from '../../constants/colors';
 
@@ -21,6 +22,7 @@ const MESSAGES: Record<PetState, string[]> = {
  * dependiendo de su estado actual. Incluye una animación de levitación.
  */
 export const PetBubble: React.FC<PetBubbleProps> = ({ state }) => {
+  const { t } = useTranslation();
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -42,8 +44,11 @@ export const PetBubble: React.FC<PetBubbleProps> = ({ state }) => {
   }, [floatAnim]);
 
   // Selección de mensaje aleatorio basado en el estado
-  const stateMessages = MESSAGES[state] || ["Miau~"];
-  const randomMessage = stateMessages[Math.floor(Math.random() * stateMessages.length)];
+  const stateMessages = (t(`pet.messages.${state.toLowerCase()}`, { returnObjects: true }) as string[]) || MESSAGES[state] || ["Miau~"];
+  const rawMessage = stateMessages[Math.floor(Math.random() * stateMessages.length)];
+  const randomMessage = typeof rawMessage === 'string'
+    ? rawMessage.replace(/\/\/.*$/, '').trim()
+    : String(rawMessage);
 
   return (
     <Animated.View style={[styles.bubbleContainer, { transform: [{ translateY: floatAnim }] }]}>

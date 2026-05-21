@@ -3,6 +3,7 @@ import { View, ActivityIndicator, Alert } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../constants/colors';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDb } from '../storage/database';
@@ -16,6 +17,7 @@ import { handleAppForeground } from '../notifications/inactivityService';
 import '../i18n';
 
 export default function RootLayout() {
+  const { t } = useTranslation();
   useDailyPenaltyJob();
 
   /**
@@ -72,8 +74,8 @@ export default function RootLayout() {
       } catch (error: any) {
         console.error('Error durante la inicialización de la app:', error);
         Alert.alert(
-          'Error de Inicialización',
-          'Hubo un problema al cargar los datos: ' + (error?.message || 'Error desconocido')
+          t('layout.initErrorTitle', { defaultValue: 'Error de Inicialización' }),
+          t('layout.initErrorMessage', { defaultValue: 'Hubo un problema al cargar los datos: ' }) + (error?.message || 'Error desconocido')
         );
         setDbReady(true);
       }

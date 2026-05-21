@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Componente principal de enrutamiento basado en pestañas (Bottom Navigation).
@@ -20,6 +21,8 @@ import { Colors } from '../../constants/colors';
  * @returns {JSX.Element} El contenedor principal con el diseño de navegación Tab.
  */
 export default function TabLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -38,7 +41,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Hoy',
+          title: t('tabs.hoy'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
@@ -47,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="habits"
         options={{
-          title: 'Mis Hábitos',
+          title: t('tabs.habitos'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="list-outline" size={size} color={color} />
           ),
@@ -56,7 +59,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: 'Historial',
+          title: t('tabs.historial'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="time-outline" size={size} color={color} />
           ),
@@ -65,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Estadísticas',
+          title: t('tabs.stats'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
@@ -74,7 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Mascota',
+          title: t('tabs.mascota'),
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="paw-outline" size={size} color={color} />
           ),
@@ -83,7 +86,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="shop"
         options={{
-          title: 'Tienda',
+          title: t('tabs.tienda'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cart-outline" size={size} color={color} />
           ),

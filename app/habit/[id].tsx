@@ -3,11 +3,23 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, SafeAreaView, To
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 
 import { useHabitStore } from '../../store/useHabitStore';
 import { Colors } from '../../constants/colors';
 import { useHabitStats } from '../../hooks/useHabitStats';
+
+const locales: Record<string, any> = {
+  es,
+  en: enUS,
+};
+
+const getLocale = () => {
+  const lang = i18n.language?.split('-')[0] || 'es';
+  return locales[lang] || es;
+};
 
 /**
  * Pantalla que muestra el detalle de un hábito en específico con lógica real.
@@ -15,6 +27,7 @@ import { useHabitStats } from '../../hooks/useHabitStats';
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { t } = useTranslation();
   
   const allHabits = useHabitStore((state) => state.habits);
   const habit = allHabits.find(h => h.id === id);
@@ -44,7 +57,7 @@ export default function HabitDetailScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalles del Hábito</Text>
+        <Text style={styles.headerTitle}>{t('habitDetails.headerTitle', { defaultValue: 'Detalles del Hábito' })}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -58,18 +71,18 @@ export default function HabitDetailScreen() {
           {habit.descripcion && <Text style={styles.habitDesc}>{habit.descripcion}</Text>}
         </View>
 
-        <Text style={styles.sectionTitle}>Estadísticas</Text>
+        <Text style={styles.sectionTitle}>{t('habitDetails.statsSectionTitle', { defaultValue: 'Estadísticas' })}</Text>
 
         <View style={styles.statsContainer}>
           <View style={styles.statTilePrimary}>
-            <Text style={styles.statTileLabelPrimary}>Racha Actual</Text>
+            <Text style={styles.statTileLabelPrimary}>{t('habitDetails.currentStreakLabel', { defaultValue: 'Racha Actual' })}</Text>
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" style={{ marginTop: 8 }} />
             ) : (
               <View style={styles.streakRow}>
                 <Text style={styles.statTileValuePrimary}>🔥 {currentStreak}</Text>
                 <Text style={styles.statTileSubPrimary}>
-                  {currentStreak === 1 ? 'día' : 'días'} consecutivos
+                  {t('habitDetails.consecutiveDays', { count: currentStreak, defaultValue: currentStreak === 1 ? 'día consecutivo' : 'días consecutivos' })}
                 </Text>
               </View>
             )}
@@ -77,37 +90,41 @@ export default function HabitDetailScreen() {
 
           <View style={styles.secondaryStatsRow}>
             <View style={styles.statTileSmall}>
-              <Text style={styles.statTileLabel}>Mejor Racha</Text>
+              <Text style={styles.statTileLabel}>{t('habitDetails.bestStreakLabel', { defaultValue: 'Mejor Racha' })}</Text>
               <Text style={styles.statTileValue}>{maxStreak}</Text>
             </View>
 
             <View style={styles.statTileSmall}>
-              <Text style={styles.statTileLabel}>Éxito Total</Text>
+              <Text style={styles.statTileLabel}>{t('habitDetails.totalSuccessLabel', { defaultValue: 'Éxito Total' })}</Text>
               <Text style={styles.statTileValue}>{completionRate.toFixed(1)}%</Text>
             </View>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Información</Text>
+        <Text style={styles.sectionTitle}>{t('habitDetails.infoSectionTitle', { defaultValue: 'Información' })}</Text>
         <View style={styles.infoBox}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Frecuencia:</Text>
-            <Text style={styles.infoValue}>{habit.frecuencia}</Text>
+            <Text style={styles.infoLabel}>{t('habitDetails.frequencyLabel', { defaultValue: 'Frecuencia:' })}</Text>
+            <Text style={styles.infoValue}>
+              {t('addHabit.settings.frequencies.' + habit.frecuencia.toLowerCase(), { defaultValue: habit.frecuencia })}
+            </Text>
           </View>
           {habit.horaRecordatorio && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Hora Récordatorio:</Text>
+              <Text style={styles.infoLabel}>{t('habitDetails.reminderLabel', { defaultValue: 'Hora Recordatorio:' })}</Text>
               <Text style={styles.infoValue}>{habit.horaRecordatorio}</Text>
             </View>
           )}
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Prioridad:</Text>
-            <Text style={styles.infoValue}>{habit.nivelPrioridad}</Text>
+            <Text style={styles.infoLabel}>{t('habitDetails.priorityLabel', { defaultValue: 'Prioridad:' })}</Text>
+            <Text style={styles.infoValue}>
+              {t('addHabit.settings.priorities.' + habit.nivelPrioridad.toLowerCase(), { defaultValue: habit.nivelPrioridad })}
+            </Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Creado:</Text>
+            <Text style={styles.infoLabel}>{t('habitDetails.createdLabel', { defaultValue: 'Creado:' })}</Text>
             <Text style={styles.infoValue}>
-              {format(new Date(habit.fechaInicio), 'dd MMM yyyy', { locale: es })}
+              {format(new Date(habit.fechaInicio), 'dd MMM yyyy', { locale: getLocale() })}
             </Text>
           </View>
         </View>

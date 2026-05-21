@@ -16,6 +16,7 @@ import {
   format, isBefore, isAfter, max, min, subMonths
 } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
+import i18n from '../i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -43,7 +44,10 @@ export type ChartData = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Etiquetas de día para el modo semanal (Lun=índice 0, Dom=índice 6). */
-const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const getDayLabel = (index: number): string => {
+  const keys = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'];
+  return i18n.t(`common.daysShort.${keys[index]}`, { defaultValue: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][index] });
+};
 
 /**
  * Decide si el hábito está programado para un día concreto.
@@ -177,7 +181,7 @@ export const aggregateByWeek = (
   return Array.from({ length: 7 }, (_, i) => {
     const day = addDays(weekStart, i);
     const { total, completed } = countDaysInPeriod([day], logs, habitOrHabits);
-    return { label: DAY_LABELS[i], value: computeRate(completed, total), completed, total };
+    return { label: getDayLabel(i), value: computeRate(completed, total), completed, total };
   });
 };
 
@@ -218,7 +222,7 @@ export const aggregateByMonth = (
     const { total, completed } = countDaysInPeriod(days, logs, habitOrHabits);
 
     result.push({
-      label: `Semana ${weekNum}`,
+      label: i18n.t('stats.charts.weekNum', { num: weekNum, defaultValue: `Semana ${weekNum}` }),
       value: computeRate(completed, total),
       completed,
       total,
@@ -245,7 +249,10 @@ export const aggregateByHistory = (
   referenceDate: Date = new Date(),
 ): ChartData[] => {
   const result: ChartData[] = [];
-  const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const getMonthLabel = (monthIndex: number): string => {
+    const keys = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return i18n.t(`common.monthsShort.${keys[monthIndex]}`, { defaultValue: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][monthIndex] });
+  };
 
   for (let i = 5; i >= 0; i--) {
     const monthTarget = subMonths(referenceDate, i);
@@ -256,7 +263,7 @@ export const aggregateByHistory = (
     const { total, completed } = countDaysInPeriod(days, logs, habitOrHabits);
 
     result.push({
-      label: monthLabels[monthTarget.getMonth()],
+      label: getMonthLabel(monthTarget.getMonth()),
       value: computeRate(completed, total),
       completed,
       total,

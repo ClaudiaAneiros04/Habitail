@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,6 +8,7 @@ import {
   StatusBar,
   ActivityIndicator
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Theme } from '../../constants/theme';
 import { StatCard } from '../../components/stats/StatCard';
 import { StatsTabs, TabType } from '../../components/stats/StatsTabs';
@@ -19,7 +20,7 @@ import { BarChartComponent } from '../../components/stats/BarChartComponent';
 import { useHabitStore } from '../../store/useHabitStore';
 import { useUserStore } from '../../store/useUserStore';
 import { useHabitStats } from '../../hooks/useHabitStats';
-import { aggregateChartData, ChartData } from '../../utils/chartAggregator';
+import { aggregateChartData } from '../../utils/chartAggregator';
 import { LogRepository } from '../../storage/LogRepository';
 import { HabitLog } from '../../types';
 
@@ -29,11 +30,12 @@ const logRepo = new LogRepository();
  * StatsScreen - Pantalla principal de estadísticas integrada.
  */
 export default function StatsScreen() {
+  const { t } = useTranslation();
   const { user } = useUserStore();
   const { habits } = useHabitStore();
 
   // Estado para el periodo seleccionado
-  const [activeTab, setActiveTab] = useState<TabType>('Semanal');
+  const [activeTab, setActiveTab] = useState<TabType>('weekly');
   
   // ID del hábito seleccionado. null/undefined significa "Vista Global".
   const [selectedHabitId, setSelectedHabitId] = useState<string | undefined>(undefined);
@@ -42,10 +44,8 @@ export default function StatsScreen() {
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
 
-  // Mapeo de TabType a StatsPeriod/AggregateMode
-  const period: 'weekly' | 'monthly' | 'total' = 
-    activeTab === 'Semanal' ? 'weekly' : 
-    activeTab === 'Mensual' ? 'monthly' : 'total';
+  // El periodo coincide directamente con activeTab
+  const period = activeTab;
 
   // 1. Obtener métricas clave (Rachas y Tasas) usando el hook de lógica centralizada
   const { 
@@ -99,8 +99,8 @@ export default function StatsScreen() {
 
   // Nombre del hábito para el selector
   const selectedHabitName = selectedHabitId 
-    ? habits.find(h => h.id === selectedHabitId)?.nombre || 'Hábito'
-    : 'Vista Global';
+    ? habits.find(h => h.id === selectedHabitId)?.nombre || t('stats.habitSelector.habit', { defaultValue: 'Hábito' })
+    : t('stats.habitSelector.global');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -111,8 +111,8 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerTextContainer}>
-          <Text style={styles.screenTitle}>Rendimiento</Text>
-          <Text style={styles.screenSubtitle}>Analiza tu progreso y mantén la constancia</Text>
+          <Text style={styles.screenTitle}>{t('stats.title')}</Text>
+          <Text style={styles.screenSubtitle}>{t('stats.subtitle')}</Text>
         </View>
 
         {/* Selector de Hábito Real */}
@@ -140,7 +140,7 @@ export default function StatsScreen() {
 
         {/* Gráfico de Barras Detallado */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Análisis de cumplimiento</Text>
+          <Text style={styles.sectionTitle}>{t('stats.charts.complianceAnalysis')}</Text>
           {isLogsLoading ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator color={Theme.colors.primary} />
@@ -155,26 +155,32 @@ export default function StatsScreen() {
 
         {/* Métricas clave */}
         <View style={styles.gridSection}>
-          <Text style={styles.sectionTitle}>Métricas clave</Text>
+          <Text style={styles.sectionTitle}>{t('stats.metrics.title')}</Text>
           <View style={styles.grid}>
             <View style={styles.row}>
               <StatCard 
-                title="Racha Actual" 
-                value={isStatsLoading ? "..." : `${currentStreak} días 🔥`} 
+                title={t('stats.metrics.currentStreak')} 
+                value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: currentStreak })} 🔥`} 
               />
               <StatCard 
-                title="Racha Máxima" 
-                value={isStatsLoading ? "..." : `${maxStreak} días 🏆`} 
+                title={t('stats.metrics.maxStreak')} 
+                value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: maxStreak })} 🏆`} 
               />
             </View>
             <View style={styles.row}>
               <StatCard 
-                title={period === 'total' ? "Tasa Total" : "Tasa Periodo"} 
+                title={period === 'total' ? t('stats.metrics.totalRate') : t('stats.metrics.periodRate')} 
                 value={isStatsLoading ? "..." : `${completionRate.toFixed(1)}%`} 
               />
               <StatCard 
-                title="Estado" 
-                value={completionRate > 80 ? "Excelente" : completionRate > 50 ? "Regular" : "Mejorable"} 
+                title={t('stats.metrics.status')} 
+                value={
+                  completionRate > 80 
+                    ? t('stats.metrics.statusExcellent') 
+                    : completionRate > 50 
+                      ? t('stats.metrics.statusRegular') 
+                      : t('stats.metrics.statusImproveable')
+                } 
               />
             </View>
           </View>

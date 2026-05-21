@@ -7,60 +7,8 @@ import { useLogStore } from '../../store/useLogStore';
 import { Colors } from '../../constants/colors';
 import { HabitLog } from '../../types';
 import { getHabitsForToday } from '../../utils/frequencyEngine';
-
-// Helpers de fecha duplicados mínimamente para aislar UI o usar los globales
-/**
- * Determina si una fecha dada es estrictamente posterior al día de hoy (futuro).
- * Sirve para bloquear la navegación hacia fechas inexistentes en el calendario de check-ins.
- * @param {Date} date - La fecha a evaluar.
- * @returns {boolean} True si la fecha es en el futuro.
- */
-const isFutureDate = (date: Date) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const check = new Date(date);
-  check.setHours(0, 0, 0, 0);
-  return check.getTime() > today.getTime();
-};
-
-/**
- * Normaliza una fecha eliminando la información de horas, minutos y segundos.
- * Fundamental para comparar fechas absolutas ("hoy es igual a hoy") sin importar la hora del tap.
- * @param {Date} date - La fecha sucia.
- * @returns {Date} Instancia de fecha apuntando estrictamente a las 00:00:00.
- */
-const startOfDayDate = (date: Date) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-/**
- * Formatea una fecha en formato local y amigable en español (ej. "lunes, 12 de abril").
- * No se utiliza Date-fns aquí intencionadamente para evitar sobrecargar los bundles de locales
- * y asegurar robustez nativa.
- * @param {Date} date - Fecha a formatear.
- * @returns {string} String formateada y en minúsculas.
- */
-const formatDateLocally = (date: Date) => {
-  const days = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]}`;
-};
-
-/**
- * Convierte un objeto Date a un string de formato YYYY-MM-DD.
- * Es el contrato vital exigido por `LogRepository` y la persistencia del Store para 
- * almacenar y recuperar logs diarios.
- * @param {Date} date - Fecha a formatear.
- * @returns {string} Cadena en molde YYYY-MM-DD.
- */
-const formatDateDB = (date: Date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
+import { isFutureDate, startOfDayDate, formatDateDB, formatDateLocally } from '../../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Pantalla del Historial (HistoryScreen) para revisar retrospectivamente los registros.
@@ -72,6 +20,7 @@ const formatDateDB = (date: Date) => {
  * @returns {JSX.Element} Screen principal del historial, listando cada hábito para un día en específico.
  */
 export default function HistoryScreen() {
+  const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDayDate(new Date()));
   const [logsObj, setLogsObj] = useState<Record<string, HabitLog>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -133,7 +82,7 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Actividad Histórica</Text>
+        <Text style={styles.headerTitle}>{t('history.title')}</Text>
       </View>
 
       {/* Rownav de fecha */}
@@ -144,7 +93,7 @@ export default function HistoryScreen() {
         
         <View style={styles.dateCenter}>
           <Text style={styles.dateCenterText}>
-            {isToday ? 'Hoy' : formatDateLocally(selectedDate)}
+            {isToday ? t('tabs.hoy') : formatDateLocally(selectedDate)}
           </Text>
         </View>
 
@@ -187,8 +136,8 @@ export default function HistoryScreen() {
 
               return (
                 <View style={[
-                  styles.historyItem,
-                  statusType === 'FAILED' && styles.historyItemFailed,
+                   styles.historyItem,
+                   statusType === 'FAILED' && styles.historyItemFailed,
                 ]}>
                   <View style={styles.leftPill}>
                     <View style={[styles.iconBox, { backgroundColor: item.colorHex || Colors.primary }]}>
@@ -226,7 +175,7 @@ export default function HistoryScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="documents-outline" size={48} color={Colors.inactive} />
-                <Text style={styles.emptyText}>No hay datos para esta fecha de búsqueda.</Text>
+                <Text style={styles.emptyText}>{t('history.empty')}</Text>
               </View>
             }
           />

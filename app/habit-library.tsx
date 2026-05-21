@@ -1,14 +1,9 @@
-/**
- * @file habit-library.tsx
- * @description Pantalla de Biblioteca de Sugerencias.
- * Proporciona un catálogo de hábitos predefinidos que los usuarios
- * pueden añadir rápidamente, organizados por categorías usando "Tabs" simulados.
- */
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Colors } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Category, SuggestedHabit, Frequency, Priority } from '../types';
 import { createHabitFromLibrary } from '../services/habitCreation';
 
@@ -26,6 +21,7 @@ const SUGGESTED_HABITS: SuggestedHabit[] = [
 
 export default function HabitLibraryScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   
   // Extraemos las categorías únicas basadas en nuestras sugerencias
   const tabs = useMemo(() => {
@@ -45,7 +41,12 @@ export default function HabitLibraryScreen() {
   // Maneja el botón de añadir rápido
   const handleAddTemplate = async (habit: SuggestedHabit) => {
     try {
-      await createHabitFromLibrary(habit, {
+      const translatedHabit = {
+        ...habit,
+        nombre: t(`habitLibrary.presets.${habit.id}.nombre`, { defaultValue: habit.nombre }),
+        descripcion: t(`habitLibrary.presets.${habit.id}.descripcion`, { defaultValue: habit.descripcion }),
+      };
+      await createHabitFromLibrary(translatedHabit, {
         userId: 'default-user',
         frecuencia: Frequency.DAILY,
         nivelPrioridad: Priority.NORMAL,
@@ -62,7 +63,7 @@ export default function HabitLibraryScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Librería de Ideas</Text>
+        <Text style={styles.headerTitle}>{t('habitLibrary.headerTitle', { defaultValue: 'Librería de Ideas' })}</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -81,7 +82,7 @@ export default function HabitLibraryScreen() {
                 style={[styles.tabBadge, isActive && styles.tabBadgeActive]}
               >
                 <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {item === 'TODOS' ? 'Todos' : item}
+                  {item === 'TODOS' ? t('habitLibrary.all', { defaultValue: 'Todos' }) : t('categories.' + item.toLowerCase(), { defaultValue: item })}
                 </Text>
               </TouchableOpacity>
             )
@@ -102,22 +103,22 @@ export default function HabitLibraryScreen() {
             </View>
             
             <View style={styles.cardInfo}>
-              <Text style={styles.cardTitle}>{item.nombre}</Text>
-              <Text style={styles.cardDesc} numberOfLines={2}>{item.descripcion}</Text>
+              <Text style={styles.cardTitle}>{t(`habitLibrary.presets.${item.id}.nombre`, { defaultValue: item.nombre })}</Text>
+              <Text style={styles.cardDesc} numberOfLines={2}>{t(`habitLibrary.presets.${item.id}.descripcion`, { defaultValue: item.descripcion })}</Text>
             </View>
 
             <TouchableOpacity 
               style={styles.addButton}
               onPress={() => handleAddTemplate(item)}
             >
-              <Text style={styles.addButtonText}>Añadir</Text>
+              <Text style={styles.addButtonText}>{t('common.anadir', { defaultValue: 'Añadir' })}</Text>
             </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="library-outline" size={48} color={Colors.inactive} />
-            <Text style={styles.emptyText}>No hay ideas en esta categoría.</Text>
+            <Text style={styles.emptyText}>{t('habitLibrary.emptyText', { defaultValue: 'No hay ideas en esta categoría.' })}</Text>
           </View>
         }
       />
