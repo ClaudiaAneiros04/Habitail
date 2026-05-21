@@ -1,4 +1,4 @@
-import { Pet, PetState } from '../../types';
+import { Pet, PetState } from '../types';
 
 /**
  * Mocks de datos de la mascota para testear las condiciones de salud y vida
