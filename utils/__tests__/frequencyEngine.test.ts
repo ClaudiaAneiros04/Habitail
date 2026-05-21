@@ -1,5 +1,5 @@
-import { getHabitsForToday } from './frequencyEngine';
-import { Habit, Frequency, Category, Priority, VerificationType } from '../types';
+import { getHabitsForToday } from '../frequencyEngine';
+import { Habit, Frequency, Category, Priority, VerificationType } from '../../types';
 
 describe('frequencyEngine - getHabitsForToday', () => {
   const baseHabit: Habit = {

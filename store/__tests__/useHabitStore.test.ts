@@ -1,5 +1,5 @@
-import { useHabitStore } from './useHabitStore';
-import { Habit } from '../types';
+import { useHabitStore } from '../useHabitStore';
+import { Habit } from '../../types';
 
 // Mock de AsyncStorage para aislar el store de advertencias de dependencias externas en las pruebas
 jest.mock('@react-native-async-storage/async-storage', () => ({
