@@ -2,10 +2,13 @@ import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useHabitStore } from '../store/useHabitStore';
 import { useLogStore } from '../store/useLogStore';
+import { useUserStore } from '../store/useUserStore';
+import { usePetStore } from '../store/usePetStore';
+import { handleAppForeground } from '../notifications/inactivityService';
 
 /**
  * Hook para detectar cuando la app vuelve a primer plano (active)
- * y forzar una recarga del store (hábitos y logs) para reflejar
+ * y forzar una recarga del store (hábitos, logs, usuario y mascota) para reflejar
  * interacciones hechas desde notificaciones en segundo plano.
  * 
  * ¿Por qué AppState en lugar de un listener de notificaciones?
@@ -26,6 +29,9 @@ export function useAppStateRefresh(onRefresh: () => void) {
         // App ha vuelto a primer plano
         await useHabitStore.getState().loadHabits();
         await useLogStore.getState().loadLogs();
+        await useUserStore.getState().loadUser();
+        await usePetStore.getState().loadPet();
+        await handleAppForeground();
         onRefresh();
       }
       appState.current = nextAppState;
@@ -36,3 +42,4 @@ export function useAppStateRefresh(onRefresh: () => void) {
     };
   }, [onRefresh]);
 }
+

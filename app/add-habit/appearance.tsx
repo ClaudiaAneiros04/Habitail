@@ -10,7 +10,7 @@ import { Colors } from '../../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHabitStore } from '../../store/useHabitStore';
-import { Frequency, VerificationType, Priority } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // 12 tonos HEX para el Selector de Color (ColorPicker)
 const PREDEFINED_COLORS = [
@@ -39,10 +39,11 @@ const ICONS = [
 
 export default function AppearanceScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   
   // Extraemos parámetros (nombre y categoría) enviados desde el Paso 1 (basic-info)
   const params = useLocalSearchParams();
-  const nombreHabito = params.nombre as string || 'Hábito';
+  const nombreHabito = params.nombre as string || t('addHabit.appearance.defaultName', { defaultValue: 'Hábito' });
   
   // Estado local para el Paso 2
   const [description, setDescription] = useState('');
@@ -76,7 +77,7 @@ export default function AppearanceScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Apariencia (2/3)</Text>
+          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 2, total: 3, defaultValue: 'Apariencia (2/3)' })}</Text>
           <View style={{ width: 32 }} />
         </View>
 
@@ -84,19 +85,19 @@ export default function AppearanceScreen() {
           <ProgressBar step={2} total={3} />
 
           {/* Tarjeta Visual: Previsualización reactiva del Hábito en tiempo real */}
-          <Text style={styles.label}>Previsualización</Text>
+          <Text style={styles.label}>{t('addHabit.appearance.previewTitle')}</Text>
           <View style={styles.previewCard}>
             <View style={[styles.iconPreviewContainer, { backgroundColor: selectedColor }]}>
               <Ionicons name={selectedIcon as any} size={28} color="#FFF" />
             </View>
             <View style={styles.previewInfo}>
               <Text style={styles.previewName}>{nombreHabito}</Text>
-              <Text style={styles.previewSubName}>{description ? description : 'Sin descripción'}</Text>
+              <Text style={styles.previewSubName}>{description ? description : t('addHabit.appearance.noDescription', { defaultValue: 'Sin descripción' })}</Text>
             </View>
           </View>
 
           {/* Componente: ColorPicker (Burbujas de 12 tonos) */}
-          <Text style={[styles.label, { marginTop: 24 }]}>Color del hábito</Text>
+          <Text style={[styles.label, { marginTop: 24 }]}>{t('addHabit.appearance.colorLabel')}</Text>
           <View style={styles.colorGrid}>
             {PREDEFINED_COLORS.map(color => {
               const isSelected = selectedColor === color;
@@ -119,7 +120,7 @@ export default function AppearanceScreen() {
           </View>
 
           {/* Componente: IconPicker (Grid con Scroll) */}
-          <Text style={[styles.label, { marginTop: 24 }]}>Icono representativo</Text>
+          <Text style={[styles.label, { marginTop: 24 }]}>{t('addHabit.appearance.iconLabel')}</Text>
           <View style={styles.iconGrid}>
             {ICONS.map((iconName) => {
               const isSelected = selectedIcon === iconName;
@@ -143,10 +144,10 @@ export default function AppearanceScreen() {
           </View>
 
           {/* Componente: Area de texto opcional para Descripción */}
-          <Text style={[styles.label, { marginTop: 24 }]}>Descripción (Opcional)</Text>
+          <Text style={[styles.label, { marginTop: 24 }]}>{t('addHabit.appearance.descriptionLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="¿Por qué quieres cumplir este hábito?"
+            placeholder={t('addHabit.appearance.descriptionPlaceholder')}
             placeholderTextColor={Colors.inactive}
             value={description}
             onChangeText={setDescription}
@@ -161,7 +162,7 @@ export default function AppearanceScreen() {
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextText}>Siguiente</Text>
+            <Text style={styles.nextText}>{t('addHabit.wizard.next')}</Text>
             <Ionicons name="arrow-forward" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>

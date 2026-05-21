@@ -1,15 +1,17 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLogStore } from '../../store/useLogStore';
-import { usePetStore } from '../../store/usePetStore';
-import { useHabitStore } from '../../store/useHabitStore';
-import { useUserStore } from '../../store/useUserStore';
-import { useStatsStore } from '../../store/useStatsStore';
-import { calcPointsDelta } from '../../utils/pointsEngine';
-import { evaluateBadges } from '../../utils/badgeEngine';
-import { generateLogId, formatDateDB } from '../../utils/dateUtils';
-import { HabitLog, Habit } from '../../types';
+import { useLogStore } from '../store/useLogStore';
+import { usePetStore } from '../store/usePetStore';
+import { useHabitStore } from '../store/useHabitStore';
+import { useUserStore } from '../store/useUserStore';
+import { useStatsStore } from '../store/useStatsStore';
+import { calcPointsDelta } from '../utils/pointsEngine';
+import { evaluateBadges } from '../utils/badgeEngine';
+import { generateLogId, formatDateDB } from '../utils/dateUtils';
+import { HabitLog, Habit } from '../types';
+import { initDb } from '../storage/database';
+import { LogRepository } from '../storage/LogRepository';
 
 // ============================================================================
 // Constants
@@ -103,18 +105,27 @@ async function handleDoneAction(habitId: string): Promise<void> {
     const today = new Date();
     const dateStr = formatDateDB(today);
     
-    // 1. Obtener estado actual
+    // Asegurar que la base de datos está inicializada
+    await initDb();
+    
+    // Cargar y sincronizar stores en background (Zustand context limpio en Headless JS)
+    await useUserStore.getState().loadUser();
+    await usePetStore.getState().loadPet();
+    await useHabitStore.getState().loadHabits();
+    
+    // 1. Obtener estado actual hidratado
     const user = useUserStore.getState().user;
     const habits = useHabitStore.getState().habits;
-    const { logs, addLog } = useLogStore.getState();
+    const { addLog, getLogsForDay } = useLogStore.getState();
     const { updateHealth } = usePetStore.getState();
     const { updatePoints, addBadges } = useUserStore.getState();
     
     const logId = generateLogId(habitId, today);
     
-    // Verificar si ya está completado
-    const existingLog = logs.find(l => l.habitId === habitId && (l.fecha === dateStr || l.fecha.startsWith(dateStr)));
-    if (existingLog && existingLog.completado) {
+    // Consultar logs del día directamente de la base de datos
+    const dayLogs = await getLogsForDay(dateStr);
+    const existingLog = dayLogs.find(l => l.habitId === habitId && l.completado);
+    if (existingLog) {
       console.log(`[NotificationService] El hábito ${habitId} ya estaba completado hoy.`);
       return;
     }
@@ -138,9 +149,15 @@ async function handleDoneAction(habitId: string): Promise<void> {
       const points = calcPointsDelta(habit);
       await updatePoints(points);
       
-      if (user) {
-        const allLogs = [...logs, newLog];
-        const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
+      const updatedUser = useUserStore.getState().user;
+      if (updatedUser) {
+        // Cargar todo el historial para la evaluación de insignias
+        const allLogs = await new LogRepository().getAll();
+        // Asegurarse de incluir el log que acabamos de guardar (en caso de desfase en la lectura)
+        if (!allLogs.some(l => l.id === newLog.id)) {
+          allLogs.push(newLog);
+        }
+        const newEarnedBadges = evaluateBadges(updatedUser as any, habits, allLogs);
         if (newEarnedBadges.length > 0) {
           await addBadges(newEarnedBadges);
         }

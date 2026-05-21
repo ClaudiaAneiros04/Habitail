@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Theme } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 interface HabitSelectorProps {
   /** Nombre del hábito seleccionado actualmente */
@@ -15,6 +16,8 @@ interface HabitSelectorProps {
  * Muestra el nombre del hábito actual y un icono para indicar que es desplegable.
  */
 export const HabitSelector: React.FC<HabitSelectorProps> = ({ selectedHabit, onSelect }) => {
+  const { t } = useTranslation();
+
   return (
     <TouchableOpacity 
       style={styles.container} 
@@ -22,7 +25,7 @@ export const HabitSelector: React.FC<HabitSelectorProps> = ({ selectedHabit, onS
       onPress={onSelect}
     >
       <View style={styles.textContainer}>
-        <Text style={styles.label}>Visualizando estadísticas de:</Text>
+        <Text style={styles.label}>{t('stats.habitSelector.visualizing')}</Text>
         <Text style={styles.value} numberOfLines={1}>
           {selectedHabit}
         </Text>

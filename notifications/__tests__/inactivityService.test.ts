@@ -12,8 +12,8 @@ import {
   mockAbsentPet
 } from '../inactivityMocks';
 import * as Notifications from 'expo-notifications';
-import { useUserStore } from '../../../store/useUserStore';
-import { usePetStore } from '../../../store/usePetStore';
+import { useUserStore } from '../../store/useUserStore';
+import { usePetStore } from '../../store/usePetStore';
 
 // Mock de expo-notifications para testeo aislado
 jest.mock('expo-notifications', () => ({

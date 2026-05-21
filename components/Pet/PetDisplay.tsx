@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/colors';
 import { Pet, PetState } from '../../types';
 import { PetBubble } from './PetBubble';
@@ -60,6 +61,8 @@ const FloatingDelta = ({ text, onComplete }: { text: string, onComplete: () => v
  * Maneja transiciones de estado, animaciones de recompensas y mensajes dinámicos.
  */
 const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => {
+  const { t } = useTranslation();
+
   // Estado local para manejar el fade-out/fade-in suave entre estados de mascota
   const [displayedState, setDisplayedState] = useState<PetState | null>(pet ? pet.estadoActual : null);
   
@@ -122,7 +125,7 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
   if (!pet || !displayedState) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
-        <Text style={styles.emptyText}>Cargando mascota...</Text>
+        <Text style={styles.emptyText}>{t('pet.loading', { defaultValue: 'Cargando mascota...' })}</Text>
       </View>
     );
   }
@@ -153,7 +156,7 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
       {/* Header: Nivel y Vida */}
       <View style={styles.statsHeader}>
         <View style={styles.statBadge}>
-          <Text style={styles.statLabel}>Nvl</Text>
+          <Text style={styles.statLabel}>{t('pet.levelShort', { defaultValue: 'Nvl' })}</Text>
           <Text style={styles.statValue}>{pet.nivel}</Text>
         </View>
         <View style={[styles.statBadge, styles.healthBadge]}>
@@ -203,7 +206,7 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
       {/* Barra de Experiencia */}
       <View style={styles.xpContainer}>
         <View style={styles.xpHeader}>
-          <Text style={styles.xpText}>XP</Text>
+          <Text style={styles.xpText}>{t('pet.xpLabel', { defaultValue: 'XP' })}</Text>
           <Text style={styles.xpText}>{pet.xp} / {pet.xpParaSiguienteNivel}</Text>
         </View>
         <View style={styles.xpBarBackground}>

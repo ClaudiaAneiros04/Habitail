@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { useUserStore } from '../../store/useUserStore';
-import { usePetStore } from '../../store/usePetStore';
-import { PetState, Pet } from '../../types';
+import { useUserStore } from '../store/useUserStore';
+import { usePetStore } from '../store/usePetStore';
+import { PetState, Pet } from '../types';
 
 // Identificador único para la notificación de inactividad de la mascota
 export const PET_INACTIVITY_NOTIFICATION_ID = 'pet_inactivity_reminder';

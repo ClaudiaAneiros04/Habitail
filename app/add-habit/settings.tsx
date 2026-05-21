@@ -10,21 +10,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Frequency, VerificationType, Priority } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 const DAYS_OF_WEEK = [
-  { id: 1, label: 'L' },
-  { id: 2, label: 'M' },
-  { id: 3, label: 'X' },
-  { id: 4, label: 'J' },
-  { id: 5, label: 'V' },
-  { id: 6, label: 'S' },
-  { id: 0, label: 'D' },
+  { id: 1, key: 'lun' },
+  { id: 2, key: 'mar' },
+  { id: 3, key: 'mie' },
+  { id: 4, key: 'jue' },
+  { id: 5, key: 'vie' },
+  { id: 6, key: 'sab' },
+  { id: 0, key: 'dom' },
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const addHabit = useHabitStore(state => state.addHabit);
+  const { t } = useTranslation();
 
   const [frequency, setFrequency] = useState<Frequency>(Frequency.DAILY);
   const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // L-V por defecto
@@ -75,7 +77,7 @@ export default function SettingsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Configuración (3/3)</Text>
+          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 3, total: 3, defaultValue: 'Configuración (3/3)' })}</Text>
           <View style={{ width: 32 }} />
         </View>
 
@@ -83,32 +85,32 @@ export default function SettingsScreen() {
           <ProgressBar step={3} total={3} />
 
           {/* Frecuencia */}
-          <Text style={styles.label}>Frecuencia</Text>
+          <Text style={styles.label}>{t('addHabit.settings.frequencyLabel')}</Text>
           <View style={styles.optionsRow}>
             <TouchableOpacity
               style={[styles.optionButton, frequency === Frequency.DAILY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.DAILY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.DAILY && styles.optionTextSelected]}>Diaria</Text>
+              <Text style={[styles.optionText, frequency === Frequency.DAILY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.daily')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.optionButton, frequency === Frequency.WEEKLY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.WEEKLY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.WEEKLY && styles.optionTextSelected]}>Semanal</Text>
+              <Text style={[styles.optionText, frequency === Frequency.WEEKLY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.weekly')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.optionButton, frequency === Frequency.MONTHLY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.MONTHLY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.MONTHLY && styles.optionTextSelected]}>Mensual</Text>
+              <Text style={[styles.optionText, frequency === Frequency.MONTHLY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.monthly')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Selector de días para Semanal */}
           {frequency === Frequency.WEEKLY && (
             <View style={styles.daysContainer}>
-              <Text style={styles.subLabel}>¿Qué días quieres realizarlo?</Text>
+              <Text style={styles.subLabel}>{t('addHabit.settings.daySelectorLabel')}</Text>
               <View style={styles.daysRow}>
                 {DAYS_OF_WEEK.map((day) => {
                   const isSelected = selectedDays.includes(day.id);
@@ -118,7 +120,9 @@ export default function SettingsScreen() {
                       style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}
                       onPress={() => toggleDay(day.id)}
                     >
-                      <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{day.label}</Text>
+                      <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
+                        {t(`common.daysLetter.${day.key}`, { defaultValue: day.key.substring(0, 1).toUpperCase() })}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -127,37 +131,43 @@ export default function SettingsScreen() {
           )}
 
           {/* Prioridad */}
-          <Text style={[styles.label, { marginTop: 32 }]}>Nivel de Prioridad</Text>
-          <Text style={styles.descriptionText}>Esto afecta la vida de tu mascota virtual si no cumples el hábito.</Text>
+          <Text style={[styles.label, { marginTop: 32 }]}>{t('addHabit.settings.priorityLabel')}</Text>
+          <Text style={styles.descriptionText}>{t('addHabit.settings.priorityDescription', { defaultValue: 'Esto afecta la vida de tu mascota virtual si no cumples el hábito.' })}</Text>
           <View style={styles.priorityGrid}>
             <TouchableOpacity
               style={[styles.priorityCard, priority === Priority.FLEXIBLE && styles.prioritySelected]}
               onPress={() => setPriority(Priority.FLEXIBLE)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>Flexible</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>±5 de vida</Text>
+              <Text style={[styles.priorityTitle, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.flexible')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>
+                {t('addHabit.settings.priorities.healthValue', { points: 5, defaultValue: '±5 de vida' })}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.priorityCard, priority === Priority.NORMAL && styles.prioritySelected]}
               onPress={() => setPriority(Priority.NORMAL)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.NORMAL && styles.priorityTextSelected]}>Normal</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.NORMAL && styles.priorityTextSelected]}>±10 de vida</Text>
+              <Text style={[styles.priorityTitle, priority === Priority.NORMAL && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.normal')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.NORMAL && styles.priorityTextSelected]}>
+                {t('addHabit.settings.priorities.healthValue', { points: 10, defaultValue: '±10 de vida' })}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.priorityCard, priority === Priority.ESSENTIAL && styles.prioritySelected]}
               onPress={() => setPriority(Priority.ESSENTIAL)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>Esencial</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>±20 de vida</Text>
+              <Text style={[styles.priorityTitle, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.essential')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>
+                {t('addHabit.settings.priorities.healthValue', { points: 20, defaultValue: '±20 de vida' })}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Recordatorio */}
           <View style={styles.reminderContainer}>
             <View>
-              <Text style={styles.label}>Recordatorio</Text>
-              <Text style={styles.descriptionText}>Recibe una notificación diaria.</Text>
+              <Text style={styles.label}>{t('addHabit.settings.reminderLabel')}</Text>
+              <Text style={styles.descriptionText}>{t('addHabit.settings.reminderDescription', { defaultValue: 'Recibe una notificación diaria.' })}</Text>
             </View>
             <Switch
               trackColor={{ false: Colors.inactive, true: Colors.primary }}
@@ -169,7 +179,7 @@ export default function SettingsScreen() {
           </View>
           {reminderEnabled && (
              <Text style={styles.mockReminderText}>
-               * Hora de recordatorio por defecto: 09:00 (configurable en futuras versiones).
+               {t('addHabit.settings.mockReminderText', { defaultValue: '* Hora de recordatorio por defecto: 09:00 (configurable en futuras versiones).' })}
              </Text>
           )}
 
@@ -180,7 +190,7 @@ export default function SettingsScreen() {
             style={styles.nextButton}
             onPress={handleSave}
           >
-            <Text style={styles.nextText}>Guardar Hábito</Text>
+            <Text style={styles.nextText}>{t('addHabit.wizard.save', { defaultValue: 'Guardar Hábito' })}</Text>
             <Ionicons name="checkmark" size={20} color="#FFF" />
           </TouchableOpacity>
         </View>

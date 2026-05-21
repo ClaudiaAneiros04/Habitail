@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../types';
 import { HabitRepository } from '../storage/HabitRepository';
+import { scheduleHabitReminder, cancelHabitReminder } from '../notifications/notificationService';
 
 const habitRepo = new HabitRepository();
 
@@ -34,6 +35,12 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       habits: [...state.habits, newHabit],
     }));
     saveToStorage(get().habits);
+
+    // Programar recordatorio si está activo y tiene hora de recordatorio
+    const reminderTime = newHabit.horaRecordatorio || (newHabit as any).reminderTime;
+    if (newHabit.activo && reminderTime) {
+      await scheduleHabitReminder(newHabit);
+    }
   },
 
   updateHabit: async (id: string, updates: Partial<Habit>) => {
@@ -44,6 +51,17 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       ),
     }));
     saveToStorage(get().habits);
+
+    // Programar/actualizar o cancelar recordatorio
+    const updatedHabit = get().habits.find((h) => h.id === id);
+    if (updatedHabit) {
+      const reminderTime = updatedHabit.horaRecordatorio || (updatedHabit as any).reminderTime;
+      if (updatedHabit.activo && reminderTime) {
+        await scheduleHabitReminder(updatedHabit);
+      } else {
+        await cancelHabitReminder(id);
+      }
+    }
   },
 
   archiveHabit: async (id: string) => {
@@ -54,6 +72,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       ),
     }));
     saveToStorage(get().habits);
+
+    // Cancelar recordatorio programado al archivar
+    await cancelHabitReminder(id);
   },
 
   removeHabit: async (id: string) => {
@@ -63,6 +84,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       habits: state.habits.filter((h) => h.id !== id),
     }));
     saveToStorage(get().habits);
+
+    // Cancelar recordatorio programado al remover
+    await cancelHabitReminder(id);
   },
 
   loadHabits: async () => {
@@ -76,12 +100,44 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
         if (data) {
           const parsed = JSON.parse(data);
           if (parsed.state && parsed.state.habits) {
-            const habits = parsed.state.habits;
-            set({ habits });
-            // Guardar en SQLite para el futuro
-            for (const h of habits) {
-              await habitRepo.save(h);
+            const rawHabits = parsed.state.habits;
+            
+            // Sanitizar los hábitos para asegurar que cumplen las restricciones NOT NULL de SQLite
+            const sanitizedHabits = rawHabits.map((h: any) => ({
+              id: h.id || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              }),
+              userId: h.userId || 'default-user',
+              nombre: h.nombre || 'Hábito sin nombre',
+              descripcion: h.descripcion || null,
+              categoria: h.categoria || 'General',
+              icono: h.icono || 'leaf-outline',
+              colorHex: h.colorHex || '#4CAF50',
+              frecuencia: h.frecuencia || 'DAILY',
+              diasSemana: Array.isArray(h.diasSemana) ? h.diasSemana : [0, 1, 2, 3, 4, 5, 6],
+              horaRecordatorio: h.horaRecordatorio || null,
+              tipoVerificacion: h.tipoVerificacion || 'BOOLEAN',
+              nivelPrioridad: h.nivelPrioridad || 'NORMAL',
+              fechaInicio: h.fechaInicio || new Date().toISOString(),
+              fechaFin: h.fechaFin || null,
+              activo: h.activo !== undefined ? Boolean(h.activo) : true,
+            }));
+
+            set({ habits: sanitizedHabits });
+
+            // Guardar en SQLite de forma segura con try-catch individual por hábito
+            for (const h of sanitizedHabits) {
+              try {
+                await habitRepo.save(h);
+              } catch (dbError) {
+                console.error(`[HabitStore] Error al guardar hábito migrado ${h.id} en SQLite:`, dbError);
+              }
             }
+
+            // Sincronizar los hábitos sanitizados de vuelta a AsyncStorage
+            await saveToStorage(sanitizedHabits);
           }
         }
       }

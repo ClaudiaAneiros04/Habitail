@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Theme } from '../../constants/theme';
+import { useTranslation } from 'react-i18next';
 
-export type TabType = 'Semanal' | 'Mensual' | 'Total';
+export type TabType = 'weekly' | 'monthly' | 'total';
 
 interface StatsTabsProps {
   /** El tab seleccionado actualmente */
@@ -16,7 +17,8 @@ interface StatsTabsProps {
  * Diseñado con una estética moderna de "píldora" o selector segmentado.
  */
 export const StatsTabs: React.FC<StatsTabsProps> = ({ activeTab, onTabChange }) => {
-  const tabs: TabType[] = ['Semanal', 'Mensual', 'Total'];
+  const { t } = useTranslation();
+  const tabs: TabType[] = ['weekly', 'monthly', 'total'];
 
   return (
     <View style={styles.container}>
@@ -30,7 +32,7 @@ export const StatsTabs: React.FC<StatsTabsProps> = ({ activeTab, onTabChange }) 
             style={[styles.tab, isActive && styles.activeTab]}
           >
             <Text style={[styles.tabText, isActive && styles.activeTabText]}>
-              {tab}
+              {t(`stats.tabs.${tab}`)}
             </Text>
           </TouchableOpacity>
         );
