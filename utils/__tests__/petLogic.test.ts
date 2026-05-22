@@ -1,5 +1,29 @@
-import { calculatePenaltyDelta, applyHealthDelta } from '../petLogic';
+import { calculatePenaltyDelta, applyHealthDelta, getHealthDeltaForPriority } from '../petLogic';
 import { Priority, Habit, Category, Frequency, VerificationType } from '../../types';
+
+describe('getHealthDeltaForPriority', () => {
+  test('should return 20 for ESSENTIAL', () => {
+    expect(getHealthDeltaForPriority(Priority.ESSENTIAL)).toBe(20);
+    expect(getHealthDeltaForPriority('ESSENTIAL')).toBe(20);
+  });
+
+  test('should return 10 for NORMAL', () => {
+    expect(getHealthDeltaForPriority(Priority.NORMAL)).toBe(10);
+    expect(getHealthDeltaForPriority('NORMAL')).toBe(10);
+  });
+
+  test('should return 5 for FLEXIBLE', () => {
+    expect(getHealthDeltaForPriority(Priority.FLEXIBLE)).toBe(5);
+    expect(getHealthDeltaForPriority('FLEXIBLE')).toBe(5);
+  });
+
+  test('should return fallback if priority is undefined or unknown', () => {
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(getHealthDeltaForPriority(undefined, 10)).toBe(10);
+    expect(getHealthDeltaForPriority('UNKNOWN', 0)).toBe(0);
+    spy.mockRestore();
+  });
+});
 
 describe('petLogic - Penalty Calculation', () => {
   const mockHabit = (priority: Priority): Habit => ({
