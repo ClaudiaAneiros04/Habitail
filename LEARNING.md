@@ -1124,3 +1124,30 @@ Se erradicaron por completo las cadenas de texto en español hardcodeadas a lo l
 
 *   **Desacoplamiento**: Se reubicó el servicio y las utilidades de notificaciones (`notifications/`) en la raíz del proyecto para facilitar el acceso en importaciones absolutas y evitar la profundidad de carpetas obsoletas.
 *   **Pruebas Consolidadas**: Se movieron todos los archivos de tests unitarios a subcarpetas dedicadas `__tests__` y se eliminaron scripts temporales locales como `test-pet.ts`.
+
+---
+
+# Lógica de Negocio y Robustez — Fase 7: Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos
+
+Se han realizado mejoras críticas en la precisión de la gamificación, en la robustez del manejo de fechas bajo motores JS restrictivos (como Hermes en React Native) y en la eliminación de condiciones de carrera durante la persistencia de datos.
+
+## 1. Gamificación con Cambios de Salud Basados en Prioridad
+Anteriormente, marcar un hábito como completado sumaba un valor fijo de $+10$ de salud y desmarcarlo restaba $-5$, ignorando la prioridad del hábito.
+*   **Centralización en `petLogic.ts`**: Se definió y exportó la función pura `getHealthDeltaForPriority(prioridad, fallback)` para mapear de manera única las prioridades a deltas de salud:
+    *   `ESSENTIAL` → 20
+    *   `NORMAL` → 10
+    *   `FLEXIBLE` → 5
+*   **Integración en Check-In y Notificaciones**:
+    *   `markComplete` ahora suma el delta correspondiente a la prioridad del hábito.
+    *   `markIncomplete` aplica una penalización restando el delta según prioridad (multiplicado por $-1$, con un valor por defecto de $-5$).
+    *   El manejador de notificaciones en background (`handleDoneAction` en `notificationService.ts`) también utiliza esta misma lógica de prioridad al registrar check-ins desde notificaciones.
+
+## 2. Prevención de Caídas en el Parseo de Fechas (Motor Hermes)
+En motores de JavaScript restrictivos como Hermes en React Native, inicializar fechas mediante `new Date(dateString)` con strings de fecha en formato de solo fecha (ej: `YYYY-MM-DD` o strings vacíos/inválidos) genera un objeto `Invalid Date`. Al intentar llamar a `.toISOString()` en un objeto de fecha inválido, JavaScript arroja un error fatal `RangeError: Invalid time value`, el cual hacía que la pantalla del Home y los check-ins de los hábitos fallaran en producción y revirtieran su estado.
+*   **Migración a `parseISO` e `isValid`**: Se actualizó el evaluador de insignias (`badgeEngine.ts`) y la calculadora de rachas (`streakCalculator.ts`) para utilizar `parseISO` y realizar validaciones mediante `isValid` de la librería `date-fns` antes de invocar a `.toISOString()`.
+*   **Salvaguarda en el Hook de Check-In**: Se encapsuló la llamada a `evaluateBadges` y `addBadges` dentro de un bloque `try-catch` en `useHabitCheckIn.ts`. De esta forma, si ocurre algún problema con la asignación o cálculo de insignias, el flujo de check-in principal del hábito no se interrumpe y la UI no revierte el checkbox del usuario.
+*   **Fechas de Logs Estandarizadas**: Al desmarcar un hábito (`markIncomplete`), la fecha del log se normaliza explícitamente a formato `YYYY-MM-DD` (`formatDateDB`) en lugar de `formatISO`, manteniendo consistencia con el resto de inserciones en SQLite.
+
+## 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
+Al guardar un hábito desde la pantalla de creación (`settings.tsx`), la interfaz del wizard navegaba de regreso a la pantalla de inicio mediante `router.replace('/')` de forma síncrona sin esperar a que la promesa asíncrona de inserción en base de datos (`addHabit`) terminara. Esto causaba una condición de carrera: si el usuario intentaba marcar el hábito recién creado inmediatamente al cargar el Home, SQLite arrojaba un error de violación de clave foránea (`Foreign Key Constraint violation`) porque el registro de log hacía referencia a un hábito que aún no se había insertado físicamente en la tabla de SQLite.
+*   **Llamadas Asíncronas con Await**: Se modificaron `handleSave` en `settings.tsx` y el resolvedor en `habitCreation.ts` para usar `async/await`, de modo que la redirección a la pantalla de inicio ocurra estrictamente después de que la persistencia en el store e inserción en SQLite hayan finalizado con éxito.
