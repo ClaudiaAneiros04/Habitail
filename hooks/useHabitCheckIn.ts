@@ -11,6 +11,7 @@ import { useUserStore } from '../store/useUserStore';
 import { calcPointsDelta } from '../utils/pointsEngine';
 import { evaluateBadges } from '../utils/badgeEngine';
 import { formatDateDB, generateLogId } from '../utils/dateUtils';
+import { getHealthDeltaForPriority } from '../utils/petLogic';
 
 /**
  * Hook principal y modular para gestionar el Check-In (completar/desmarcar) de los hábitos.
@@ -117,6 +118,8 @@ export const useHabitCheckIn = () => {
     const status = getStatusForDay(habitId, fecha);
     if (status) return { shouldLaunchConfetti: false }; // Ya está completado en esa fecha, abortar
 
+    const habit = habits.find(h => h.id === habitId);
+
     // 2. Crear la entidad de registro (log)
     const newLog: HabitLog = {
       id: getLogId(habitId, fecha),
@@ -130,21 +133,25 @@ export const useHabitCheckIn = () => {
     // 3. Persistimos el registro de éxito
     await addLog(newLog);
 
-    // 4. Actualizamos la gamificación (+10 de salud por completar la tarea)
-    await updateHealth(10);
+    // 4. Actualizamos la gamificación según la prioridad
+    const healthDelta = getHealthDeltaForPriority(habit?.nivelPrioridad, 10);
+    await updateHealth(healthDelta);
 
     // 5. Asignación de puntos y evaluación de insignias
-    const habit = habits.find(h => h.id === habitId);
     if (habit) {
       const points = calcPointsDelta(habit);
       await updatePoints(points);
 
       if (user) {
         // Necesitamos asegurar que los logs pasados a evaluateBadges incluyen el que acabamos de agregar
-        const allLogs = [...logs, newLog];
-        const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
-        if (newEarnedBadges.length > 0) {
-          await addBadges(newEarnedBadges);
+        try {
+          const allLogs = [...logs, newLog];
+          const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
+          if (newEarnedBadges.length > 0) {
+            await addBadges(newEarnedBadges);
+          }
+        } catch (badgeError) {
+          console.error('[useHabitCheckIn] Error evaluating badges:', badgeError);
         }
       }
     }
@@ -183,12 +190,14 @@ export const useHabitCheckIn = () => {
     const status = getStatusForDay(habitId, fecha);
     if (!status) return; // Ya está desmarcado o nunca se completó, abortar
 
+    const habit = habits.find(h => h.id === habitId);
+
     // 2. Crear/Actualizar la entidad de registro indicando que NO está completado
     const newLog: HabitLog = {
       id: generateLogId(habitId, fecha),
       habitId,
       userId: user?.id || 'default-user',
-      fecha: formatISO(fecha),
+      fecha: formatDateDB(fecha),
       completado: false, // Refleja explícitamente el cambio de estado
       timestampRegistro: formatISO(new Date())
     };
@@ -203,11 +212,11 @@ export const useHabitCheckIn = () => {
       await addLog(newLog);
     }
 
-    // 4. Actualizamos la gamificación a modo de penalización suave (-5 de salud)
-    await updateHealth(-5);
+    // 4. Actualizamos la gamificación a modo de penalización según la prioridad
+    const healthDelta = -getHealthDeltaForPriority(habit?.nivelPrioridad, 5);
+    await updateHealth(healthDelta);
 
     // 5. Descontar puntos por deshacer el check-in
-    const habit = habits.find(h => h.id === habitId);
     if (habit) {
       const points = calcPointsDelta(habit);
       await updatePoints(-points);

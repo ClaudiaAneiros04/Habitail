@@ -1,4 +1,4 @@
-import { differenceInDays, differenceInWeeks, parseISO, startOfDay, startOfWeek, isAfter, isBefore } from 'date-fns';
+import { differenceInDays, differenceInWeeks, parseISO, startOfDay, startOfWeek, isAfter, isBefore, isValid } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
 
 /**
@@ -8,16 +8,19 @@ import { Habit, HabitLog, Frequency } from '../types';
  * - Los ordena descendentemente (más reciente primero).
  */
 const prepareLogs = (logs: HabitLog[]): Date[] => {
-  const completedLogs = logs.filter(log => log.completado);
+  const completedLogs = logs.filter(log => log.completado && log.fecha);
   
   // Extraemos fechas, eliminamos horas y quitamos duplicados
   const uniqueDatesMap = new Map<string, Date>();
   
   completedLogs.forEach(log => {
-    const dateObj = startOfDay(parseISO(log.fecha));
-    const dateStr = dateObj.toISOString();
-    if (!uniqueDatesMap.has(dateStr)) {
-      uniqueDatesMap.set(dateStr, dateObj);
+    const parsed = parseISO(log.fecha);
+    if (isValid(parsed)) {
+      const dateObj = startOfDay(parsed);
+      const dateStr = dateObj.toISOString();
+      if (!uniqueDatesMap.has(dateStr)) {
+        uniqueDatesMap.set(dateStr, dateObj);
+      }
     }
   });
 
@@ -167,13 +170,21 @@ export const calculateCompletionRate = (logs: HabitLog[], days: number, referenc
 
   // Consideramos solo los logs en el rango de los últimos 'days' días y que están completados
   const completedInPeriod = logs.filter(log => {
-    if (!log.completado) return false;
-    const logDate = startOfDay(parseISO(log.fecha));
+    if (!log.completado || !log.fecha) return false;
+    const parsed = parseISO(log.fecha);
+    if (!isValid(parsed)) return false;
+    const logDate = startOfDay(parsed);
     return !isBefore(logDate, startDate) && !isAfter(logDate, refDay);
   });
 
   // Fechas únicas para evitar contar múltiples logs el mismo día como >1 de éxito
-  const uniqueDatesMap = new Set(completedInPeriod.map(log => startOfDay(parseISO(log.fecha)).toISOString()));
+  const uniqueDatesMap = new Set<string>();
+  completedInPeriod.forEach(log => {
+    const parsed = parseISO(log.fecha);
+    if (isValid(parsed)) {
+      uniqueDatesMap.add(startOfDay(parsed).toISOString());
+    }
+  });
 
   const completedDays = uniqueDatesMap.size;
   

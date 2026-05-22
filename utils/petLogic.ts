@@ -81,6 +81,31 @@ export function petAssetResolver(state: PetState): PetAsset {
 }
 
 /**
+ * Obtiene el delta de salud correspondiente a una prioridad dada.
+ * ESSENTIAL = 20, NORMAL = 10, FLEXIBLE = 5.
+ * 
+ * @param prioridad - La prioridad a evaluar.
+ * @param fallback - Valor por defecto a retornar si no se reconoce la prioridad.
+ * @returns El valor numérico de la salud.
+ */
+export function getHealthDeltaForPriority(prioridad?: Priority | string, fallback = 10): number {
+  switch (prioridad) {
+    case Priority.ESSENTIAL:
+    case 'ESSENTIAL':
+      return 20;
+    case Priority.NORMAL:
+    case 'NORMAL':
+      return 10;
+    case Priority.FLEXIBLE:
+    case 'FLEXIBLE':
+      return 5;
+    default:
+      console.warn(`Prioridad desconocida o no definida: ${prioridad}`);
+      return fallback;
+  }
+}
+
+/**
  * Calcula la nueva vida de la mascota tras aplicar los deltas de salud de los check-ins del día.
  * Función pura, no modifica el estado externo.
  * Un hábito sin log para el día cuenta como fallido (completado: false).
@@ -97,25 +122,7 @@ export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult
   let deltaTotal = 0;
 
   for (const habit of habitos) {
-    let delta = 0;
-
-    switch (habit.prioridad) {
-      case Priority.ESSENTIAL:
-      case 'ESSENTIAL':
-        delta = 20;
-        break;
-      case Priority.NORMAL:
-      case 'NORMAL':
-        delta = 10;
-        break;
-      case Priority.FLEXIBLE:
-      case 'FLEXIBLE':
-        delta = 5;
-        break;
-      default:
-        console.warn(`Prioridad desconocida o no definida para el hábito ${habit.id}: ${habit.prioridad}`);
-        delta = 0;
-    }
+    const delta = getHealthDeltaForPriority(habit.prioridad, 0);
 
     if (habit.completado) {
       deltaTotal += delta;
@@ -140,23 +147,7 @@ export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult
 export function calculatePenaltyDelta(missedHabits: import('../types').Habit[]): number {
   let delta = 0;
   for (const habit of missedHabits) {
-    switch (habit.nivelPrioridad) {
-      case Priority.ESSENTIAL:
-      case 'ESSENTIAL':
-        delta -= 20;
-        break;
-      case Priority.NORMAL:
-      case 'NORMAL':
-        delta -= 10;
-        break;
-      case Priority.FLEXIBLE:
-      case 'FLEXIBLE':
-        delta -= 5;
-        break;
-      default:
-        console.warn(`Prioridad desconocida o no definida para el hábito ${habit.id}: ${habit.nivelPrioridad}`);
-        break;
-    }
+    delta -= getHealthDeltaForPriority(habit.nivelPrioridad, 0);
   }
   return delta;
 }

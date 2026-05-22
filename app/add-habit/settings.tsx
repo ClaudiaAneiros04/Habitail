@@ -44,28 +44,32 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Resolver días de la semana según frecuencia
     let diasSemana = [0, 1, 2, 3, 4, 5, 6];
     if (frequency === Frequency.WEEKLY) {
       diasSemana = selectedDays;
     }
 
-    addHabit({
-      userId: 'default-user', // MVP: offline sin cuenta
-      nombre: params.nombre as string,
-      descripcion: params.descripcion as string,
-      categoria: params.categoria as string,
-      icono: params.icono as string,
-      colorHex: params.colorHex as string,
-      frecuencia: frequency,
-      diasSemana,
-      horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
-      tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
-      nivelPrioridad: priority,
-      fechaInicio: new Date().toISOString(),
-      activo: true,
-    });
+    try {
+      await addHabit({
+        userId: 'default-user', // MVP: offline sin cuenta
+        nombre: params.nombre as string,
+        descripcion: params.descripcion as string,
+        categoria: params.categoria as string,
+        icono: params.icono as string,
+        colorHex: params.colorHex as string,
+        frecuencia: frequency,
+        diasSemana,
+        horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
+        tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
+        nivelPrioridad: priority,
+        fechaInicio: new Date().toISOString(),
+        activo: true,
+      });
+    } catch (error) {
+      console.error('Error saving habit:', error);
+    }
 
     router.replace('/');
   };

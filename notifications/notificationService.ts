@@ -9,6 +9,7 @@ import { useStatsStore } from '../store/useStatsStore';
 import { calcPointsDelta } from '../utils/pointsEngine';
 import { evaluateBadges } from '../utils/badgeEngine';
 import { generateLogId, formatDateDB } from '../utils/dateUtils';
+import { getHealthDeltaForPriority } from '../utils/petLogic';
 import { HabitLog, Habit } from '../types';
 import { initDb } from '../storage/database';
 import { LogRepository } from '../storage/LogRepository';
@@ -142,9 +143,11 @@ async function handleDoneAction(habitId: string): Promise<void> {
 
     // 3. Persistir y aplicar gamificación
     await addLog(newLog);
-    await updateHealth(10);
     
     const habit = habits.find(h => h.id === habitId);
+    const healthDelta = getHealthDeltaForPriority(habit?.nivelPrioridad, 10);
+    await updateHealth(healthDelta);
+    
     if (habit) {
       const points = calcPointsDelta(habit);
       await updatePoints(points);
