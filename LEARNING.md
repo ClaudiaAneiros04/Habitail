@@ -17,6 +17,8 @@
 13. [Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota](#lógica-de-negocio--fase-6-retención-por-inactividad-de-la-mascota)
 14. [Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio--fase-6-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
 15. [Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos](#refactorización-del-schema-de-base-de-datos-deuda-simplificación-y-riesgos)
+16. [UI/UX y Casos Borde — Fase 6: Onboarding y Notificaciones](#uiux-y-casos-borde--fase-6-onboarding-y-notificaciones)
+17. [Post-Merge Fixes y Calidad — Fase 6: Sincronización en Segundo Plano, Permisos e Internacionalización](#post-merge-fixes-y-calidad--fase-6-sincronización-en-segundo-plano-permisos-e-internacionalización)
 
 
  
@@ -800,7 +802,6 @@ Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente
 
 ---
 
-<<<<<<< HEAD
 # Lógica de Negocio — Fase 6: Notificaciones Interactivas y Acciones en Segundo Plano
 
 En esta fase se diseñó e implementó un robusto sistema de **notificaciones nativas interactivas** utilizando `expo-notifications`, permitiendo a los usuarios interactuar de manera fluida y en tiempo real directamente desde la bandeja de entrada del sistema operativo.
@@ -959,7 +960,9 @@ Este arranque secuencial garantiza que todos los esquemas e instancias de usuari
 - **Crashes por Incompatibilidad en Runtime**: Al añadir campos nuevos en paralelo (ej. `inventario` o `lastPenaltyAppliedDate`), el compilador de TypeScript detecta inmediatamente cualquier omisión en las consultas de guardado o lectura de los repositorios, evitando crasheos silenciosos en producción.
 - **Ausencia de Integridad Referencial**: Se habilitó explícitamente `PRAGMA foreign_keys = ON`, cerrando el riesgo de dejar registros huérfanos al eliminar usuarios (por ejemplo, previniendo inconsistencias de logs, hábitos o mascota).
 - **Gotchas de Coacción de Tipos**: Se eliminaron los fallos derivados del driver web/WASM de SQLite (`wa-sqlite`) al tratar valores devueltos como strings (ej: `Boolean("0") === true`), normalizando el mapeo de tipos primitivos.
-=======
+
+---
+
 # UI/UX y Casos Borde — Fase 6: Onboarding y Notificaciones
 
 Durante el desarrollo de la interfaz visual del flujo inicial y el sistema de permisos, se documentaron e implementaron resoluciones para los siguientes casos límite:
@@ -1080,4 +1083,44 @@ Si en el futuro se detectan problemas visuales graves en landscape en pantallas 
 - `accessibilityState={{ checked: selected }}` — el lector de pantalla anuncia "marcado" o "no marcado".
 - `accessibilityLabel={label}` — se lee el nombre de la categoría/hábito.
 Esta decisión se tomó porque añadir estos 3 props tiene coste cero de implementación y excluirlos crearía deuda técnica que a menudo nunca se paga. Los items de `HabitsScreen` tienen la misma configuración de accesibilidad (`accessibilityRole="checkbox"` + `accessibilityState` + `accessibilityLabel`).
->>>>>>> frontend_fase6
+
+---
+
+# Post-Merge Fixes y Calidad — Fase 6: Sincronización en Segundo Plano, Permisos e Internacionalización
+
+Tras la integración del sistema de notificaciones y la interfaz del Onboarding, se detectaron e implementaron correcciones críticas para garantizar la robustez del sistema y una óptima experiencia internacional.
+
+## 1. Robustez en la Migración de Datos a SQLite
+
+Durante la migración de hábitos almacenados en `AsyncStorage` hacia la base de datos de SQLite, surgieron riesgos asociados a restricciones `NOT NULL` de campos del esquema que podían estar ausentes en los registros antiguos de los usuarios.
+
+*   **Sanitización Preventiva**: Se implementó una rutina en [useHabitStore.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/store/useHabitStore.ts) que intercepta la carga inicial de hábitos y asegura valores por defecto válidos (generación de IDs UUID v4 si faltaran, asignación de prioridades por defecto, etc.) antes de intentar la persistencia en DB.
+*   **Aislamiento de Errores**: Se envolvió cada inserción en base de datos de forma individual dentro de un bloque `try-catch`. Esto evita que un solo hábito mal formado o corrupto impida la migración del resto.
+*   **Retroalimentación de Almacenamiento**: Una vez sanitizados, los datos son guardados de vuelta en `AsyncStorage` para sincronizar los estados.
+
+## 2. Inicialización en Hilos de Fondo (Headless JS)
+
+El sistema de notificaciones nativo ejecuta código en segundo plano en entornos asíncronos aislados (Headless JS). En estos contextos, los stores globales de React (Zustand) no están necesariamente hidratados en memoria.
+
+*   **Hidratación Forzada**: Al procesarse la acción "Hecho" (`handleDoneAction`), el servicio [notificationService.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/notifications/notificationService.ts) fuerza la inicialización de la base de datos (`await initDb()`) y la carga explícita de los almacenes de usuario, mascota y hábitos desde SQLite.
+*   **Lectura Directa de DB**: En lugar de consultar el estado reactivo del store, el servicio lee directamente la base de datos SQLite para verificar duplicados (`getLogsForDay`) y evalúa insignias usando el historial completo obtenido directamente de la DB a través de `LogRepository`.
+*   **Sincronización en Foreground**: Se configuró un orquestador que actualiza todas las dependencias críticas de gamificación (salud de la mascota y balance de puntos) y re-ejecuta el job de inactividad cuando la app vuelve a primer plano a través de [useAppStateRefresh.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useAppStateRefresh.ts).
+
+## 3. Gestión Real de Permisos Nativa
+
+Se reemplazaron los stubs de prueba en el sistema de gestión de notificaciones para alinear el comportamiento con las APIs físicas del dispositivo.
+
+*   **Ecosistema Web vs Nativo**: En [useNotificationPermission.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useNotificationPermission.ts), se maneja el caso de ejecución en web retornando automáticamente `granted` de manera segura, mientras que en nativo se interactúa con las promesas de `Notifications.getPermissionsAsync()` y `Notifications.requestPermissionsAsync()`.
+*   **Listener Activo**: Para prever que el usuario deshabilite manualmente los permisos desde los Ajustes del sistema operativo, el hook mantiene un listener de `AppState` que refresca el estado en cada transición al primer plano (`active`).
+
+## 4. Internacionalización Total (i18n)
+
+Se erradicaron por completo las cadenas de texto en español hardcodeadas a lo largo de las vistas de la aplicación para dotarla de soporte multi-idioma nativo.
+
+*   **Estructuración en JSON**: Se crearon diccionarios completos en [i18n/es.json](file:///c:/Users/PC/Desktop/Clase/Habitail/i18n/es.json) y [i18n/en.json](file:///c:/Users/PC/Desktop/Clase/Habitail/i18n/en.json) abarcando la configuración de la tienda, onboarding, visualización del historial, estados de la mascota y configuración de recordatorios.
+*   **Adaptación de Formatos**: Se actualizaron utilidades de fecha y agregadores gráficos en [chartAggregator.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/utils/chartAggregator.ts) y [dateUtils.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/utils/dateUtils.ts) para usar la configuración local de la librería i18n, garantizando que el ordenamiento lexicográfico de fechas y los nombres de los días de la semana coincidan con el idioma configurado.
+
+## 5. Limpieza de Código y Estructura
+
+*   **Desacoplamiento**: Se reubicó el servicio y las utilidades de notificaciones (`notifications/`) en la raíz del proyecto para facilitar el acceso en importaciones absolutas y evitar la profundidad de carpetas obsoletas.
+*   **Pruebas Consolidadas**: Se movieron todos los archivos de tests unitarios a subcarpetas dedicadas `__tests__` y se eliminaron scripts temporales locales como `test-pet.ts`.
