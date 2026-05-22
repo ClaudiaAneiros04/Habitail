@@ -1,4 +1,4 @@
-import { startOfWeek, subDays, isSameWeek } from 'date-fns';
+import { startOfWeek, subDays, isSameWeek, parseISO, isValid } from 'date-fns';
 import { Habit, HabitLog, User } from '../types';
 import { calculateCurrentStreak } from './streakCalculator';
 
@@ -33,8 +33,8 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
 
   // 1. first_week: Primera semana
   if (user.fechaRegistro && !existingBadges.has('first_week')) {
-    const createdAt = new Date(user.fechaRegistro);
-    if (!isNaN(createdAt.getTime())) {
+    const createdAt = parseISO(user.fechaRegistro);
+    if (isValid(createdAt)) {
       const now = new Date();
       const diffTime = Math.abs(now.getTime() - createdAt.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -84,9 +84,11 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
     const activeHabits = habits.filter(h => h.activo);
     if (activeHabits.length > 0) {
       const uniqueWeeks = new Set<string>();
-      logs.filter(l => l.completado).forEach(l => {
-        const d = new Date(l.fecha);
-        uniqueWeeks.add(startOfWeek(d, { weekStartsOn: 1 }).toISOString());
+      logs.filter(l => l.completado && l.fecha).forEach(l => {
+        const d = parseISO(l.fecha);
+        if (isValid(d)) {
+          uniqueWeeks.add(startOfWeek(d, { weekStartsOn: 1 }).toISOString());
+        }
       });
 
       for (const weekStr of uniqueWeeks) {
@@ -98,11 +100,13 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
           const daysCompletedInWeek = new Set<string>();
 
           hLogs.forEach(l => {
-            if (l.completado) {
-              const d = new Date(l.fecha);
-              if (isSameWeek(d, weekStart, { weekStartsOn: 1 })) {
-                // guardamos la fecha truncada a dia para evitar dobles checkins
-                daysCompletedInWeek.add(d.toISOString().split('T')[0]);
+            if (l.completado && l.fecha) {
+              const d = parseISO(l.fecha);
+              if (isValid(d)) {
+                if (isSameWeek(d, weekStart, { weekStartsOn: 1 })) {
+                  // guardamos la fecha truncada a dia para evitar dobles checkins
+                  daysCompletedInWeek.add(d.toISOString().split('T')[0]);
+                }
               }
             }
           });
@@ -130,10 +134,12 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
     const startDate = subDays(now, 30);
     const activeDays = new Set<string>();
     
-    logs.filter(l => l.completado).forEach(l => {
-      const d = new Date(l.fecha);
-      if (d >= startDate) {
-        activeDays.add(d.toISOString().split('T')[0]);
+    logs.filter(l => l.completado && l.fecha).forEach(l => {
+      const d = parseISO(l.fecha);
+      if (isValid(d)) {
+        if (d >= startDate) {
+          activeDays.add(d.toISOString().split('T')[0]);
+        }
       }
     });
 

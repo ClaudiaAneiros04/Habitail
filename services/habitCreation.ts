@@ -84,11 +84,15 @@ export const createHabitFromLibrary = (
       };
 
       // 3. Llamar directamente al store de Zustand que ya maneja el estado y la persistencia (AsyncStorage)
-      useHabitStore.getState().addHabit(newHabit);
-
-      // Devolvemos el hábito completo tras crearlo y guardarlo 
-      // de forma que la UI pueda saber que el proceso terminó para navegar (ej: router.push('/home'))
-      resolve(newHabit);
+      useHabitStore.getState().addHabit(newHabit)
+        .then(() => {
+          // Devolvemos el hábito completo tras crearlo y guardarlo 
+          // de forma que la UI pueda saber que el proceso terminó para navegar (ej: router.push('/home'))
+          resolve(newHabit);
+        })
+        .catch((err) => {
+          reject(err);
+        });
     } catch (error) {
       reject(error);
     }

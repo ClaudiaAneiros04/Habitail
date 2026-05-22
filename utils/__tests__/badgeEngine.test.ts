@@ -117,4 +117,32 @@ describe('badgeEngine', () => {
     expect(habits).toEqual(habitsClone);
     expect(logs).toEqual(logsClone);
   });
+
+  it('should handle logs with invalid or empty dates gracefully without crashing', () => {
+    const user = getMockUser([], subDays(new Date(), 8).toISOString());
+    const h1 = getMockHabit('h1');
+    const logs = [
+      createLog('h1', 1),
+      {
+        id: 'bad-log-1',
+        habitId: 'h1',
+        userId: 'u1',
+        fecha: 'invalid-date-string',
+        completado: true,
+        timestampRegistro: new Date().toISOString()
+      },
+      {
+        id: 'bad-log-2',
+        habitId: 'h1',
+        userId: 'u1',
+        fecha: '',
+        completado: true,
+        timestampRegistro: new Date().toISOString()
+      }
+    ];
+
+    expect(() => {
+      evaluateBadges(user, [h1], logs);
+    }).not.toThrow();
+  });
 });

@@ -144,10 +144,14 @@ export const useHabitCheckIn = () => {
 
       if (user) {
         // Necesitamos asegurar que los logs pasados a evaluateBadges incluyen el que acabamos de agregar
-        const allLogs = [...logs, newLog];
-        const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
-        if (newEarnedBadges.length > 0) {
-          await addBadges(newEarnedBadges);
+        try {
+          const allLogs = [...logs, newLog];
+          const newEarnedBadges = evaluateBadges(user as any, habits, allLogs);
+          if (newEarnedBadges.length > 0) {
+            await addBadges(newEarnedBadges);
+          }
+        } catch (badgeError) {
+          console.error('[useHabitCheckIn] Error evaluating badges:', badgeError);
         }
       }
     }
@@ -193,7 +197,7 @@ export const useHabitCheckIn = () => {
       id: generateLogId(habitId, fecha),
       habitId,
       userId: user?.id || 'default-user',
-      fecha: formatISO(fecha),
+      fecha: formatDateDB(fecha),
       completado: false, // Refleja explícitamente el cambio de estado
       timestampRegistro: formatISO(new Date())
     };
