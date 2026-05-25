@@ -1,38 +1,53 @@
 # Bitácora de Aprendizaje — Habitail
  
 ## Índice de Contenidos
+
+- **FASE 2: Diseño de Arquitectura de Datos y Optimización**
+  1. [Índices en Consultas de Hábitos](#índices-en-consultas-de-hábitos)
+- **FASE 3: Rachas y Check-in**
+  2. [Lógica de Negocio: Rachas y Check-in](#lógica-de-negocio-rachas-y-check-in)
+  3. [Errores y Aprendizajes](#errores-y-aprendizajes)
+- **FASE 4: Estadísticas, Heatmap y Agregación**
+  4. [Lógica de Negocio: useHabitStats](#lógica-de-negocio-usehabitstats)
+  5. [Lógica de Negocio: useHeatmapData](#lógica-de-negocio-useheatmapdata)
+  6. [Lógica de Negocio: chartAggregator](#lógica-de-negocio-chartaggregator)
+  7. [Lógica de Negocio: Definición y Prompts de la Mascota](#lógica-de-negocio-definición-y-prompts-de-la-mascota)
+  8. [Gestión de Dependencias: Incidente de Revert](#gestión-de-dependencias-incidente-de-revert)
+- **FASE 5: Mascota y Gamificación**
+  9. [Gestión de Assets: Fuentes y Recursos](#gestión-de-assets-fuentes-y-recursos)
+  10. [Lógica de Negocio: Job de Penalización Diaria](#lógica-de-negocio-job-de-penalización-diaria)
+  11. [Lógica de Negocio: Gamificación (Puntos e Insignias)](#lógica-de-negocio-gamificación-puntos-e-insignias)
+  12. [Post-Merge Fixes: Integración Lógica & Frontend](#post-merge-fixes-integración-lógica-&-frontend)
+  13. [Lógica de Negocio: Alineación de Contratos (Tipos vs. Schema)](#lógica-de-negocio-alineación-de-contratos-tipos-vs-schema)
+  14. [Refactorización y Mejoras de Calidad: Estadísticas y Persistencia](#refactorización-y-mejoras-de-calidad-estadísticas-y-persistencia)
+- **FASE 6: Onboarding y Notificaciones**
+  15. [Lógica de Negocio: Notificaciones Interactivas y Acciones en Segundo Plano](#lógica-de-negocio-notificaciones-interactivas-y-acciones-en-segundo-plano)
+  16. [Lógica de Negocio: Programación de Recordatorios y la Regla de Oro](#lógica-de-negocio-programación-de-recordatorios-y-la-regla-de-oro)
+  17. [Lógica de Negocio: Retención por Inactividad de la Mascota](#lógica-de-negocio-retención-por-inactividad-de-la-mascota)
+  18. [Lógica de Negocio: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
+  19. [Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos](#refactorización-del-schema-de-base-de-datos-deuda-simplificación-y-riesgos)
+  20. [UI/UX y Casos Borde: Onboarding y Notificaciones](#uiux-y-casos-borde-onboarding-y-notificaciones)
+  21. [Post-Merge Fixes y Calidad: Sincronización en Segundo Plano, Permisos e Internacionalización](#post-merge-fixes-y-calidad-sincronización-en-segundo-plano-permisos-e-internacionalización)
+- **FASE 7: Lógica de Negocio y Robustez**
+  22. [Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos](#cambios-de-salud-por-prioridad-parseo-de-fechas-en-hermes-y-sincronización-de-base-de-datos)
+
  
-1.  [Diseño de Arquitectura de Datos y Optimización: Índices](#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
-2.  [Lógica de Negocio — Fase 3: Rachas y Check-in](#lógica-de-negocio--fase-3-rachas-y-check-in)
-3.  [Errores y Aprendizajes — Fase 3](#errores-y-aprendizajes--fase-3)
-4.  [Lógica de Negocio — Fase 4: Estadísticas, Heatmap y Agregación](#lógica-de-negocio--fase-4-usehabitstats)
-5.  [Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota](#lógica-de-negocio--fase-4-definición-y-prompts-de-la-mascota)
-6.  [Gestión de Dependencias — Incidente de Revert en Fase 4](#gestión-de-dependencias--incidente-de-revert-en-fase-4)
-7.  [Gestión de Assets — Fase 5: Fuentes y Recursos](#gestión-de-assets--fase-5-fuentes-y-recursos)
-8.  [Lógica de Negocio — Fase 5: Mascota y Gamificación](#lógica-de-negocio--fase-5-lógica-de-la-mascota-petlogic-ts)
-9.  [Post-Merge Fixes — Fase 5: Integración y Alineación de Contratos](#post-merge-fixes--fase-5-integración-lógica--frontend)
-10. [Refactorización y Mejoras de Calidad: Estadísticas y Persistencia](#refactorización-y-mejoras-de-calidad-estadísticas-y-persistencia)
-11. [Lógica de Negocio — Fase 6: Notificaciones Interactivas y Acciones en Segundo Plano](#lógica-de-negocio--fase-6-notificaciones-interactivas-y-acciones-en-segundo-plano)
-12. [Lógica de Negocio — Fase 6: Programación de Recordatorios y la Regla de Oro](#lógica-de-negocio--fase-6-programación-de-recordatorios-y-la-regla-de-oro)
-13. [Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota](#lógica-de-negocio--fase-6-retención-por-inactividad-de-la-mascota)
-14. [Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio--fase-6-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
-15. [Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos](#refactorización-del-schema-de-base-de-datos-deuda-simplificación-y-riesgos)
-16. [UI/UX y Casos Borde — Fase 6: Onboarding y Notificaciones](#uiux-y-casos-borde--fase-6-onboarding-y-notificaciones)
-17. [Post-Merge Fixes y Calidad — Fase 6: Sincronización en Segundo Plano, Permisos e Internacionalización](#post-merge-fixes-y-calidad--fase-6-sincronización-en-segundo-plano-permisos-e-internacionalización)
 
 
  
 ---
  
-# Diseño de Arquitectura de Datos y Optimización: Índices en Consultas de Hábitos
+# FASE 2: Diseño de Arquitectura de Datos y Optimización
 
-## Contexto Técnico
+## Índices en Consultas de Hábitos
+
+### Contexto Técnico
 
 En el desarrollo de **Habitail**, la tabla `habit_logs` registra todas las interacciones de los usuarios con sus hábitos (check-ins, valores, notas). Con el paso del tiempo, un usuario activo generará miles de registros. 
 
 Para features de UI como **gráficos de progreso**, **estadísticas de rachas**, o un **calendario histórico**, es necesario extraer todos los logs vinculados a un hábito concreto en un rango de fechas delimitado. Esto lo realizamos a través de la función `getLogsForRange(habitId, from, to)` en nuestro `LogRepository`.
 
-## La Solución a Largo Plazo: Índice Compuesto
+### La Solución a Largo Plazo: Índice Compuesto
 
 A nivel de base de datos se ha introducido la siguiente instrucción SQL para optimizar las consultas históricas:
 
@@ -42,7 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON habit_logs (habitId, fe
 
 Las fechas se persisten siempre basándonos en un formato consistente e ISO-compatible (ej. ISO 8601 `YYYY-MM-DD` o Timestamp ISO). Gracias a ello, la BD puede tratar las fechas como cadenas alfanuméricas predecibles lexicográficamente para evaluar operadores de rango `>` o `<`.
 
-### Beneficios para el Rendimiento a Lleno Pulmón
+#### Beneficios para el Rendimiento a Lleno Pulmón
 
 1. **Eficiencia algorítmica (B-Tree frente a Full Scan):**
    Al no disponer de un índice, calcular las rachas del último mes obliga a SQLite a realizar un **Full Table Scan** [O(N)] leyendo toda la tabla de `habit_logs` filtrando cada fila, lo cual escalará terriblemente a los 6 meses de uso del usuario.
@@ -54,7 +69,7 @@ Las fechas se persisten siempre basándonos en un formato consistente e ISO-comp
 3. **Prevención de colas de I/O en UI:**
    A nivel de frontend en React Native, los cuellos de botella en la renderización se suelen originar al bloquear el puente o cuando las lecturas de almacenamiento lento en local retrasan la hidratación de hooks (ej: los cálculos en uso de rachas y estadísticas). Acceder por índices previene lags visuales considerables y mejora la UX/UI al montar componentes de gráficas.
 
-## Reglas de Arquitectura
+### Reglas de Arquitectura
 
 Para mantener la eficacia de esta estrategia:
 * Nunca insertar fechas en formatos localizados (ej: `DD-MM-YYYY` no es lexicográficamente ordenable de manera natural, rompería el rango en SQLite).
@@ -62,11 +77,13 @@ Para mantener la eficacia de esta estrategia:
 
 ---
  
-# Lógica de Negocio — Fase 3: Rachas y Check-in
+# FASE 3: Rachas y Check-in
+
+## Lógica de Negocio: Rachas y Check-in
  
 En esta fase se implementó la inteligencia detrás del seguimiento de hábitos, centrándose en la persistencia, la gamificación y el cálculo de métricas de éxito.
  
-## 1. Motor de Cálculo de Rachas (`streakCalculator.ts`)
+### 1. Motor de Cálculo de Rachas (`streakCalculator.ts`)
  
 El `streakCalculator` es un módulo de lógica pura encargado de procesar los `habit_logs` para derivar estadísticas.
  
@@ -76,7 +93,7 @@ El `streakCalculator` es un módulo de lógica pura encargado de procesar los `h
 *   **Racha Máxima (`calculateMaxStreak`)**: Algoritmo de "ventana deslizante" que recorre todo el historial buscando el segmento más largo de días consecutivos completados.
 *   **Tasa de Cumplimiento (`calculateCompletionRate`)**: Porcentaje de días con éxito sobre un periodo (ej. últimos 30 días), normalizando múltiples registros en un mismo día.
  
-## 2. Hook de Gestión de Estado (`useHabitCheckIn.ts`)
+### 2. Hook de Gestión de Estado (`useHabitCheckIn.ts`)
  
 Este hook actúa como el orquestador principal entre la UI y las diferentes capas de datos.
  
@@ -87,7 +104,7 @@ Este hook actúa como el orquestador principal entre la UI y las diferentes capa
  
 ---
  
-# Errores y Aprendizajes — Fase 3
+## Errores y Aprendizajes
 
 Registro técnico de todos los errores detectados durante la Fase 3 del proyecto Habitail
 (integración UI de rachas + Home Screen + History Screen). Se documenta dónde apareció cada
@@ -95,12 +112,12 @@ error, por qué se producía y cómo se resolvió.
 
 ---
 
-## Error 1 — `expo-sqlite` en Web: `.wasm` no resuelto por Metro
+### Error 1 — `expo-sqlite` en Web: `.wasm` no resuelto por Metro
 
-### Dónde se encontró
+#### Dónde se encontró
 Consola del servidor Expo al ejecutar `npx expo start --web --clear`.
 
-### Síntoma
+#### Síntoma
 ```
 Web Bundling failed
 Unable to resolve "./wa-sqlite/wa-sqlite.wasm"
@@ -109,12 +126,12 @@ from "node_modules\expo-sqlite\web\worker.ts"
 Las pantallas "Hoy" e "Historial" se quedaban en estado de carga infinita porque
 el worker de SQLite nunca se inicializaba.
 
-### Por qué se producía
+#### Por qué se producía
 `expo-sqlite` en web usa WebAssembly (`.wasm`) para ejecutar SQLite a través de
 `wa-sqlite`. Metro Bundler, el empaquetador de Expo, por defecto no reconoce la
 extensión `.wasm` como un asset válido y lanza un error de resolución de módulo.
 
-### Solución
+#### Solución
 Añadir `.wasm` a la lista de extensiones de assets en `metro.config.js`:
 
 ```js
@@ -124,23 +141,23 @@ config.resolver.assetExts.push('wasm');
 
 ---
 
-## Error 2 — `initDb()` nunca se llamaba: tablas SQLite inexistentes
+### Error 2 — `initDb()` nunca se llamaba: tablas SQLite inexistentes
 
-### Dónde se encontró
+#### Dónde se encontró
 Consola del navegador al intentar marcar un hábito o navegar al historial.
 
-### Síntoma
+#### Síntoma
 ```
 Error: Error code 1: no such table: habit_logs
 ```
 El toggle de hábito fallaba silenciosamente; el historial no mostraba ningún dato.
 
-### Por qué se producía
+#### Por qué se producía
 `storage/database.ts` exportaba la función `initDb()` (responsable de ejecutar todos
 los `CREATE TABLE IF NOT EXISTS`), pero **nadie la llamaba** en el arranque de la app.
 Los repositorios intentaban hacer queries sobre tablas que aún no existían.
 
-### Solución
+#### Solución
 Llamar a `initDb()` en el layout raíz (`app/_layout.tsx`) bloqueando el renderizado
 hasta que la promesa resuelva:
 
@@ -159,26 +176,26 @@ if (!dbReady) return <ActivityIndicator />;
 
 ---
 
-## Error 3 — `NoModificationAllowedError`: múltiples conexiones OPFS a SQLite
+### Error 3 — `NoModificationAllowedError`: múltiples conexiones OPFS a SQLite
 
-### Dónde se encontró
+#### Dónde se encontró
 Consola del navegador, aparecía junto al Error 2.
 
-### Síntoma
+#### Síntoma
 ```
 NoModificationAllowedError: Failed to execute 'createSyncAccessHandle'
 on 'FileSystemFileHandle': Access Handles cannot be created if there
 is another open Access Handle or Writable stream associated with the same file.
 ```
 
-### Por qué se producía
+#### Por qué se producía
 `expo-sqlite` en web usa el sistema de ficheros OPFS del navegador, que solo admite
 **una conexión de escritura simultánea** al mismo archivo. La función `getDb()` original
 llamaba a `SQLite.openDatabaseAsync()` cada vez que se invocaba — sin cachear la
 instancia. Como `LogRepository` se instanciaba tanto en `useLogStore` como en
 `useHabitStats`, el motor intentaba abrir dos conexiones paralelas, provocando el error.
 
-### Solución
+#### Solución
 Refactorizar `database.ts` al patrón **Singleton** usando una promesa cacheada.
 La BD se abre **una única vez** y, en esa misma apertura, se crean todas las tablas:
 
@@ -203,16 +220,16 @@ la primera query, y nunca hay más de una conexión activa.
 
 ---
 
-## Error 4 — Booleanos SQLite invertidos en web (`Boolean("0") === true`)
+### Error 4 — Booleanos SQLite invertidos en web (`Boolean("0") === true`)
 
-### Dónde se encontró
+#### Dónde se encontró
 `storage/LogRepository.ts`, método `mapRowToLog`.
 
-### Síntoma
+#### Síntoma
 Un hábito marcado como **completado** en la pantalla "Hoy" aparecía como
 **incumplido** (X roja) en la pantalla Historial.
 
-### Por qué se producía
+#### Por qué se producía
 `expo-sqlite` sobre `wa-sqlite` (WASM en web) puede devolver columnas `INTEGER`
 como **strings JavaScript** (`"0"` / `"1"`) en lugar de números. La conversión
 original usaba `Boolean(row.completado)`, pero en JS cualquier string no vacío es
@@ -228,7 +245,7 @@ Boolean(1)    // → true
 Esto hacía que todos los logs se leyeran como `completado: true`, o que se
 invirtiera la lógica dependiendo del valor exacto recibido.
 
-### Solución
+#### Solución
 Normalizar el valor con `Number()` antes de la comparación estricta. `Number()`
 maneja correctamente todos los tipos posibles:
 
@@ -250,23 +267,23 @@ log.completado === true ? 1 : 0,
 
 ---
 
-## Error 5 — Desmarcar un hábito guardaba `completado: false`, creando falsos FAILED
+### Error 5 — Desmarcar un hábito guardaba `completado: false`, creando falsos FAILED
 
-### Dónde se encontró
+#### Dónde se encontró
 Flujo: Home Screen → desmarcar hábito → Historial para ese día.
 
-### Síntoma
+#### Síntoma
 Al desmarcar un hábito que estaba completado, el historial de ese día mostraba
 una **X roja** (incumplido), cuando el comportamiento esperado es que no apareciese
 ningún indicador (sin registro).
 
-### Por qué se producía
+#### Por qué se producía
 El toggle de `handleToggleHabit` en `index.tsx` siempre guardaba un log, tanto al
 marcar (`completado: true`) como al desmarcar (`completado: false`). El historial
 interpretaba cualquier log con `completado: false` como "el usuario incumplió
 explícitamente ese día".
 
-### Solución
+#### Solución
 Cambiar la **semántica del toggle** según la dirección de la acción:
 
 - **Marcar** → `addLog({ completado: true })` — guarda el registro de éxito.
@@ -282,21 +299,21 @@ soportar esta semántica.
 
 ---
 
-## Error 6 — Historial no mostraba X roja en hábitos no realizados días anteriores
+### Error 6 — Historial no mostraba X roja en hábitos no realizados días anteriores
 
-### Dónde se encontró
+#### Dónde se encontró
 `app/(tabs)/history.tsx`, lógica de resolución de `statusType`.
 
-### Síntoma
+#### Síntoma
 Los hábitos de días pasados que no se habían completado aparecían sin ningún
 indicador (NONE) en lugar de mostrar la X roja suave esperada.
 
-### Por qué se producía
+#### Por qué se producía
 La lógica original solo derivaba `FAILED` cuando existía un log explícito con
 `completado: false`. Como tras la solución del Error 5 esos logs nunca se crean,
 la ausencia de un log siempre producía `NONE`, incluso para días ya pasados.
 
-### Solución
+#### Solución
 Cambiar la condición de `statusType` para derivar `FAILED` de la **ausencia de
 log en un día que ya pasó**, no de la presencia de un log negativo:
 
@@ -317,18 +334,18 @@ informativa y no punitiva.
 
 ---
 
-## Error 7 — `Unexpected text node` en el badge de racha
+### Error 7 — `Unexpected text node` en el badge de racha
 
-### Dónde se encontró
+#### Dónde se encontró
 `components/HabitItem.tsx`, badge del contador de racha.
 
-### Síntoma
+#### Síntoma
 Warning en la consola:
 ```
 Unexpected text node: . A text node cannot be a child of a <View>.
 ```
 
-### Por qué se producía
+#### Por qué se producía
 El JSX mezclaba texto literal (emoji + espacios) con expresiones dentro de un
 `<Text>`, generando nodos de texto "sueltos" que React Native no admite como
 hijos directos de un `<View>`:
@@ -340,7 +357,7 @@ hijos directos de un `<View>`:
 //   texto    expresión             expresión → tres nodos separados
 ```
 
-### Solución
+#### Solución
 Unificar todo el contenido en un único string mediante un template literal,
 eliminando los nodos de texto intermedios:
 
@@ -351,7 +368,7 @@ eliminando los nodos de texto intermedios:
 
 ---
 
-## Resumen de aprendizajes clave
+### Resumen de aprendizajes clave
 
 | # | Área | Lección |
 |---|---|---|
@@ -365,11 +382,13 @@ eliminando los nodos de texto intermedios:
 
 ---
 
-# Lógica de Negocio — Fase 4: useHabitStats
+# FASE 4: Estadísticas, Heatmap y Agregación
 
-## 1. Queries SQL de agregación: por qué COUNT en lugar de cargar filas
+## Lógica de Negocio: useHabitStats
 
-### El problema que se quería evitar
+### 1. Queries SQL de agregación: por qué COUNT en lugar de cargar filas
+
+#### El problema que se quería evitar
 El patrón ingenuo para calcular estadísticas sería:
 ```ts
 const logs = await logRepo.getByHabit(habitId); // todos los logs
@@ -377,7 +396,7 @@ const completed = logs.filter(l => l.completado && l.fecha >= from).length;
 ```
 Con un año de uso diario, `getByHabit` traería >365 objetos `HabitLog` a memoria JavaScript solo para contarlos. En dispositivos de gama baja esto bloquea el JS thread durante la hidratación del hook.
 
-### La solución: agregación en SQLite
+#### La solución: agregación en SQLite
 Se añadieron dos métodos al `LogRepository`:
 
 ```sql
@@ -403,7 +422,7 @@ El índice compuesto `(habitId, fecha)` permite que SQLite localice los logs del
 
 ---
 
-## 2. Cálculo de `totalDays` en SQL vs. TS
+### 2. Cálculo de `totalDays` en SQL vs. TS
 
 `totalDays` representa el «universo» de días del periodo (no los días en que el hábito debía hacerse según su frecuencia). Esta simplificación es intencional:
 
@@ -414,7 +433,7 @@ El índice compuesto `(habitId, fecha)` permite que SQLite localice los logs del
 
 ---
 
-## 3. Caché Zustand: por qué sin persistencia en AsyncStorage
+### 3. Caché Zustand: por qué sin persistencia en AsyncStorage
 
 `useStatsStore` cachea los resultados en memoria (Zustand) pero **no** los persiste en `AsyncStorage`:
 
@@ -424,7 +443,7 @@ El índice compuesto `(habitId, fecha)` permite que SQLite localice los logs del
 
 ---
 
-## 4. Inyección de dependencias en useHabitStats
+### 4. Inyección de dependencias en useHabitStats
 
 El hook acepta `_logRepo` y `_habitRepo` como parámetros opcionales para facilitar tests unitarios sin necesidad de mockear módulos (`jest.mock`):
 
@@ -444,7 +463,7 @@ Los repos se guardan en `useRef` para evitar recrearlos en cada render (son obje
 
 ---
 
-## 5. Casos borde documentados y pendientes
+### 5. Casos borde documentados y pendientes
 
 | Caso | Estado | Solución actual |
 |---|---|---|
@@ -458,9 +477,9 @@ Los repos se guardan en `useRef` para evitar recrearlos en cada render (son obje
 
 ---
 
-# Lógica de Negocio — Fase 4: useHeatmapData
+## Lógica de Negocio: useHeatmapData
 
-## 1. Diseño SQL: DATE(fecha) para agrupar por día
+### 1. Diseño SQL: DATE(fecha) para agrupar por día
 
 El campo `fecha` se persiste con `formatISO()` → produce strings con hora y offset como `2026-05-03T00:00:00+02:00`. Agrupar directamente con `GROUP BY fecha` crearía un grupo por timestamp, no por día. La solución:
 
@@ -473,7 +492,7 @@ ORDER BY DATE(fecha) ASC
 
 ---
 
-## 2. Nuevo índice: `idx_habit_logs_user_fecha`
+### 2. Nuevo índice: `idx_habit_logs_user_fecha`
 
 ```sql
 CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fecha);
@@ -483,7 +502,7 @@ CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fech
 
 ---
 
-## 3. Casos borde del heatmap
+### 3. Casos borde del heatmap
 
 | Caso | Estado | Detalle |
 |---|---|---|
@@ -497,7 +516,7 @@ CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON habit_logs (userId, fech
 
 ---
 
-## 4. mergeHeatmapData: TypeScript vs CTE recursivo en SQL
+### 4. mergeHeatmapData: TypeScript vs CTE recursivo en SQL
 
 La alternativa SQL sería un CTE recursivo para generar los 365 días y hacer LEFT JOIN. Se eligió TypeScript porque:
 - Los CTEs recursivos tienen compatibilidad limitada en versiones antiguas de SQLite embebido.
@@ -506,15 +525,15 @@ La alternativa SQL sería un CTE recursivo para generar los 365 días y hacer LE
 
 ---
 
-# Lógica de Negocio — Fase 4: chartAggregator
+## Lógica de Negocio: chartAggregator
 
-## 1. Diseño de `isDayScheduled`
+### 1. Diseño de `isDayScheduled`
 
 La función determina si el hábito estaba programado para un día dado, respetando `frecuencia`, `diasSemana`, `fechaInicio` y `fechaFin`. Es el discriminador central que hace que `total` solo cuente días activos (sin dividir por días inactivos).
 
 **Convención de `diasSemana`:** usa `date.getDay()` → 0=Dom, 1=Lun, …, 6=Sáb. Coincide con la convención de `frequencyEngine.ts`.
 
-## 2. Casos borde documentados
+### 2. Casos borde documentados
 
 | Caso | Solución implementada |
 |---|---|
@@ -526,7 +545,7 @@ La función determina si el hábito estaba programado para un día dado, respeta
 | `total = 0` en un periodo | `computeRate` devuelve `0` explícitamente antes de dividir |
 | Logs fuera del rango solicitado | `countDaysInPeriod` itera solo los días del periodo y comprueba si hay log para esa fecha. Logs de otras semanas/meses están en el Set pero nunca se consultan porque su fecha no coincide con ningún día del array |
 
-## 3. `aggregateByMonth`: semanas ISO vs. bloques de 7 días
+### 3. `aggregateByMonth`: semanas ISO vs. bloques de 7 días
 
 Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días empezando el día 1 del mes porque:
 - Las semanas ISO son el concepto que el usuario percibe como "semana natural".
@@ -536,11 +555,11 @@ Se eligieron **semanas ISO** (Lun–Dom) en lugar de bloques fijos de 7 días em
 
 ---
 
-# Lógica de Negocio — Fase 4: Definición y Prompts de la Mascota
+## Lógica de Negocio: Definición y Prompts de la Mascota
 
 En esta sub-fase se definieron las reglas matemáticas y de estado que rigen el comportamiento de la mascota virtual, utilizando un enfoque orientado a **funciones puras** y **prompts estructurados**.
 
-## 1. Documentación de Prompts (`prompt_fase5_logic_PetLogic.md`)
+### 1. Documentación de Prompts (`prompt_fase5_logic_PetLogic.md`)
 
 Aunque implementado físicamente en la transición a la Fase 5, el diseño lógico se consolidó en la Fase 4 siguiendo estas directrices:
 
@@ -557,7 +576,7 @@ Aunque implementado físicamente en la transición a la Fase 5, el diseño lógi
     *   **Flexible**: ±5 HP.
     *   **Regla Crítica**: Un hábito sin log para el día cuenta como **fallido** (penalización), garantizando que la omisión tenga consecuencias.
 
-## 2. Decisiones de Diseño y Casos Borde
+### 2. Decisiones de Diseño y Casos Borde
 
 *   **Inmutabilidad**: Las funciones no modifican el estado del store directamente; devuelven el nuevo valor calculado para que el orquestador (`useHabitCheckIn` o `useDailyPenaltyJob`) decida qué hacer.
 *   **Clamp Matemático**: Implementación de `Math.max(0, Math.min(100, nuevaVida))` para asegurar que la salud nunca desborde los límites visuales de la barra de progreso.
@@ -565,16 +584,16 @@ Aunque implementado físicamente en la transición a la Fase 5, el diseño lógi
 
 ---
 
-# Gestión de Dependencias — Incidente de Revert en Fase 4
+## Gestión de Dependencias: Incidente de Revert
 
-## 1. El Incidente: Merge de `logic_fase4`
+### 1. El Incidente: Merge de `logic_fase4`
 Durante la integración de la rama `logic_fase4`, se produjo una rotura crítica de dependencias que impedía el arranque de la aplicación. El problema se originó por actualizaciones automáticas de paquetes que entraron en conflicto con el entorno de ejecución de Expo.
 
 - **Commit de Corrección**: `Revert dependency upgrades to match master state` (con −3,299 líneas).
 - **Impacto**: Se tuvo que realizar un revert manual ("a pelo") de las versiones en `package.json` y `package-lock.json` para volver al estado estable de la rama `master`.
 - **Lección**: Las actualizaciones masivas de dependencias durante un merge de lógica de negocio introducen demasiadas variables de error simultáneas, dificultando el debugging.
 
-## 2. Regla Acordada para Futuras Actualizaciones (Fase 5+)
+### 2. Regla Acordada para Futuras Actualizaciones (Fase 5+)
 Para evitar que este incidente se repita en la Fase 5 y posteriores, se establece el siguiente protocolo obligatorio para cualquier cambio en dependencias:
 
 1.  **Aislamiento**: Cualquier actualización de dependencias debe realizarse en una **rama propia y dedicada** (ej: `fix/dependency-upgrade`), nunca como parte de una rama de feature de lógica.
@@ -585,9 +604,11 @@ Para evitar que este incidente se repita en la Fase 5 y posteriores, se establec
 ---
 
 
-# Gestión de Assets — Fase 5: Fuentes y Recursos
+# FASE 5: Mascota y Gamificación
 
-## 1. Implementación de petAssetResolver y Fallback Visual
+## Gestión de Assets: Fuentes y Recursos
+
+### 1. Implementación de petAssetResolver y Fallback Visual
 
 Durante la integración de la lógica visual de la mascota, se detectó que los archivos físicos de sprites (`.png`) en `assets/pet/states/` y `assets/pet/skins/` aún no están disponibles.
 
@@ -597,7 +618,7 @@ Para garantizar la disponibilidad visual de la app en cualquier momento:
 - **Tamaño estándar de assets esperado:** Los PNG finales deben ser de 128x128 píxeles con fondo transparente.
 - Este diseño asegura que cuando los assets gráficos definitivos estén listos, la transición solo requiera colocar los archivos en la ruta y cambiar el flag a `true`, sin alterar componentes visuales ni tests.
 
-## 2. Casos Borde y Decisiones de Assets (Fase 5)
+### 2. Casos Borde y Decisiones de Assets (Fase 5)
 
 | Caso Borde | Impacto / Riesgo | Compensación Aplicada / Recomendación |
 | :--- | :--- | :--- |
@@ -610,7 +631,7 @@ Para garantizar la disponibilidad visual de la app en cualquier momento:
 
 # Lógica de Negocio — Fase 5: Lógica de la Mascota (`petLogic.ts`)
 
-## Casos Borde Documentados y Resoluciones
+### Casos Borde Documentados y Resoluciones
 
 Durante la implementación de `getPetState` y `applyHealthDelta`, se abordaron los siguientes escenarios:
 
@@ -624,9 +645,9 @@ Durante la implementación de `getPetState` y `applyHealthDelta`, se abordaron l
 
 ---
 
-# Lógica de Negocio — Fase 5: Job de Penalización Diaria
+## Lógica de Negocio: Job de Penalización Diaria
 
-## 1. Diseño del Job (`useDailyPenaltyJob`)
+### 1. Diseño del Job (`useDailyPenaltyJob`)
 Se implementó un orquestador silencioso que corre cada vez que la app arranca (`app/_layout.tsx`), evaluando si los hábitos del día anterior se incumplieron y aplicando la penalización correspondiente a la salud de la mascota.
 
 **Características de diseño:**
@@ -635,7 +656,7 @@ Se implementó un orquestador silencioso que corre cada vez que la app arranca (
 - **Inmunidad a zona horaria**: Utiliza `startOfYesterday()` y formato `YYYY-MM-DD` local, asegurando que "ayer" tenga sentido semántico para el usuario en su zona horaria actual.
 - **Short-circuiting**: Si la mascota ya tiene 0 de vida, el job solo actualiza la fecha de ejecución y termina.
 
-## 2. Optimización de la Query de Incumplimientos
+### 2. Optimización de la Query de Incumplimientos
 La función `getMissedHabitsForDate(date, habits)` implementada en `LogRepository` utiliza el operador `IN` de SQLite para cruzar la lista de hábitos activos con los logs completados en una sola query:
 
 ```sql
@@ -647,7 +668,7 @@ WHERE fecha = ? AND completado = 1 AND habitId IN (...)
 - El índice compuesto `idx_habit_logs_habit_fecha (habitId, fecha)` es utilizado a la perfección. SQLite realiza N búsquedas rápidas (donde N es el número de IDs en la cláusula IN) usando la clave primaria compuesta del índice.
 - Devuelve únicamente los IDs de los hábitos que SÍ se completaron. El filtrado final para descubrir los "incumplidos" se hace mediante una simple diferencia de conjuntos (`Set`) en TypeScript. Esto evita traer logs enteros a memoria.
 
-## 3. Casos Borde y Decisiones de Diseño
+### 3. Casos Borde y Decisiones de Diseño
 
 | Caso Borde | Resolución / Comportamiento |
 | :--- | :--- |
@@ -657,7 +678,7 @@ WHERE fecha = ? AND completado = 1 AND habitId IN (...)
 | **Primera apertura / Sin hábitos** | Si `lastPenaltyAppliedDate` es `null`, el job se ejecuta por primera vez. Si no hay hábitos activos ayer, el delta es `0` y simplemente se registra la fecha de hoy. No se lanzan errores por arrays vacíos. |
 | **Vida ya en 0** | Si la mascota ya está en estado `ABSENT` (vida=0), el job registra igualmente la ejecución para hoy pero omite el cálculo de logs y la aplicación de deltas, evitando procesos innecesarios y notificaciones redundantes. |
 
-## 4. Fórmula Final y Decisiones Acordadas
+### 4. Fórmula Final y Decisiones Acordadas
 
 Para responder a las preguntas clave sobre la gamificación de la mascota:
 
@@ -669,7 +690,7 @@ Para responder a las preguntas clave sobre la gamificación de la mascota:
 - **¿La penalización es diaria o por hábito incumplido?**: Como se explica en la fórmula, la penalización es **por cada hábito incumplido**, sumando todas las penalizaciones en un delta total negativo. Esto hace que cada pequeña victoria cuente y cada fallo pese proporcionalmente.
 - **¿Cuántos días sin abrir la app para que 'se vaya'?**: Actualmente, la app solo evalúa el "día anterior" para no ser tan destructiva si el usuario olvida abrirla un fin de semana (penalización no acumulativa). Sin embargo, se define la regla de **Ausencia Prolongada**: Si el usuario no abre la app por **3 días consecutivos o más**, se considera un abandono. En este caso, la mascota perderá toda su vida y pasará directamente a estado `ABSENT` (vida = 0).
 
-### Prueba de Estrés (Datos Extremos)
+#### Prueba de Estrés (Datos Extremos)
 Se validó la función pura `applyHealthDelta` con un script de test local (`test-pet.ts`):
 - **Vida Inicial: 100**, al recibir nuevos deltas positivos (ej: +30), la función aplica el límite superior. **Resultado: 100**.
 - **Vida Inicial: 0**, al recibir deltas negativos (ej: -30), la función aplica el límite inferior. **Resultado: 0**.
@@ -677,11 +698,11 @@ Se validó la función pura `applyHealthDelta` con un script de test local (`tes
 
 ---
 
-# Lógica de Negocio — Fase 5: Gamificación (Puntos e Insignias)
+## Lógica de Negocio: Gamificación (Puntos e Insignias)
 
-## 1. Sistema de Puntos (`pointsEngine.ts`)
+### 1. Sistema de Puntos (`pointsEngine.ts`)
 
-### Acumulación de Puntos
+#### Acumulación de Puntos
 Se ha implementado una función pura `calcPointsDelta(habit)` que mapea la prioridad del hábito a puntos:
 - Esencial: +20 pts
 - Normal: +10 pts
@@ -692,7 +713,7 @@ Se ha implementado una función pura `calcPointsDelta(habit)` que mapea la prior
 - **Deducción de puntos (compras):** `deductPoints(balance, price)` nunca lanza excepciones. Devuelve un tipo `Result` (`{ ok: true, value: number }` o `{ ok: false, error: InsufficientPointsError }`). Esto protege a la UI de crasheos por lógica de negocio.
 - **Sincronización Zustand/SQLite:** Para evitar desincronizaciones si la app se cierra a mitad de una transacción, el hook `useHabitCheckIn` llama secuencialmente a `await updatePoints` (que actualiza SQLite de forma síncrona mediante el Repository) y luego Zustand actualiza la UI.
 
-## 2. Sistema de Insignias (`badgeEngine.ts`)
+### 2. Sistema de Insignias (`badgeEngine.ts`)
 
 La evaluación de insignias (`evaluateBadges`) es una función pura y *lazy*, que solo se ejecuta sobre logs y no altera la BD por sí misma. Devuelve únicamente las insignias **nuevas** desbloqueadas.
 
@@ -705,29 +726,29 @@ La evaluación de insignias (`evaluateBadges`) es una función pura y *lazy*, qu
 
 ---
 
-# Post-Merge Fixes — Fase 5: Integración Lógica & Frontend
+## Post-Merge Fixes: Integración Lógica & Frontend
 
 Tras el merge de las ramas `logic_fase5` (Motores de gamificación) y `frontend_fase5` (Tienda e Inventario), se realizaron los siguientes ajustes críticos para asegurar la integridad del sistema:
 
-## 1. Discrepancia en el Flujo de Check-in
+### 1. Discrepancia en el Flujo de Check-in
 - **Error:** La UI (`app/(tabs)/index.tsx`) ignoraba por completo la lógica de gamificación.
 - **Ubicación:** `HomeScreen` -> `handleToggleHabit`.
 - **Causa:** La pantalla principal utilizaba una función local que llamaba directamente a `useLogStore`, puenteando la capa de negocio que calcula puntos e insignias.
 - **Solución:** Se refactorizó la UI para utilizar el hook `useHabitCheckIn`. Ahora, cada check-in activa la cadena completa: Persistencia -> Salud Mascota -> Puntos -> Evaluación de Logros.
 
-## 2. Inconsistencia de Usuario (Hardcoding)
+### 2. Inconsistencia de Usuario (Hardcoding)
 - **Error:** Los registros de logs y gamificación no se asociaban al usuario real.
 - **Ubicación:** `hooks/useHabitCheckIn.ts`.
 - **Causa:** Se utilizaba un string estático `'current-user'` como fallback temporal.
 - **Solución:** Se integró `useUserStore` dentro del hook para extraer dinámicamente el `user.id`. Se mantiene `'default-user'` solo como red de seguridad.
 
-## 3. Conflicto de Esquema en `UserRepository`
+### 3. Conflicto de Esquema en `UserRepository`
 - **Error:** Fallo en la persistencia del objeto `User` al intentar guardar 8 parámetros en una tabla que ahora requería 9 (tras añadir `inventario`).
 - **Ubicación:** `storage/UserRepository.ts` -> `save()`.
 - **Causa:** Desarrollo en paralelo; la rama de lógica añadió `lastPenaltyAppliedDate` y la de frontend añadió `inventario`. El merge inicial no unificó la sentencia `INSERT OR REPLACE`.
 - **Solución:** Se unificó la query SQL y el mapeo de objetos para soportar el esquema completo de 9 columnas, asegurando que `get()` y `save()` manejen ambos dominios de datos.
 
-## 4. Degradación del Entorno de Tests
+### 4. Degradación del Entorno de Tests
 - **Error:** Imposibilidad de ejecutar tests de hooks tras la actualización a React 19.
 - **Ubicación:** `hooks/__tests__/useDailyPenaltyJob.test.ts`.
 - **Causa:** `@testing-library/react-hooks` es incompatible con React 18/19 (requiere peer dependencies antiguas).
@@ -736,21 +757,21 @@ Tras el merge de las ramas `logic_fase5` (Motores de gamificación) y `frontend_
 
 ---
 
-# Lógica de Negocio — Alineación de Contratos (Tipos vs. Schema)
+## Lógica de Negocio: Alineación de Contratos (Tipos vs. Schema)
 
-## 1. El Problema: Divergencia Histórica
+### 1. El Problema: Divergencia Histórica
 Desde la Fase 1, existía una desconexión entre la definición de los objetos de dominio en `types/index.ts` y la estructura real de las tablas en SQLite (gestionada mediante strings SQL dispersos). Esto provocaba:
 - Uso excesivo de `any` en los repositorios.
 - Campos faltantes en las interfaces (ej: `badges` en `User`).
 - Ambigüedad en la representación de booleanos (`0/1` en DB vs `boolean` en TS) y arrays (`JSON string` en DB vs `array` en TS).
 
-## 2. La Solución: `db/schema.ts` como Fuente de Verdad
+### 2. La Solución: `db/schema.ts` como Fuente de Verdad
 Se ha consolidado un **Contrato Único** mediante la creación de `db/schema.ts`, que centraliza:
 - **`TABLE_NAMES`**: Nombres de tablas como constantes para evitar errores tipográficos.
 - **`CREATE_TABLES_SQL`**: Un único string DDL que define todo el esquema, consumido por `storage/database.ts`.
 - **`Row Types`**: Interfaces que describen exactamente cómo se almacenan los datos (ej: `HabitRow` usa `activo: number` y `diasSemana: string`).
 
-## 3. Alineación con `types/index.ts` (Dominio)
+### 3. Alineación con `types/index.ts` (Dominio)
 La interfaz de dominio en `types/index.ts` se ha actualizado para ser el reflejo ideal del negocio, mientras que los repositorios ahora realizan el mapeo explícito de `Row` -> `Domain` usando tipos fuertes en lugar de `any`.
 
 **Beneficios inmediatos:**
@@ -758,7 +779,7 @@ La interfaz de dominio en `types/index.ts` se ha actualizado para ser el reflejo
 - **Documentación Viva**: Cualquier cambio en el esquema debe realizarse en `db/schema.ts`, actualizando automáticamente tanto la creación de la BD como los tipos de las filas.
 - **Claridad en la Persistencia**: Se han resuelto divergencias como el campo `badges` de `User`, que ahora está presente tanto en el flujo de insignias como en la interfaz de usuario.
 
-## 4. Convenciones de Mapeo
+### 4. Convenciones de Mapeo
 Para mantener la coherencia, se siguen estas reglas en los Repositorios:
 - **Booleanos**: `0/1` en DB <-> `boolean` en TS (usando `Number(row.val) === 1` para lectura robusta).
 - **Arrays**: `JSON string` en DB <-> `T[]` en TS (usando `JSON.parse` / `JSON.stringify`).
@@ -767,9 +788,9 @@ Para mantener la coherencia, se siguen estas reglas en los Repositorios:
 
 ---
 
-# Refactorización y Mejoras de Calidad: Estadísticas y Persistencia
+## Refactorización y Mejoras de Calidad: Estadísticas y Persistencia
 
-## 1. Optimización del Caché de Estadísticas
+### 1. Optimización del Caché de Estadísticas
 Se identificó un problema de inconsistencia visual donde los gráficos de racha y éxito no se actualizaban inmediatamente tras un check-in debido a la política de caché del `useStatsStore`.
 
 **Solución:**
@@ -777,7 +798,7 @@ Se identificó un problema de inconsistencia visual donde los gráficos de racha
 - Se añadió un listener que observa los cambios en `logStore`. Al detectar un nuevo log o una eliminación, dispara automáticamente `refresh()`.
 - Esto elimina la necesidad de que el usuario navegue fuera y vuelva a entrar para ver reflejado su progreso, mejorando drásticamente la percepción de fluidez (UX).
 
-## 2. Robustez en el Cálculo de Estadísticas (`chartAggregator.ts`)
+### 2. Robustez en el Cálculo de Estadísticas (`chartAggregator.ts`)
 El motor de agregación fue refactorizado para soportar una visión global y corregir sesgos en periodos largos.
 
 **Mejoras Clave:**
@@ -785,7 +806,7 @@ El motor de agregación fue refactorizado para soportar una visión global y cor
 - **Soporte Multi-Hábito**: `countDaysInPeriod` ahora acepta tanto un solo hábito como un array de ellos, permitiendo que `BarChartComponent` muestre estadísticas agregadas de toda la cuenta del usuario (vista "Global").
 - **Deduplicación de Logs**: Se reforzó el uso de `Set<string>` con formato `YYYY-MM-DD` para asegurar que, incluso ante inconsistencias en la base de datos (múltiples registros el mismo día), el cálculo de cumplimiento sea siempre preciso.
 
-## 3. Evolución del Esquema: Base de Datos v2 y Android
+### 3. Evolución del Esquema: Base de Datos v2 y Android
 Para resolver problemas de inicialización y "loading infinito" en dispositivos Android reales (APK), se realizaron cambios estructurales en la capa de persistencia.
 
 **Cambios Técnicos:**
@@ -793,7 +814,7 @@ Para resolver problemas de inicialización y "loading infinito" en dispositivos 
 - **Lazy Loading de Usuario**: Se corrigió un error en `useHeatmapData` donde la falta de un `userId` inicial (durante el splash screen) provocaba un fallo silencioso. Ahora el sistema maneja el ID opcionalmente y reintenta la carga una vez hidratado el `UserStore`.
 - **Limpieza de Inicialización**: Se centralizó la lógica de `initDb()` en un único punto de entrada en `app/_layout.tsx`, eliminando duplicidades que causaban bloqueos en el sistema de archivos (OPFS/SQLite).
 
-## 4. Refinamiento de la Interfaz de Gráficos
+### 4. Refinamiento de la Interfaz de Gráficos
 Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente superior.
 
 - **Alertas Detalladas**: Al pulsar sobre una barra, el sistema ahora distingue entre "Sin programación" (días donde no tocaba hacer el hábito) y el desglose real de `completados/totales`.
@@ -802,11 +823,13 @@ Se mejoró el `BarChartComponent` para que sea más informativo y estéticamente
 
 ---
 
-# Lógica de Negocio — Fase 6: Notificaciones Interactivas y Acciones en Segundo Plano
+# FASE 6: Onboarding y Notificaciones
+
+## Lógica de Negocio: Notificaciones Interactivas y Acciones en Segundo Plano
 
 En esta fase se diseñó e implementó un robusto sistema de **notificaciones nativas interactivas** utilizando `expo-notifications`, permitiendo a los usuarios interactuar de manera fluida y en tiempo real directamente desde la bandeja de entrada del sistema operativo.
 
-## 1. Configuración de Categoría y Acciones Nativas
+### 1. Configuración de Categoría y Acciones Nativas
 Se configuró una categoría única llamada `HABIT_REMINDER` con dos acciones principales que se ejecutan en segundo plano, maximizando la UX al evitar aperturas lentas o intrusivas del hilo principal del frontend:
 
 *   **Acción DONE ("Hecho")** (`ACTION_DONE`): Marca el hábito como completado de inmediato.
@@ -828,7 +851,7 @@ await Notifications.setNotificationCategoryAsync(HABIT_REMINDER_CATEGORY, [
 ]);
 ```
 
-## 2. Flujo Completo de Ejecución Asíncrona (DONE)
+### 2. Flujo Completo de Ejecución Asíncrona (DONE)
 Al ser pulsada la acción "Hecho", el servicio (`handleDoneAction`) se orquesta directamente con los almacenes globales de datos (`Zustand`) y la base de datos (`SQLite`), ejecutando las siguientes acciones de manera transaccional:
 
 1.  **Generación de Claves**: Genera un ID determinista (`generateLogId`) en base al `habitId` y la fecha de hoy.
@@ -840,7 +863,7 @@ Al ser pulsada la acción "Hecho", el servicio (`handleDoneAction`) se orquesta 
     *   Invoca de manera perezosa a `evaluateBadges()` para otorgar logros e insignias nuevas al instante.
 5.  **Limpieza del Caché de UI**: Llama a `useStatsStore.getState().clearAll()` para invalidar de forma proactiva la caché en memoria. De este modo, en la próxima apertura de la app, los gráficos de estadísticas y el heatmap reflejarán el check-in instantáneamente.
 
-## 3. Lógica de Pospuesto (SNOOZE)
+### 3. Lógica de Pospuesto (SNOOZE)
 Cuando el usuario decide posponer el hábito (`handleSnoozeAction`), el sistema responde de manera controlada y defensiva:
 
 *   **Control de Abuso**: Se limita a un máximo estricto de **1 pospuesto al día** por hábito (`snoozeCount < 1`).
@@ -848,34 +871,34 @@ Cuando el usuario decide posponer el hábito (`handleSnoozeAction`), el sistema 
 
 ---
 
-# Lógica de Negocio — Fase 6: Programación de Recordatorios y la Regla de Oro
+## Lógica de Negocio: Programación de Recordatorios y la Regla de Oro
 
 La consistencia es vital en la formación de hábitos, pero las alertas repetitivas o imprecisas causan rechazo. Por ello, la programación de recordatorios individuales fue estructurada bajo directrices estrictas de validación.
 
-## 1. El Algoritmo de Programación y su Disparador
+### 1. El Algoritmo de Programación y su Disparador
 La función `scheduleHabitReminder(habit: Habit)` lee la propiedad `horaRecordatorio` (por ejemplo `"08:30"`) y planifica un recordatorio recurrente de tipo `CALENDAR` con `repeats: true`.
 
-## 2. La Regla de Oro contra la Fatiga por Notificaciones
+### 2. La Regla de Oro contra la Fatiga por Notificaciones
 Para salvaguardar la tranquilidad del usuario, antes de persistir o actualizar cualquier notificación, el sistema evalúa dos criterios:
 
 *   **Criterio A (Ya Completado)**: ¿El hábito ya ha sido marcado hoy? Se consulta el `logsStore` en tiempo real y la propiedad física `completedDays`. Si existe un log válido de éxito hoy, se activa la regla.
 *   **Criterio B (Ya Notificado)**: ¿Ya se emitió la alerta hoy? Cada vez que una notificación se despliega en primer plano (`addNotificationReceivedListener`) o se pulsa un botón interactivo (`addNotificationResponseReceivedListener`), se almacena la fecha `"YYYY-MM-DD"` actual en AsyncStorage con la clave `notification_last_sent_${habitId}`. Si el valor coincide con hoy, se activa la regla.
 
-### Comportamiento Defensivo (Short-Circuit a Mañana)
+#### Comportamiento Defensivo (Short-Circuit a Mañana)
 Si se cumple el Criterio A o el Criterio B, **el recordatorio para hoy se descarta**. Sin embargo, para no perder el ciclo de notificaciones automáticas futuras, el sistema realiza una **reprogramación inteligente**:
 Agenda una alerta única de tipo `DATE` configurada exactamente para **MAÑANA** a la hora especificada. Esto asegura que la primera alerta real del siguiente día se reciba con éxito, sin importunar al usuario hoy.
 
-## 3. Administración y Reconfiguración Global
+### 3. Administración y Reconfiguración Global
 *   **Cancelación**: `cancelHabitReminder(habitId)` cancela de forma aislada la alerta en el programador de Expo.
 *   **Reprogramación Masiva**: `rescheduleAll(habits)` cancela el total de alertas pendientes del dispositivo y vuelve a agendar todos los recordatorios activos uno a uno. Esta rutina se ejecuta cuando el usuario actualiza la lista de hábitos o cuando la aplicación arranca.
 
 ---
 
-# Lógica de Negocio — Fase 6: Retención por Inactividad de la Mascota
+## Lógica de Negocio: Retención por Inactividad de la Mascota
 
 La mascota virtual es el pilar motivacional de Habitail. Su salud física sirve como reflejo del progreso del usuario, por lo que el sistema de notificaciones de inactividad se diseñó para reenganchar al usuario de forma no intrusiva mediante la gamificación.
 
-## 1. Mensajería Motivacional y Clamping de Estado
+### 1. Mensajería Motivacional y Clamping de Estado
 El servicio `inactivityService.ts` analiza la salud (`vida`) y el `estadoActual` de la mascota para componer dinámicamente un mensaje de persuasión adaptado:
 
 | Rango HP | Estado Mascota | Título Notificación | Mensaje Motivacional (Cuerpo) |
@@ -886,13 +909,13 @@ El servicio `inactivityService.ts` analiza la salud (`vida`) y el `estadoActual`
 | **HP <= 75** | `CHEERING` | 💪 ¡No te rindas ahora! | 😊 Tu mascota te extraña un poco, pero mantiene el ánimo. ¡Vuelve a registrar tus hábitos de hoy! |
 | **HP > 75** | `HAPPY` | ❤️ ¡Tu mascota te está esperando! | 🌟 Tu mascota está súper feliz y saludable. ¡Vuelve y mantén esa racha de hábitos ganadora! |
 
-## 2. Restricciones y Control Anti-Spam
+### 2. Restricciones y Control Anti-Spam
 Para evitar penalizaciones severas de los sistemas de notificaciones móviles o malestar en el usuario:
 *   **Restricción de Mascota Ausente**: Si la salud es 0 (`ABSENT`), el servicio **cancela y omite** programar la alerta por inactividad. Una mascota huida no puede enviar recordatorios de inactividad.
 *   **Límite Estricto**: Máximo 1 alerta cada 48 horas.
 *   **Reseteo Automático**: Cualquier recordatorio de inactividad agendado previamente se cancela antes de crear el nuevo.
 
-## 3. Ciclo de Vida y Desplazamiento de la Ventana de 48 Horas
+### 3. Ciclo de Vida y Desplazamiento de la Ventana de 48 Horas
 El sistema se sincroniza con el ciclo de vida nativo (`AppState`) en `app/_layout.tsx`. Cada vez que la aplicación pasa del segundo plano a **primer plano (foreground)**:
 
 1.  **Evaluación de Inactividad Pasada**: Se lee el timestamp `lastOpenedAt` del store del usuario para determinar cuánto tiempo ha transcurrido.
@@ -901,11 +924,11 @@ El sistema se sincroniza con el ciclo de vida nativo (`AppState`) en `app/_layou
 
 ---
 
-# Lógica de Negocio — Fase 6: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos
+## Lógica de Negocio: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos
 
 El primer contacto con Habitail debe ser fluido, intuitivo y sentar las bases de la gamificación. Para lograrlo, se diseñó un sistema integrado de onboarding, inicialización de datos y enrutamiento protegido.
 
-## 1. Diseño del Flujo: ¿Por qué 3 pantallas?
+### 1. Diseño del Flujo: ¿Por qué 3 pantallas?
 El onboarding se diseñó buscando el equilibrio exacto entre recopilar datos útiles para el inicio y reducir la fricción cognitiva. Se estructuró en **tres pantallas** progresivas para crear una "rampa de compromiso" (commitment ramp):
 1. **WelcomeScreen (Vínculo Emocional)**: Se pide al usuario que nombre a su mascota. Este paso inicial de baja fricción establece la conexión con el motor de gamificación antes de exigir un esfuerzo organizativo.
 2. **InterestsScreen (Personalización)**: El usuario selecciona áreas de interés macro (Deporte, Salud, Productividad). Es una decisión rápida y visual a través de chips que guía al sistema.
@@ -913,7 +936,7 @@ El onboarding se diseñó buscando el equilibrio exacto entre recopilar datos ú
 
 Este flujo se gestiona íntegramente mediante un estado temporal en memoria (`OnboardingContext`) para no escribir datos en la base de datos hasta que el proceso haya finalizado con éxito (atomicidad).
 
-## 2. Casos Borde Testados en el Onboarding
+### 2. Casos Borde Testados en el Onboarding
 Para garantizar la solidez de esta primera experiencia, se testaron múltiples escenarios atípicos:
 * **Validación de Inputs Vacíos**: Nombres de mascota conformados por espacios en blanco (`«   »`) inhabilitan el botón de continuar mediante reactividad estricta (`.trim()`).
 * **Abandono a Mitad del Flujo (Cold Close)**: Si la app se cierra antes de concluir el paso 3, las selecciones temporales se descartan. Al volver, se exige iniciar desde la pantalla 1 para prevenir la persistencia de perfiles parciales.
@@ -921,14 +944,14 @@ Para garantizar la solidez de esta primera experiencia, se testaron múltiples e
 * **Navegación Defensiva (Botón "Atrás")**: Completar el onboarding activa un guard en el `_layout.tsx` que bloquea permanentemente cualquier retroceso accidental a las pantallas iniciales, tanto en gestos nativos como en navegadores web.
 * **Rotación de Pantalla (Landscape)**: El contenido y el input están adaptados para pantallas horizontales, usando `KeyboardAvoidingView` y grids dinámicos para que el botón de avanzar siempre sea visible.
 
-## 3. Enrutamiento y Protección de Rutas con Expo Router
+### 3. Enrutamiento y Protección de Rutas con Expo Router
 El estado del onboarding se almacena de forma persistente en `AsyncStorage` mediante la clave `@onboarding_completed`. 
 
 El hook personalizado `useOnboardingNavigation` monitoriza en tiempo real los segmentos activos de la ruta (`useSegments`). Al iniciar la app o transicionar de pantalla:
 *   **Filtro A (Redirección a Onboarding)**: Si el flag es `false` y el usuario no se encuentra dentro del grupo `/onboarding`, es redirigido inmediatamente a `/onboarding` usando `router.replace()`, bloqueando el acceso a la app principal.
 *   **Filtro B (Redirección a App Principal)**: Si el flag es `true` y el usuario intenta acceder a `/onboarding`, es redirigido de inmediato a la Home `/(tabs)` para prevenir bucles.
 
-## 4. Librería de Hábitos y Auto-creación
+### 4. Librería de Hábitos y Auto-creación
 Al finalizar el onboarding, el usuario selecciona las categorías que le interesan (ej. SALUD, DEPORTE, PRODUCTIVIDAD). La función `completeOnboarding` ejecuta el proceso de inicialización:
 
 1.  **Filtrado Inteligente**: Cruza las categorías seleccionadas por el usuario con nuestra librería estática predefinida (`habitLibrary`).
@@ -940,7 +963,7 @@ Al finalizar el onboarding, el usuario selecciona las categorías que le interes
 3.  **Persistencia Directa**: Invoca a `habitStore.addHabit()`, persistiendo los hábitos en SQLite e hidratando reactivamente la UI de Zustand.
 4.  **Confirmación**: Guarda el flag `@onboarding_completed: "true"` en AsyncStorage y actualiza el UserStore local.
 
-## 5. Inicialización Secuencial de Datos en Layout Raíz
+### 5. Inicialización Secuencial de Datos en Layout Raíz
 Para eliminar fallos de inicialización o violaciones de claves foráneas en SQLite (especialmente notorios en dispositivos Android nativos), se implementó un orden de carga secuencial estricto en `app/_layout.tsx` que bloquea la interacción del usuario mediante un estado reactivo `dbReady`:
 
 ```mermaid
@@ -959,63 +982,68 @@ Este arranque secuencial garantiza que todos los esquemas e instancias de usuari
 
 ---
 
-# Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos
+## Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos
 
-## 1. Deuda Técnica Existente (Antes del Refactor)
+### 1. Deuda Técnica Existente (Antes del Refactor)
 - **Divergencia entre Dominio y Persistencia**: Había una desconexión crítica entre las interfaces de TypeScript en [types/index.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/types/index.ts) y la estructura real de las tablas en SQLite.
 - **SQL DDL Disperso**: Las sentencias de creación de tablas (`CREATE TABLE`) estaban fragmentadas en strings literales dentro de los repositorios, dificultando cualquier evolución del esquema.
 - **Inconsistencia de Tipos (`any`)**: La ausencia de tipos intermedios para las filas de la base de datos obligaba a abusar del tipo `any` en los repositorios, anulando los beneficios de TypeScript.
 - **Conversión Compleja e Informal**: La conversión de booleanos (`0/1` en SQLite a `boolean` en JS) y de arrays (strings JSON a arrays nativos) se realizaba de manera ad-hoc en cada consulta, aumentando el riesgo de fallos silenciosos.
 
-## 2. Qué Quedó Simplificado (La Solución)
+### 2. Qué Quedó Simplificado (La Solución)
 - **Contrato Único como Fuente de Verdad (`db/schema.ts`)**: Toda la definición de la base de datos (nombres de tablas constantes `TABLE_NAMES`, el DDL de inicialización `CREATE_TABLES_SQL`, y tipos exactos de filas como `UserRow` y `HabitRow`) se centralizó en [db/schema.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/db/schema.ts).
 - **Mapeo Explícito y Tipado Fuerte**: Los repositorios ahora implementan un mapeo rígido y tipado de `Row` a `Domain` (entidades de negocio), aislando los detalles de SQLite de la lógica de negocio pura.
 - **Singleton de Conexión**: La apertura y creación de tablas se unificó en una sola función asíncrona singleton en [storage/database.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/storage/database.ts) que bloquea accesos concurrentes innecesarios (evitando el error de múltiples descriptores de acceso en web).
 
-## 3. Riesgos Cerrados y Mitigados
+### 3. Riesgos Cerrados y Mitigados
 - **Crashes por Incompatibilidad en Runtime**: Al añadir campos nuevos en paralelo (ej. `inventario` o `lastPenaltyAppliedDate`), el compilador de TypeScript detecta inmediatamente cualquier omisión en las consultas de guardado o lectura de los repositorios, evitando crasheos silenciosos en producción.
 - **Ausencia de Integridad Referencial**: Se habilitó explícitamente `PRAGMA foreign_keys = ON`, cerrando el riesgo de dejar registros huérfanos al eliminar usuarios (por ejemplo, previniendo inconsistencias de logs, hábitos o mascota).
 - **Gotchas de Coacción de Tipos**: Se eliminaron los fallos derivados del driver web/WASM de SQLite (`wa-sqlite`) al tratar valores devueltos como strings (ej: `Boolean("0") === true`), normalizando el mapeo de tipos primitivos.
 
 ---
 
-# UI/UX y Casos Borde — Fase 6: Onboarding y Notificaciones
+## UI/UX y Casos Borde: Onboarding y Notificaciones
 
 Durante el desarrollo de la interfaz visual del flujo inicial y el sistema de permisos, se documentaron e implementaron resoluciones para los siguientes casos límite:
 
-## 1. Permisos concedidos y luego revocados desde Ajustes
+### 1. Permisos concedidos y luego revocados desde Ajustes
 Si un usuario concede permisos de notificación pero semanas después los revoca directamente desde los ajustes nativos de su sistema operativo, el `requestPermissions()` inicial ya no es suficiente. 
 **Resolución**: Se implementó en el hook `useNotificationPermission` un listener de `AppState` que re-evalúa el status cada vez que la app entra en estado `active`. Esto asegura que el `PermissionBanner` reaccione y vuelva a aparecer alertando al usuario en caso de revocación externa.
 
-## 2. Onboarding interrumpido
+### 2. Onboarding interrumpido
 Si un usuario abandona la app a mitad del flujo (ej: llega a la selección de hábitos y cierra el proceso), ¿qué ocurre al volver a abrirla?
 **Resolución (MVP)**: El flujo completo se reinicia desde `WelcomeScreen`. La decisión técnica se fundamenta en que el estado del onboarding (`onboardingCompleted`) solo muta a `true` al pulsar el botón final *"Empezar"*. Como el input de la mascota y los intereses seleccionados no se guardan en el storage hasta el final de la transacción para mantener la atomicidad de los datos, reiniciar desde cero garantiza la integridad de las preferencias.
 
-## 3. Validación: Nombre de mascota "vacío"
+### 3. Validación: Nombre de mascota "vacío"
 Un usuario podría introducir `«   »` (3 espacios). Técnicamente, cumple con la regla de longitud `length >= 2`.
 **Resolución**: Se aplica `.trim()` reactivamente al evaluar el estado `isValid` y antes de inyectar el parámetro en la navegación hacia la siguiente pantalla (`petName.trim()`). Esto impide que nombres formados únicamente por espacios vacíos habiliten el botón *"Siguiente"*.
 
-## 4. Empty State en OnboardingHabitsScreen
+### 4. Empty State en OnboardingHabitsScreen
 Es teóricamente posible que las categorías elegidas por el usuario no devuelvan ningún hábito pre-sugerido en el MVP.
 **Resolución**: Se diseñó un `ListEmptyComponent` que muestra un icono sutil (`leaf-outline`), un mensaje explicativo y un CTA (Call to Action) explícito: *"Cambiar intereses"*. Este botón realiza un `router.back()` devolviendo al usuario a la pantalla anterior sin perder la coherencia del Stack Navigator, previniendo un estado de bloqueo.
 
-## 5. Pantalla de Permisos en Ecosistemas Android
+### 5. Pantalla de Permisos en Ecosistemas Android
 Existen discrepancias fundamentales en cómo iOS y Android manejan permisos de notificaciones:
 **Resolución**: La pantalla explicativa (`NotificationPermissionScreen`) fue diseñada para contextualizar al usuario antes del prompt nativo. Sin embargo, en **Android 12 o inferior**, los permisos de notificaciones están concedidos por defecto al instalar la app (API < 33). El hook `useNotificationPermission` maneja silenciosamente este caso, resolviendo el `status` como `granted` inmediatamente. Un `useEffect` en la UI detecta esto y realiza un "bypass" (redirección automática a `HomeScreen`), asegurando que el flujo no quede bloqueado con botones inoperantes en sistemas operativos más antiguos.
 
-## 6. Accesibilidad del ChipSelector
+### 6. Accesibilidad del ChipSelector
 Para garantizar que la selección de categorías sea utilizable por herramientas de lectura de pantalla (VoiceOver/TalkBack).
 **Resolución**: Se implementó explícitamente `accessibilityRole="checkbox"` y `accessibilityState={{ checked: selected }}` en el componente `ChipSelector`. Esto comunica semánticamente al SO que el botón actúa como un toggle binario y le transmite su estado actual, más allá de la retroalimentación puramente visual de los colores primarios.
 
-## 7. Refresco en Background y Notificaciones (Feedback UI)
-La UI (`HomeScreen`) debe reflejar instantáneamente los cambios (check-ins o snooze) realizados desde notificaciones mientras la app está cerrada o en segundo plano, sin requerir la interacción explícita del usuario al volver a abrirla.
-**Resolución**: En lugar de acoplar la UI al sistema de push notifications, se creó el hook `useAppStateRefresh`. Éste detecta transiciones a `active` y fuerza una recarga de los stores. Para mostrar la confirmación visual de forma no intrusiva, se implementó un `ToastConfirmation` que detecta nuevos "logs" completados comparándolos contra una referencia en memoria y muestra un mensaje temporal de "✓ [Hábito] completado".
+### 7. Refresco Automático en Background (Feedback UI)
+La UI (`HomeScreen`) debe reflejar instantáneamente los cambios (check-ins o snooze) realizados desde las notificaciones nativas interactivas mientras la app está cerrada o en segundo plano, sin requerir que el usuario refresque la pantalla manualmente al volver.
+**Resolución**: En lugar de acoplar la UI fuertemente al sistema de push notifications de Expo, se adoptó un enfoque reactivo basado en el ciclo de vida de la aplicación creando el hook `useAppStateRefresh`. Este hook escucha las transiciones nativas del sistema operativo; cada vez que la app pasa a estado `active` (primer plano), fuerza una recarga transparente de los stores (Zustand y SQLite).
+Para potenciar la UX, se implementó el componente `ToastConfirmation`. Al recargar los datos, este componente compara los "logs" actuales contra una referencia en memoria (snapshot previo). Si detecta que un hábito fue completado desde fuera de la app, muestra de forma no intrusiva un mensaje temporal ("✓ [Hábito] completado"), cerrando el ciclo de retroalimentación visual para el usuario sin bloquear el uso de la interfaz.
 
-## 8. Badge de "Pospuesto" (Snoozed)
-El usuario requiere un feedback visual en la lista de hábitos si un recordatorio ha sido pospuesto pero aún no completado.
-**Resolución y Acuerdo Técnico**: Se ha preparado el componente `HabitItem` con una prop opcional `snoozedUntil?: Date | null` que renderiza condicionalmente un badge amarillo indicando "Pospuesto". **Acuerdo documentado:** Dado que el equipo de Logic/Data aún no expone la propiedad `snoozedUntil` ni persistida ni en el store de Zustand en el momento actual, se ha dejado implementada la capa visual y en `HomeScreen` se pasa provisionalmente `undefined`. La responsabilidad queda de lado de Data para integrar esta prop en el futuro cercano, evitando bloqueos en la fase de UI.
+### 8. Badges Implementadas: El Badge de "Pospuesto" (Snoozed)
+Para proveer contexto inmediato, los elementos de la lista de hábitos (`HabitItem`) cuentan con insignias o "badges". Además del badge de racha activa (`🔥 X días`), el usuario requiere un feedback visual si interactuó con una notificación para posponer el recordatorio.
+**Resolución y Arquitectura**: Se dotó al componente `HabitItem` de una prop opcional `snoozedUntil?: Date | null`. 
+En lugar de depender de un estado global persistente para ocultar el badge con el paso del tiempo, la lógica se encapsuló a nivel local en el propio componente usando `useEffect` y `setTimeout`. Al renderizarse, el componente calcula la diferencia de tiempo entre `snoozedUntil` y el momento actual (`now`). 
+- Si el tiempo es positivo y el hábito no está completado, se muestra el badge indicando "Pospuesto" y se programa un `setTimeout` con la diferencia exacta en milisegundos.
+- Cuando el temporizador expira (ej: pasaron los 30 minutos del snooze), el componente actualiza su estado local (`isSnoozedVisible = false`) y el badge desaparece dinámicamente, invitando sutilmente al usuario a completar el hábito sin requerir re-renderizados costosos o lógica de limpieza desde el componente padre.
+Esta implementación visual garantiza que la UI sea resiliente y auto-gestionada, dejando preparado el terreno visual a la espera de que la capa de Datos inyecte esta propiedad persistida desde el store global.
 
-## 9. Casos Borde: Testing y Feedback UI (Fase 6)
+### 9. Casos Borde: Testing y Feedback UI (Fase 6)
 Durante el desarrollo del feedback visual (`ToastConfirmation` y Badge de «Pospuesto»), se identificaron y resolvieron/documentaron los siguientes escenarios:
 - **App cerrada al pulsar «Hecho» (Cold Start):** Si la app estaba terminada (muerta), `AppState` no transita de `background` a `active`. En este escenario, la hidratación inicial del store que realiza `Logic/Data` al arrancar se encarga de cargar el hábito ya completado. El toast de confirmación no se mostrará, pero la UI reflejará el estado correcto de forma natural.
 - **Múltiples hábitos pospuestos simultáneamente:** Sí, puede haber más de un badge activo. Cada `HabitItem` maneja su propio estado local (`isSnoozedVisible`) y su propio ciclo de vida del `setTimeout`. Los timers son independientes por componente, por lo que no hay colisiones ni estados globales compartidos que manejar en la UI.
@@ -1023,60 +1051,60 @@ Durante el desarrollo del feedback visual (`ToastConfirmation` y Badge de «Posp
 - **`HomeScreen` no visible al volver a primer plano:** Dado el sistema de navegación por pestañas (Tabs), si el usuario está en la pestaña "Estadísticas" y responde «Hecho» desde la notificación, `HomeScreen` (que permanece montada en memoria) disparará la actualización y el toast. Sin embargo, el toast se renderiza dentro del contexto de `HomeScreen`, por lo que el usuario no lo verá mientras esté en "Estadísticas". Este comportamiento es esperado y aceptable: el refresco del store sucede correctamente, y mostrar el toast al navegar de vuelta a Home dependerá del ciclo de vida (que aquí se desvanece tras 2.5s).
 - **Modo no molestar / permisos revocados entre el envío y la acción:** Si el usuario responde a una notificación que quedó en la bandeja, pero entre tanto revocó los permisos de notificaciones (o está en No Molestar), el sistema nativo o Logic/Data procesan el handler de fondo igualmente. Dado que nuestra UI de `HomeScreen` está desacoplada de `expo-notifications` y reacciona únicamente escuchando a la base de datos (Zustand/SQLite) vía `useAppStateRefresh`, la interfaz reflejará limpiamente el estado completado/pospuesto sin lanzar excepciones de permisos, garantizando estabilidad total.
 
-## 10. Generación de Mensajes de la Mascota y UX Writing (Fase 6)
+### 10. Generación de Mensajes de la Mascota y UX Writing (Fase 6)
 Durante la creación de los copys y la redacción de los mensajes de la mascota (i18n), surgieron tres problemas principales de integración que se resolvieron de la siguiente manera:
 - **Ausencia de soporte para comentarios en JSON:** Las reglas requerían marcar explícitamente ciertos mensajes con `// solo pantalla` en los archivos `es.json` y `en.json` para que fueran excluidos del pool de notificaciones. Dado que el estándar JSON no soporta comentarios estructurales (lanzaría un error de parseo), la solución técnica fue **inyectar la etiqueta al final de la propia cadena de texto** (ej: `"Mi cariño por ti no se agota. // solo pantalla"`). El equipo de lógica debe procesar estos strings con un `.includes('// solo pantalla')` para filtrarlos o limpiarlos mediante `.replace()` antes de mostrarlos.
 - **Tono contemplativo vs. Gancho para notificaciones:** Algunos mensajes eran muy efectivos en pantalla, pero como notificación push no incentivaban al usuario a abrir la app al carecer de un "hook" (gancho) en las primeras palabras. **Resolución:** Se realizó una purga de mensajes, marcando adicionalmente con `// solo pantalla` los textos más introspectivos (incluso en estados interactivos como *triste* o *feliz*) para garantizar que las notificaciones emitidas tengan un alto ratio de conversión y llamen directamente a la acción.
 - **Marcas de género en el idioma español:** Dado que el género de la mascota es definido por el usuario durante el Onboarding y el diseño no persiste esa variable en el idioma, construcciones iniciales como "Me siento solo" u "Estoy orgulloso" rompían la coherencia de identidad. **Resolución:** Se implementó UX Writing con perspectiva de género neutro, refactorizando las estructuras sintácticas para usar sustantivos abstractos, perífrasis e infinitivos (ej: "Me vendría muy bien algo de compañía" o "Siempre consigues que sienta muchísimo orgullo").
 
-## 11. Estado Compartido en el Stack de Onboarding
+### 11. Estado Compartido en el Stack de Onboarding
 Para mantener el flujo de Onboarding aislado y no contaminar el store global de Zustand con datos temporales (nombre de mascota, intereses, hábitos iniciales que podrían ser descartados si el usuario cierra la app a la mitad), se decidió utilizar un **Contexto de React local (`OnboardingContext`)**.
 **Resolución y Acuerdo Técnico**: El `OnboardingContext` se provee desde el `_layout.tsx` del `OnboardingNavigator`. Se optó por esta vía en lugar de los `params` de React Navigation porque, al ser un flujo lineal de 3 pasos, el contexto evita el trasiego de datos entre pantallas y centraliza la captura del estado temporal.
 
-## 12. Comportamiento del Onboarding en Landscape (Rotación)
+### 12. Comportamiento del Onboarding en Landscape (Rotación)
 **Decisión Técnica**: Para las pantallas de onboarding, al tener elementos centrados verticalmente como el `KeyboardAvoidingView` y botones anclados al fondo, la rotación a landscape puede aplastar el contenido y dejar inaccesibles algunos controles en pantallas de menor tamaño. Por ahora, se ha delegado a `KeyboardAvoidingView` (con `behavior="padding"|"height"`) la responsabilidad de manejar el reflow del teclado, asegurando que el input y el botón siempre sean visibles incluso en modo horizontal. Si en el futuro el UI es insalvable en landscape, se bloqueará explícitamente a portrait en el manifest o en el _layout del onboarding.
 
-## 13. Diseño del ChipSelector: Props de Icono Opcionales
+### 13. Diseño del ChipSelector: Props de Icono Opcionales
 **Decisión Técnica**: Se extendió el `ChipSelector` con una prop `icon?: keyof typeof Ionicons.glyphMap` para soportar iconos sin romper la compatibilidad con usos existentes. La prop es opcional deliberadamente: el componente sigue siendo agnóstico al dominio y no necesita conocer la existencia de categorías, hábitos ni sus iconos asociados. El mapeo icono↔categoría vive exclusivamente en `InterestsScreen`, donde se define `CATEGORY_CONFIG`. Se mantuvo la interfaz mínima (`label`, `icon`, `selected`, `onPress`) para que `ChipSelector` sea reutilizable en cualquier contexto de selección múltiple.
 
-## 14. Grid de 2 Columnas: Cálculo Dinámico de Ancho
+### 14. Grid de 2 Columnas: Cálculo Dinámico de Ancho
 **Decisión Técnica**: En lugar de usar `width: '50%'` (que no descuenta márgenes y produce overflow horizontal), cada chip calcula su ancho en función de `useWindowDimensions().width`, descontando paddings laterales y márgenes del chip. Esto garantiza un grid uniforme de exactamente 2 columnas tanto en portrait como en landscape, adaptándose automáticamente a cualquier densidad de pantalla. La fórmula es: `chipWidth = (screenWidth - paddingLateral × 2 - margenChip × 4) / 2`.
 
-## 15. Animaciones Escalonadas en InterestsScreen
+### 15. Animaciones Escalonadas en InterestsScreen
 **Decisión de Animación**: Se mantiene `type: 'spring'` con la misma curva que `WelcomeScreen` para coherencia perceptual entre las 3 pantallas del flujo. El escalonamiento dentro del grid de chips (50ms por chip en lugar de 100ms) es más rápido que el de los textos porque son elementos paralelos del mismo tipo visual — un escalonamiento más largo produciría una sensación de lentitud innecesaria. El delay base del grid (300ms) da tiempo al usuario para leer título y subtítulo antes de que aparezcan los controles interactuables.
 
-## 16. Migración Completa a OnboardingContext
+### 16. Migración Completa a OnboardingContext
 **Decisión Técnica**: Se refactorizaron las 3 pantallas del onboarding (`WelcomeScreen`, `InterestsScreen`, `HabitsScreen`) para que todas lean y escriban estado exclusivamente a través de `OnboardingContext`, eliminando el uso de `useLocalSearchParams` y `params` de navegación. Esto resuelve dos problemas: (1) los params se serializan a string, lo que obligaba a hacer `categories.split(',')` en `HabitsScreen` y perdía el tipado de `Category[]`; (2) al volver atrás con el botón del header, los params del screen anterior podían estar desincronizados con el estado real. Con el contexto, navegar hacia atrás preserva automáticamente todas las selecciones porque viven en el `_layout.tsx` padre del stack.
 
-## 17. Pre-selección de Hábitos con Guard de Referencia
+### 17. Pre-selección de Hábitos con Guard de Referencia
 **Decisión Técnica**: Al entrar a `HabitsScreen`, todos los hábitos sugeridos vienen **pre-seleccionados**. Esto se implementa con un `useEffect` que observa `suggestedHabits` y un `useRef` que guarda la referencia anterior del array. La lógica solo pre-selecciona cuando la referencia cambia (es decir, cuando `useHabitLibrary` recalcula la lista porque las categorías cambiaron), evitando que un re-render sobreescriba las deselecciones manuales del usuario. Si el hook de librería es un stub que devuelve `[]`, el efecto no se dispara.
 
-## 18. Animación de Lista: `timing` en lugar de `spring`
+### 18. Animación de Lista: `timing` en lugar de `spring`
 **Decisión de Animación**: En `HabitsScreen`, los items de la lista usan `type: 'timing'` con `duration: 300ms` en lugar de `spring`. Esto difiere deliberadamente de las pantallas 1 y 2 (que usan spring). La razón: cuando hay muchos elementos (potencialmente 8-10 hábitos), las animaciones spring acumuladas con delays largos producen una sensación de "gelatina" poco profesional. `timing` es más predecible y rápido para listas. El delay por item es de `60ms` con un máximo de `300ms` (5º item) para que el escalonamiento sea perceptible pero la lista sea usable rápidamente. El título y subtítulo sí mantienen `spring` para coherencia con el resto del flujo.
 
-## 19. Botón «Empezar» Siempre Activo
+### 19. Botón «Empezar» Siempre Activo
 **Decisión de UX**: El botón «Empezar» en `HabitsScreen` está siempre habilitado, incluso con 0 hábitos seleccionados. La razón: el usuario ya ha recorrido 2 pantallas de onboarding y bloquearle aquí por no seleccionar hábitos sería frustrante. Si no selecciona ninguno, `completeOnboarding` recibe un array vacío y la app arranca sin hábitos iniciales — el usuario puede añadirlos manualmente desde la pantalla principal. Esto prioriza la reducción de fricción sobre la completitud de datos del primer arranque.
 
-## 20. Diseño Visual de Items de Hábito: Tinte de Color de Categoría
+### 20. Diseño Visual de Items de Hábito: Tinte de Color de Categoría
 **Decisión de UI**: Cada item de hábito muestra su `icono` dentro de un contenedor con el `colorHex` del hábito como fondo al 15% de opacidad (`${colorHex}15`). Esto aporta identidad visual por categoría sin saturar la fila ni competir con el toggle de selección (que usa el color primario de la app). El mismo patrón de "tinte sobre fondo neutro" se usa en la app principal (`HabitItem`), manteniendo coherencia entre el onboarding y la experiencia post-setup.
 
-## 21. `router.replace` en Web vs Nativo (TC-H06)
+### 21. `router.replace` en Web vs Nativo (TC-H06)
 **Problema detectado en testing**: En iOS/Android, `router.replace('/(tabs)')` reemplaza el stack de navegación nativo, impidiendo que el botón atrás del sistema vuelva al onboarding. En **web**, `router.replace` traduce a `window.history.replaceState`, pero el historial previo del navegador sigue conteniendo las URLs `/onboarding/welcome`, `/onboarding/interests` y `/onboarding/habits`. Al pulsar el botón atrás del navegador, la URL volvía a una ruta de onboarding y el flujo se re-renderizaba.
 **Solución**: Se añadió un **guard de redirección** en `_layout.tsx` del onboarding: si `useOnboarding().onboardingCompleted === true`, el layout devuelve `<Redirect href="/(tabs)" />` sin renderizar el Provider ni las pantallas. Así, cualquier acceso a rutas `/onboarding/*` post-completado redirige instantáneamente a Home, tanto en web como en nativo.
 **Nota para iOS nativo**: Si en el futuro se detecta que el gesto de swipe-back de iOS permite volver al onboarding, se añadirá `gestureEnabled: false` en el `screenOptions` del Stack del onboarding.
 
-## 22. Onboarding Interrumpido a Mitad
+### 22. Onboarding Interrumpido a Mitad
 **Decisión de UX**: Si el usuario cierra la app durante el onboarding (ej. en la Pantalla 2, tras elegir categorías), al volver la app reinicia desde la Pantalla 1. Esto ocurre porque el flag `onboardingCompleted` solo se escribe en SQLite al pulsar «Empezar» en la Pantalla 3, y el estado temporal del flujo (`petName`, `selectedCategories`, `selectedHabits`) vive en un `OnboardingContext` local que se destruye con el proceso de la app.
 **Implicaciones**: El usuario pierde las selecciones parciales. Esto es aceptable porque: (1) el onboarding consta de solo 3 pantallas y tarda <30 segundos en completarse; (2) persistir estado parcial en SQLite/AsyncStorage añadiría complejidad de limpieza (¿cuándo borrar el borrador si el usuario reinstala?); (3) un reinicio limpio es más predecible para el usuario que recuperar un estado a medias que podría estar desactualizado.
 
-## 23. `useHabitLibrary` — Estado de Carga vs Sin Resultados
+### 23. `useHabitLibrary` — Estado de Carga vs Sin Resultados
 **Decisión Técnica**: El hook `useHabitLibrary(selectedCategories)` es actualmente un stub síncrono que devuelve `{ suggestedHabits: [] }`. No expone un estado `isLoading`. La Pantalla 3 muestra el empty state inmediatamente sin distinguir entre "cargando" y "sin resultados". Cuando Logic/Data implemente el hook real con datos asíncronos, se deberá:
 1. Añadir `{ suggestedHabits, isLoading }` al tipo de retorno del hook.
 2. Mostrar un skeleton/spinner mientras `isLoading === true` en lugar del empty state.
 3. Solo mostrar el empty state cuando `isLoading === false && suggestedHabits.length === 0`.
 Esta deuda técnica está documentada pero no bloqueante para el MVP porque el hook eventualmente será síncrono (lee de una constante `habitLibrary` importada, no de red ni de BD).
 
-## 24. Nombre de Mascota con Emojis y Caracteres Especiales
+### 24. Nombre de Mascota con Emojis y Caracteres Especiales
 **Decisión Técnica**: La validación `petName.trim().length >= 2` usa `.length` nativo de JavaScript, que cuenta **unidades UTF-16**, no grafemas visibles. Esto tiene implicaciones:
 - `"🐉"` → `.length === 2` → **pasa la validación** (un emoji tiene 2 unidades UTF-16 = 1 surrogate pair), lo cual es correcto: el usuario ve 1 carácter pero la validación lo acepta.
 - `"🐉🔥"` → `.length === 4` → pasa también.
@@ -1086,14 +1114,14 @@ Se optó por `.length` en lugar de `[...str].length` (que cuenta code points, no
 2. `Intl.Segmenter` (la forma correcta de contar grafemas) no está disponible en Hermes/JSC de React Native.
 3. El nombre de la mascota no tiene restricciones de formato: cualquier combinación de texto/emojis es un nombre válido siempre que tenga "sustancia" suficiente (≥ 2 UTF-16 units).
 
-## 25. Rotación de Pantalla Durante el Onboarding
+### 25. Rotación de Pantalla Durante el Onboarding
 **Decisión Técnica**: El onboarding **no bloquea la rotación** en el MVP. Las tres pantallas usan layouts flexibles (`flex: 1`, `justifyContent: 'center'`) que adaptan el contenido razonablemente bien en landscape:
 - **WelcomeScreen**: `KeyboardAvoidingView` reposiciona el input y el botón sobre el teclado.
 - **InterestsScreen**: El grid de 2 columnas recalcula el ancho de los chips dinámicamente con `useWindowDimensions()`, adaptándose al ancho disponible.
 - **HabitsScreen**: La `FlatList` es scrollable por naturaleza, así que funciona bien en cualquier orientación.
 Si en el futuro se detectan problemas visuales graves en landscape en pantallas muy pequeñas (ej. iPhone SE 1ª gen en horizontal), se bloqueará la rotación usando `expo-screen-orientation` exclusivamente en el `_layout.tsx` del onboarding (`ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)`) y se restaurará en el `useEffect` de cleanup al desmontar el layout.
 
-## 26. Accesibilidad de `ChipSelector` — Implementación en el MVP
+### 26. Accesibilidad de `ChipSelector` — Implementación en el MVP
 **Decisión de Accesibilidad**: Los chips **sí implementan accesibilidad** desde el MVP. Cada `ChipSelector` tiene:
 - `accessibilityRole="checkbox"` — TalkBack/VoiceOver anuncia el chip como "casilla de verificación".
 - `accessibilityState={{ checked: selected }}` — el lector de pantalla anuncia "marcado" o "no marcado".
@@ -1102,11 +1130,11 @@ Esta decisión se tomó porque añadir estos 3 props tiene coste cero de impleme
 
 ---
 
-# Post-Merge Fixes y Calidad — Fase 6: Sincronización en Segundo Plano, Permisos e Internacionalización
+## Post-Merge Fixes y Calidad: Sincronización en Segundo Plano, Permisos e Internacionalización
 
 Tras la integración del sistema de notificaciones y la interfaz del Onboarding, se detectaron e implementaron correcciones críticas para garantizar la robustez del sistema y una óptima experiencia internacional.
 
-## 1. Robustez en la Migración de Datos a SQLite
+### 1. Robustez en la Migración de Datos a SQLite
 
 Durante la migración de hábitos almacenados en `AsyncStorage` hacia la base de datos de SQLite, surgieron riesgos asociados a restricciones `NOT NULL` de campos del esquema que podían estar ausentes en los registros antiguos de los usuarios.
 
@@ -1114,7 +1142,7 @@ Durante la migración de hábitos almacenados en `AsyncStorage` hacia la base de
 *   **Aislamiento de Errores**: Se envolvió cada inserción en base de datos de forma individual dentro de un bloque `try-catch`. Esto evita que un solo hábito mal formado o corrupto impida la migración del resto.
 *   **Retroalimentación de Almacenamiento**: Una vez sanitizados, los datos son guardados de vuelta en `AsyncStorage` para sincronizar los estados.
 
-## 2. Inicialización en Hilos de Fondo (Headless JS)
+### 2. Inicialización en Hilos de Fondo (Headless JS)
 
 El sistema de notificaciones nativo ejecuta código en segundo plano en entornos asíncronos aislados (Headless JS). En estos contextos, los stores globales de React (Zustand) no están necesariamente hidratados en memoria.
 
@@ -1122,32 +1150,34 @@ El sistema de notificaciones nativo ejecuta código en segundo plano en entornos
 *   **Lectura Directa de DB**: En lugar de consultar el estado reactivo del store, el servicio lee directamente la base de datos SQLite para verificar duplicados (`getLogsForDay`) y evalúa insignias usando el historial completo obtenido directamente de la DB a través de `LogRepository`.
 *   **Sincronización en Foreground**: Se configuró un orquestador que actualiza todas las dependencias críticas de gamificación (salud de la mascota y balance de puntos) y re-ejecuta el job de inactividad cuando la app vuelve a primer plano a través de [useAppStateRefresh.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useAppStateRefresh.ts).
 
-## 3. Gestión Real de Permisos Nativa
+### 3. Gestión Real de Permisos Nativa
 
 Se reemplazaron los stubs de prueba en el sistema de gestión de notificaciones para alinear el comportamiento con las APIs físicas del dispositivo.
 
 *   **Ecosistema Web vs Nativo**: En [useNotificationPermission.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useNotificationPermission.ts), se maneja el caso de ejecución en web retornando automáticamente `granted` de manera segura, mientras que en nativo se interactúa con las promesas de `Notifications.getPermissionsAsync()` y `Notifications.requestPermissionsAsync()`.
 *   **Listener Activo**: Para prever que el usuario deshabilite manualmente los permisos desde los Ajustes del sistema operativo, el hook mantiene un listener de `AppState` que refresca el estado en cada transición al primer plano (`active`).
 
-## 4. Internacionalización Total (i18n)
+### 4. Internacionalización Total (i18n)
 
 Se erradicaron por completo las cadenas de texto en español hardcodeadas a lo largo de las vistas de la aplicación para dotarla de soporte multi-idioma nativo.
 
 *   **Estructuración en JSON**: Se crearon diccionarios completos en [i18n/es.json](file:///c:/Users/PC/Desktop/Clase/Habitail/i18n/es.json) y [i18n/en.json](file:///c:/Users/PC/Desktop/Clase/Habitail/i18n/en.json) abarcando la configuración de la tienda, onboarding, visualización del historial, estados de la mascota y configuración de recordatorios.
 *   **Adaptación de Formatos**: Se actualizaron utilidades de fecha y agregadores gráficos en [chartAggregator.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/utils/chartAggregator.ts) y [dateUtils.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/utils/dateUtils.ts) para usar la configuración local de la librería i18n, garantizando que el ordenamiento lexicográfico de fechas y los nombres de los días de la semana coincidan con el idioma configurado.
 
-## 5. Limpieza de Código y Estructura
+### 5. Limpieza de Código y Estructura
 
 *   **Desacoplamiento**: Se reubicó el servicio y las utilidades de notificaciones (`notifications/`) en la raíz del proyecto para facilitar el acceso en importaciones absolutas y evitar la profundidad de carpetas obsoletas.
 *   **Pruebas Consolidadas**: Se movieron todos los archivos de tests unitarios a subcarpetas dedicadas `__tests__` y se eliminaron scripts temporales locales como `test-pet.ts`.
 
 ---
 
-# Lógica de Negocio y Robustez — Fase 7: Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos
+# FASE 7: Lógica de Negocio y Robustez
+
+## Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos
 
 Se han realizado mejoras críticas en la precisión de la gamificación, en la robustez del manejo de fechas bajo motores JS restrictivos (como Hermes en React Native) y en la eliminación de condiciones de carrera durante la persistencia de datos.
 
-## 1. Gamificación con Cambios de Salud Basados en Prioridad
+### 1. Gamificación con Cambios de Salud Basados en Prioridad
 Anteriormente, marcar un hábito como completado sumaba un valor fijo de $+10$ de salud y desmarcarlo restaba $-5$, ignorando la prioridad del hábito.
 *   **Centralización en `petLogic.ts`**: Se definió y exportó la función pura `getHealthDeltaForPriority(prioridad, fallback)` para mapear de manera única las prioridades a deltas de salud:
     *   `ESSENTIAL` → 20
@@ -1158,12 +1188,12 @@ Anteriormente, marcar un hábito como completado sumaba un valor fijo de $+10$ d
     *   `markIncomplete` aplica una penalización restando el delta según prioridad (multiplicado por $-1$, con un valor por defecto de $-5$).
     *   El manejador de notificaciones en background (`handleDoneAction` en `notificationService.ts`) también utiliza esta misma lógica de prioridad al registrar check-ins desde notificaciones.
 
-## 2. Prevención de Caídas en el Parseo de Fechas (Motor Hermes)
+### 2. Prevención de Caídas en el Parseo de Fechas (Motor Hermes)
 En motores de JavaScript restrictivos como Hermes en React Native, inicializar fechas mediante `new Date(dateString)` con strings de fecha en formato de solo fecha (ej: `YYYY-MM-DD` o strings vacíos/inválidos) genera un objeto `Invalid Date`. Al intentar llamar a `.toISOString()` en un objeto de fecha inválido, JavaScript arroja un error fatal `RangeError: Invalid time value`, el cual hacía que la pantalla del Home y los check-ins de los hábitos fallaran en producción y revirtieran su estado.
 *   **Migración a `parseISO` e `isValid`**: Se actualizó el evaluador de insignias (`badgeEngine.ts`) y la calculadora de rachas (`streakCalculator.ts`) para utilizar `parseISO` y realizar validaciones mediante `isValid` de la librería `date-fns` antes de invocar a `.toISOString()`.
 *   **Salvaguarda en el Hook de Check-In**: Se encapsuló la llamada a `evaluateBadges` y `addBadges` dentro de un bloque `try-catch` en `useHabitCheckIn.ts`. De esta forma, si ocurre algún problema con la asignación o cálculo de insignias, el flujo de check-in principal del hábito no se interrumpe y la UI no revierte el checkbox del usuario.
 *   **Fechas de Logs Estandarizadas**: Al desmarcar un hábito (`markIncomplete`), la fecha del log se normaliza explícitamente a formato `YYYY-MM-DD` (`formatDateDB`) en lugar de `formatISO`, manteniendo consistencia con el resto de inserciones en SQLite.
 
-## 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
+### 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
 Al guardar un hábito desde la pantalla de creación (`settings.tsx`), la interfaz del wizard navegaba de regreso a la pantalla de inicio mediante `router.replace('/')` de forma síncrona sin esperar a que la promesa asíncrona de inserción en base de datos (`addHabit`) terminara. Esto causaba una condición de carrera: si el usuario intentaba marcar el hábito recién creado inmediatamente al cargar el Home, SQLite arrojaba un error de violación de clave foránea (`Foreign Key Constraint violation`) porque el registro de log hacía referencia a un hábito que aún no se había insertado físicamente en la tabla de SQLite.
 *   **Llamadas Asíncronas con Await**: Se modificaron `handleSave` en `settings.tsx` y el resolvedor en `habitCreation.ts` para usar `async/await`, de modo que la redirección a la pantalla de inicio ocurra estrictamente después de que la persistencia en el store e inserción en SQLite hayan finalizado con éxito.
