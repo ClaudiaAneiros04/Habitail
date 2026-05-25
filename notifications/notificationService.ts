@@ -293,6 +293,24 @@ export function setupNotificationListeners(): () => void {
 // Notification Scheduling and Management
 // ============================================================================
 
+// Cola de ejecución serializada para evitar ejecuciones concurrentes en rescheduleAll
+let rescheduleQueue = Promise.resolve();
+
+/**
+ * Verifica de forma segura y silenciosa si el usuario ha otorgado permisos de notificación.
+ * Si ocurre algún error al consultar al sistema operativo, se asume false para evitar crasheos.
+ */
+export async function hasNotificationPermissionSilently(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.warn('[NotificationService] Error silencioso al verificar permisos de notificación:', error);
+    return false;
+  }
+}
+
 /**
  * Programa una notificación diaria para un hábito específico a la hora establecida en su configuración.
  * Aplica la "Regla de Oro": no se envía ni se programa para hoy si el hábito ya fue completado
@@ -307,20 +325,27 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
     return;
   }
 
-  // Obtenemos la hora de recordatorio (admite el campo en español o el alias en inglés)
-  const reminderTime = habit.horaRecordatorio || habit.reminderTime;
-
-  if (!habit.activo) {
-    console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" está inactivo. Omitiendo recordatorio.`);
-    return;
-  }
-
-  if (!reminderTime) {
-    console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" no tiene hora de recordatorio. Omitiendo.`);
-    return;
-  }
-
   try {
+    // Verificar permisos silenciosamente antes de interactuar con expo-notifications
+    const hasPermission = await hasNotificationPermissionSilently();
+    if (!hasPermission) {
+      console.log(`[NotificationService] Permisos de notificación ausentes o revocados. Omitiendo programación para el hábito: ${habit.id}`);
+      return;
+    }
+
+    // Obtenemos la hora de recordatorio (admite el campo en español o el alias en inglés)
+    const reminderTime = habit.horaRecordatorio || habit.reminderTime;
+
+    if (!habit.activo) {
+      console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" está inactivo. Omitiendo recordatorio.`);
+      return;
+    }
+
+    if (!reminderTime) {
+      console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" no tiene hora de recordatorio. Omitiendo.`);
+      return;
+    }
+
     const [hourStr, minuteStr] = reminderTime.split(':');
     const hours = parseInt(hourStr, 10);
     const minutes = parseInt(minuteStr, 10);
@@ -413,6 +438,13 @@ export async function cancelHabitReminder(habitId: string): Promise<void> {
   }
 
   try {
+    // Verificar permisos silenciosamente antes de interactuar con expo-notifications
+    const hasPermission = await hasNotificationPermissionSilently();
+    if (!hasPermission) {
+      console.log(`[NotificationService] Permisos de notificación ausentes o revocados. Omitiendo cancelación para el hábito: ${habitId}`);
+      return;
+    }
+
     await Notifications.cancelScheduledNotificationAsync(habitId);
     console.log(`[NotificationService] Recordatorio cancelado con éxito para el hábito: ${habitId}`);
   } catch (error) {
@@ -421,31 +453,49 @@ export async function cancelHabitReminder(habitId: string): Promise<void> {
 }
 
 /**
- * Cancela todas las notificaciones activas y vuelve a programarlas.
+ * Cancela todas las notificaciones activas y vuelve a programarlas de forma síncrona y segura.
  * Útil para cuando el usuario edita sus hábitos globales o inicia la aplicación.
  * 
  * @param habits Lista de todos los hábitos a reprogramar.
  */
-export async function rescheduleAll(habits: Habit[]): Promise<void> {
+export function rescheduleAll(habits: Habit[]): Promise<void> {
   if (Platform.OS === 'web') {
     console.log('[NotificationService] Reprogramación no soportada en web.');
-    return;
+    return Promise.resolve();
   }
 
-  console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios...');
-  try {
-    // 1. Cancelamos absolutamente todas las notificaciones programadas
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('[NotificationService] Todas las notificaciones programadas han sido canceladas.');
-
-    // 2. Volvemos a programar recordatorios para cada hábito activo
-    for (const habit of habits) {
-      if (habit.activo) {
-        await scheduleHabitReminder(habit);
+  // Encadenamos en la cola para asegurar ejecución serializada secuencial
+  rescheduleQueue = rescheduleQueue.then(async () => {
+    console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios...');
+    try {
+      // 1. Verificar permisos silenciosamente antes de interactuar con expo-notifications
+      const hasPermission = await hasNotificationPermissionSilently();
+      if (!hasPermission) {
+        console.log('[NotificationService] Permisos de notificación ausentes o revocados. Cancelando reprogramación masiva.');
+        return;
       }
+
+      // 2. Limpieza síncrona y segura de identificadores antiguos:
+      // Cancelamos individualmente y en paralelo todas las notificaciones específicas de los hábitos en la lista,
+      // asegurando que se liberen los IDs nativos.
+      const cancelPromises = habits.map(h => cancelHabitReminder(h.id));
+      await Promise.all(cancelPromises);
+
+      // 3. Adicionalmente cancelamos todas las programadas para barrer cualquier huérfana de forma general.
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log('[NotificationService] Todas las notificaciones previas han sido canceladas de forma segura.');
+
+      // 4. Volvemos a programar recordatorios para cada hábito activo de forma secuencial
+      for (const habit of habits) {
+        if (habit.activo) {
+          await scheduleHabitReminder(habit);
+        }
+      }
+      console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
+    } catch (error) {
+      console.error('[NotificationService] Error durante la reprogramación masiva:', error);
     }
-    console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
-  } catch (error) {
-    console.error('[NotificationService] Error durante la reprogramación masiva:', error);
-  }
+  });
+
+  return rescheduleQueue;
 }

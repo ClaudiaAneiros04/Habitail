@@ -15,6 +15,7 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   scheduleNotificationAsync: jest.fn().mockResolvedValue('mock-notification-id'),
   cancelAllScheduledNotificationsAsync: jest.fn().mockResolvedValue(undefined),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
   setNotificationHandler: jest.fn(),
   setNotificationCategoryAsync: jest.fn(),
   addNotificationResponseReceivedListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
@@ -163,6 +164,39 @@ describe('NotificationService - Pruebas Unitarias', () => {
           identifier: 'habit-active',
         })
       );
+    });
+  });
+
+  describe('Permisos revocados y manejo de errores silencioso', () => {
+    const mockHabit: Habit = {
+      id: 'habit-1',
+      userId: 'user-1',
+      nombre: 'Hábito de prueba',
+      icono: 'heart',
+      colorHex: '#FF0000',
+      frecuencia: 'DAILY',
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
+      horaRecordatorio: '08:00',
+      nivelPrioridad: 'NORMAL',
+      tipoVerificacion: 'BOOLEAN',
+      fechaInicio: '2026-05-20',
+      activo: true,
+    };
+
+    test('Debe retornar silenciosamente si los permisos están denegados', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'denied' });
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Debe tragar errores nativos silenciosamente si falla getPermissionsAsync', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockRejectedValueOnce(new Error('Native error'));
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
     });
   });
 });
