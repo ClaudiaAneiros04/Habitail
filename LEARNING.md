@@ -905,14 +905,30 @@ El sistema se sincroniza con el ciclo de vida nativo (`AppState`) en `app/_layou
 
 El primer contacto con Habitail debe ser fluido, intuitivo y sentar las bases de la gamificación. Para lograrlo, se diseñó un sistema integrado de onboarding, inicialización de datos y enrutamiento protegido.
 
-## 1. Enrutamiento y Protección de Rutas con Expo Router
+## 1. Diseño del Flujo: ¿Por qué 3 pantallas?
+El onboarding se diseñó buscando el equilibrio exacto entre recopilar datos útiles para el inicio y reducir la fricción cognitiva. Se estructuró en **tres pantallas** progresivas para crear una "rampa de compromiso" (commitment ramp):
+1. **WelcomeScreen (Vínculo Emocional)**: Se pide al usuario que nombre a su mascota. Este paso inicial de baja fricción establece la conexión con el motor de gamificación antes de exigir un esfuerzo organizativo.
+2. **InterestsScreen (Personalización)**: El usuario selecciona áreas de interés macro (Deporte, Salud, Productividad). Es una decisión rápida y visual a través de chips que guía al sistema.
+3. **HabitsScreen (Acción y Confirmación)**: Basado en los intereses, el sistema sugiere hábitos específicos pre-seleccionados. El usuario puede ajustarlos, pero el esfuerzo requerido por defecto es cero.
+
+Este flujo se gestiona íntegramente mediante un estado temporal en memoria (`OnboardingContext`) para no escribir datos en la base de datos hasta que el proceso haya finalizado con éxito (atomicidad).
+
+## 2. Casos Borde Testados en el Onboarding
+Para garantizar la solidez de esta primera experiencia, se testaron múltiples escenarios atípicos:
+* **Validación de Inputs Vacíos**: Nombres de mascota conformados por espacios en blanco (`«   »`) inhabilitan el botón de continuar mediante reactividad estricta (`.trim()`).
+* **Abandono a Mitad del Flujo (Cold Close)**: Si la app se cierra antes de concluir el paso 3, las selecciones temporales se descartan. Al volver, se exige iniciar desde la pantalla 1 para prevenir la persistencia de perfiles parciales.
+* **Selecciones Vacías**: Si el usuario no elige intereses o desmarca todos los hábitos sugeridos, el flujo no lo bloquea. El botón "Empezar" prioriza que acceda a la Home (aunque sea vacía) por encima de obligarlo a configurar rutinas.
+* **Navegación Defensiva (Botón "Atrás")**: Completar el onboarding activa un guard en el `_layout.tsx` que bloquea permanentemente cualquier retroceso accidental a las pantallas iniciales, tanto en gestos nativos como en navegadores web.
+* **Rotación de Pantalla (Landscape)**: El contenido y el input están adaptados para pantallas horizontales, usando `KeyboardAvoidingView` y grids dinámicos para que el botón de avanzar siempre sea visible.
+
+## 3. Enrutamiento y Protección de Rutas con Expo Router
 El estado del onboarding se almacena de forma persistente en `AsyncStorage` mediante la clave `@onboarding_completed`. 
 
 El hook personalizado `useOnboardingNavigation` monitoriza en tiempo real los segmentos activos de la ruta (`useSegments`). Al iniciar la app o transicionar de pantalla:
 *   **Filtro A (Redirección a Onboarding)**: Si el flag es `false` y el usuario no se encuentra dentro del grupo `/onboarding`, es redirigido inmediatamente a `/onboarding` usando `router.replace()`, bloqueando el acceso a la app principal.
 *   **Filtro B (Redirección a App Principal)**: Si el flag es `true` y el usuario intenta acceder a `/onboarding`, es redirigido de inmediato a la Home `/(tabs)` para prevenir bucles.
 
-## 2. Librería de Hábitos y Auto-creación
+## 4. Librería de Hábitos y Auto-creación
 Al finalizar el onboarding, el usuario selecciona las categorías que le interesan (ej. SALUD, DEPORTE, PRODUCTIVIDAD). La función `completeOnboarding` ejecuta el proceso de inicialización:
 
 1.  **Filtrado Inteligente**: Cruza las categorías seleccionadas por el usuario con nuestra librería estática predefinida (`habitLibrary`).
@@ -924,7 +940,7 @@ Al finalizar el onboarding, el usuario selecciona las categorías que le interes
 3.  **Persistencia Directa**: Invoca a `habitStore.addHabit()`, persistiendo los hábitos en SQLite e hidratando reactivamente la UI de Zustand.
 4.  **Confirmación**: Guarda el flag `@onboarding_completed: "true"` en AsyncStorage y actualiza el UserStore local.
 
-## 3. Inicialización Secuencial de Datos en Layout Raíz
+## 5. Inicialización Secuencial de Datos en Layout Raíz
 Para eliminar fallos de inicialización o violaciones de claves foráneas en SQLite (especialmente notorios en dispositivos Android nativos), se implementó un orden de carga secuencial estricto en `app/_layout.tsx` que bloquea la interacción del usuario mediante un estado reactivo `dbReady`:
 
 ```mermaid
