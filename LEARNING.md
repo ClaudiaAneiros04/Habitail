@@ -1197,3 +1197,14 @@ En motores de JavaScript restrictivos como Hermes en React Native, inicializar f
 ### 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
 Al guardar un hábito desde la pantalla de creación (`settings.tsx`), la interfaz del wizard navegaba de regreso a la pantalla de inicio mediante `router.replace('/')` de forma síncrona sin esperar a que la promesa asíncrona de inserción en base de datos (`addHabit`) terminara. Esto causaba una condición de carrera: si el usuario intentaba marcar el hábito recién creado inmediatamente al cargar el Home, SQLite arrojaba un error de violación de clave foránea (`Foreign Key Constraint violation`) porque el registro de log hacía referencia a un hábito que aún no se había insertado físicamente en la tabla de SQLite.
 *   **Llamadas Asíncronas con Await**: Se modificaron `handleSave` en `settings.tsx` y el resolvedor en `habitCreation.ts` para usar `async/await`, de modo que la redirección a la pantalla de inicio ocurra estrictamente después de que la persistencia en el store e inserción en SQLite hayan finalizado con éxito.
+
+### 4. Casos Borde y QA Estático: Bugs Visuales y Temporales
+
+Durante la fase de Auditoría de QA Estática (Testing Manual Simulado de Fase 7), se detectaron los siguientes comportamientos límite que requieren ajuste arquitectónico:
+
+*   **Falta de Sincronización de Fecha a Medianoche (00:00)**:
+    *   **Problema**: Si el usuario deja la aplicación abierta y visible en primer plano durante el paso de un día a otro (00:01 AM), la lista de hábitos no se refresca automáticamente. La carga de datos actual depende del hook `useAppStateRefresh`, el cual reacciona exclusivamente a las transiciones de estado de fondo (background) a primer plano (active).
+    *   **Impacto Arquitectónico**: Para solucionar esto sin forzar al usuario a cerrar y abrir la app, la arquitectura de `useHabitStore` y `HomeScreen` debe incorporar un timer interno (basado en reloj) o un listener explícito que fuerce el re-renderizado reactivo y recálculo al cruzar la barrera de las 00:00, ejecutando internamente un refresh de los registros.
+*   **Feature Fantasma: Confetti Inexistente**:
+    *   **Problema**: El hook `useHabitCheckIn.ts` implementa con éxito la lógica para calcular y retornar el flag `{ shouldLaunchConfetti: true }` cuando se completan todas las tareas del día. Sin embargo, no se ha importado ni renderizado ningún componente de Lottie o Confetti en la UI principal (`HomeScreen`).
+    *   **Impacto Visual**: El retorno de la lógica es ignorado por la interfaz. Se requiere integrar una librería dedicada en el frontend y reaccionar a esta promesa del check-in para cumplir con el efecto visual esperado (Feedback UX).
