@@ -81,10 +81,10 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
             values={data}
             endDate={new Date(currentYear, 11, 31)}
             numDays={((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0) ? 366 : 365}
-            width={980}
+            width={1150}
             height={220}
             chartConfig={chartConfig}
-            accessor="count"
+            accessor="value"
             getMonthLabel={getMonthLabel}
             tooltipDataAttrs={() => ({})}
             style={styles.chart}

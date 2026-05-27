@@ -25,6 +25,7 @@ import { useHabitStats } from '../../hooks/useHabitStats';
 import { aggregateChartData } from '../../utils/chartAggregator';
 import { LogRepository } from '../../storage/LogRepository';
 import { HabitLog } from '../../types';
+import { useLogStore } from '../../store/useLogStore';
 
 const logRepo = new LogRepository();
 
@@ -36,6 +37,7 @@ export default function StatsScreen() {
   const router = useRouter();
   const { user } = useUserStore();
   const { habits } = useHabitStore();
+  const { lastUpdate } = useLogStore();
 
   // Estado para el periodo seleccionado
   const [activeTab, setActiveTab] = useState<TabType>('weekly');
@@ -84,7 +86,7 @@ export default function StatsScreen() {
       }
     }
     loadLogs();
-  }, [selectedHabitId, user?.id]);
+  }, [selectedHabitId, user?.id, lastUpdate]);
 
   // 3. Procesar datos para el BarChartComponent
   const chartData = useMemo(() => {

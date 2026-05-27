@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import { HabitLog } from '../types';
 import { LogRepository } from '../storage/LogRepository';
+import { useStatsStore } from './useStatsStore';
+import { useHeatmapStore } from './useHeatmapStore';
 
 interface LogStore {
   logs: HabitLog[];
+  lastUpdate: number;
   addLog: (log: HabitLog) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
   loadLogs: () => Promise<void>;
@@ -14,9 +17,15 @@ const logRepo = new LogRepository();
 
 export const useLogStore = create<LogStore>((set, get) => ({
   logs: [],
+  lastUpdate: 0,
   addLog: async (log) => {
     await logRepo.save(log);
-    set((state) => ({ logs: [...state.logs.filter((l) => l.id !== log.id), log] }));
+    set((state) => ({ 
+      logs: [...state.logs.filter((l) => l.id !== log.id), log],
+      lastUpdate: Date.now()
+    }));
+    useStatsStore.getState().clearAll();
+    useHeatmapStore.getState().clearAll();
   },
   /**
    * Elimina un log de la DB y del estado local.
@@ -25,7 +34,12 @@ export const useLogStore = create<LogStore>((set, get) => ({
    */
   deleteLog: async (logId) => {
     await logRepo.deleteById(logId);
-    set((state) => ({ logs: state.logs.filter((l) => l.id !== logId) }));
+    set((state) => ({ 
+      logs: state.logs.filter((l) => l.id !== logId),
+      lastUpdate: Date.now()
+    }));
+    useStatsStore.getState().clearAll();
+    useHeatmapStore.getState().clearAll();
   },
   loadLogs: async () => {
     // Carga diferida: dependemos de getLogsForDay para consultas por día.
