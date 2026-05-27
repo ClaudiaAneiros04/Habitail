@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Category, SuggestedHabit, Frequency, Priority } from '../types';
 import { createHabitFromLibrary } from '../services/habitCreation';
+import { EmptyState } from '../components/empty-states/EmptyState';
 
 // Mock de hábitos sugeridos (En una app real podría venir de una API local/remota)
 const SUGGESTED_HABITS: SuggestedHabit[] = [
@@ -116,10 +117,13 @@ export default function HabitLibraryScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="library-outline" size={48} color={Colors.inactive} />
-            <Text style={styles.emptyText}>{t('habitLibrary.emptyText', { defaultValue: 'No hay ideas en esta categoría.' })}</Text>
-          </View>
+          <EmptyState
+            icon="library-outline"
+            title={t('habitLibrary.emptyText', { defaultValue: 'No hay ideas en esta categoría.' })}
+            description=""
+            actionLabel={t('habitLibrary.empty.cta', { defaultValue: 'Ver todas las categorías' })}
+            onAction={() => setActiveTab('TODOS')}
+          />
         }
       />
     </SafeAreaView>

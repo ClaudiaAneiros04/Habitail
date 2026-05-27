@@ -6,6 +6,8 @@ import { useUserStore } from '../../store/useUserStore';
 import { usePetStore } from '../../store/usePetStore';
 import { SHOP_ITEMS, ShopItem, ShopItemType } from '../../data/shopItems';
 import { useTranslation } from 'react-i18next';
+import { EmptyState } from '../../components/empty-states/EmptyState';
+import { useRouter } from 'expo-router';
 
 /**
  * Pantalla de Tienda (ShopScreen)
@@ -15,6 +17,7 @@ export default function ShopScreen() {
   const { user, updateUser } = useUserStore();
   const { pet, updatePet } = usePetStore();
   const { t } = useTranslation();
+  const router = useRouter();
   
   // Estado local para la pestaña seleccionada ('skin' o 'accessory')
   const [activeTab, setActiveTab] = useState<ShopItemType>('skin');
@@ -31,6 +34,8 @@ export default function ShopScreen() {
   const displayedItems = useMemo(() => {
     return SHOP_ITEMS.filter(item => item.type === activeTab);
   }, [activeTab]);
+
+  const hasInteractableItems = displayedItems.some(item => inventario.includes(item.id) || puntos >= item.price);
 
   // Skin o accesorio actualmente equipado en la mascota
   const skinEquipada = pet?.skinEquipada || 'skin_default';
@@ -206,14 +211,24 @@ export default function ShopScreen() {
       </View>
 
       {/* Grid de Ítems */}
-      <FlatList
-        data={displayedItems}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        numColumns={2}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      {!hasInteractableItems ? (
+        <EmptyState
+          icon="wallet-outline"
+          title={t('shop.empty.title', { defaultValue: 'Aún no hay accesorios' })}
+          description={t('shop.empty.description', { defaultValue: 'Sigue completando hábitos para ganar puntos y desbloquear accesorios.' })}
+          actionLabel={t('shop.empty.cta', { defaultValue: 'Ver hoy' })}
+          onAction={() => router.push('/(tabs)/index')}
+        />
+      ) : (
+        <FlatList
+          data={displayedItems}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          numColumns={2}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 }
