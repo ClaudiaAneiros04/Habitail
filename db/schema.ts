@@ -97,6 +97,8 @@ export const CREATE_TABLES_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_fecha ON ${TABLE_NAMES.HABIT_LOGS} (habitId, fecha);
   CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON ${TABLE_NAMES.HABIT_LOGS} (userId, fecha);
+  CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_completado_fecha ON ${TABLE_NAMES.HABIT_LOGS} (habitId, completado, fecha);
+  CREATE INDEX IF NOT EXISTS idx_habit_logs_user_completado_fecha ON ${TABLE_NAMES.HABIT_LOGS} (userId, completado, fecha);
 `;
 
 export interface UserRow {
