@@ -1151,3 +1151,92 @@ En motores de JavaScript restrictivos como Hermes en React Native, inicializar f
 ## 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
 Al guardar un hábito desde la pantalla de creación (`settings.tsx`), la interfaz del wizard navegaba de regreso a la pantalla de inicio mediante `router.replace('/')` de forma síncrona sin esperar a que la promesa asíncrona de inserción en base de datos (`addHabit`) terminara. Esto causaba una condición de carrera: si el usuario intentaba marcar el hábito recién creado inmediatamente al cargar el Home, SQLite arrojaba un error de violación de clave foránea (`Foreign Key Constraint violation`) porque el registro de log hacía referencia a un hábito que aún no se había insertado físicamente en la tabla de SQLite.
 *   **Llamadas Asíncronas con Await**: Se modificaron `handleSave` en `settings.tsx` y el resolvedor en `habitCreation.ts` para usar `async/await`, de modo que la redirección a la pantalla de inicio ocurra estrictamente después de que la persistencia en el store e inserción en SQLite hayan finalizado con éxito.
+
+## 4. Concurrencia de Notificaciones y Serialización de Reschedule (Commit Anterior)
+Anteriormente, al reprogramar de manera masiva los recordatorios de notificaciones (por ejemplo, al iniciar la aplicación o realizar cambios globales), múltiples promesas asíncronas no serializadas competían por el acceso a `expo-notifications`, provocando condiciones de carrera y bloqueos del sistema de archivos o hilos nativos.
+*   **Cola de Ejecución Serializada (`rescheduleQueue`)**: Se introdujo una cola global de ejecución serializada en [notificationService.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/notifications/notificationService.ts). Todas las invocaciones a `rescheduleAll` se encadenan síncronamente sobre esta cola (`rescheduleQueue = rescheduleQueue.then(...)`), asegurando que las operaciones nativas sobre notificaciones se ejecuten en secuencia estricta.
+*   **Verificación Segura y Silenciosa de Permisos**: Se implementó `hasNotificationPermissionSilently()` para verificar los permisos de notificaciones del dispositivo de forma segura. En entornos web o ante fallas nativas, el método retorna `false` de manera silenciosa en lugar de lanzar excepciones destructivas, lo que previene crasheos fatales.
+
+---
+
+# Optimización de Rendimiento y Persistencia — Fase 7: Índices Compuestos, Consultas Agregadas y Data Chunking con Parada Temprana (Cambios Actuales)
+
+Con el fin de mitigar problemas de rendimiento al escalar el historial de hábitos a más de 1000 logs por usuario, se ha rediseñado la estrategia de indexación, consultas y carga de datos en memoria.
+
+## 1. Índices Compuestos en SQLite
+Para evitar escaneos de tabla de complejidad $O(n)$ (Table Scan) y forzar búsquedas de complejidad $O(\log n)$ (Index Seek/Range Scan), se crearon los siguientes índices compuestos en [schema.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/db/schema.ts) y en el script de migración [01_habit_logs_indices.sql](file:///c:/Users/PC/Desktop/Clase/Habitail/db/migrations/01_habit_logs_indices.sql):
+*   `idx_habit_logs_habit_completado_fecha` sobre `(habitId, completado, fecha)` para acelerar consultas filtradas de hábitos específicos.
+*   `idx_habit_logs_user_completado_fecha` sobre `(userId, completado, fecha)` para optimizar búsquedas globales y de resumen por usuario.
+
+## 2. Optimización de Consultas (EXPLAIN QUERY PLAN)
+A nivel de base de datos, las consultas estadísticas críticas se estructuraron utilizando agregaciones de SQLite nativas:
+
+### A. Tasa de Éxito (Success Rate)
+Se calcula el porcentaje directo a partir del conteo distintivo de fechas completadas en el periodo evaluado:
+```sql
+SELECT 
+  COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS totalCompleted,
+  :periodDays AS totalDays,
+  ROUND((CAST(COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS REAL) / :periodDays) * 100, 1) AS successRate
+FROM habit_logs
+WHERE habitId = :habitId 
+  AND fecha >= :startDate 
+  AND fecha <= :endDate;
+```
+*   **Análisis del Plan (`EXPLAIN QUERY PLAN`)**:
+    ```text
+    SEARCH TABLE habit_logs USING INDEX idx_habit_logs_habit_completado_fecha (habitId=? AND completado=? AND fecha>? AND fecha<?)
+    ```
+    Esto demuestra el uso del índice compuesto en una operación `SEARCH TABLE` con complejidad $O(\log n)$.
+
+### B. Racha Actual (Current Streak) en SQL
+Se diseñó una consulta recursiva (Common Table Expression - CTE) que recorre el calendario hacia atrás desde el día de referencia y cuenta los días/semanas completados de forma consecutiva respetando la frecuencia de hábitos activos (DAILY/WEEKLY/MONTHLY) sin cargar registros individuales a la RAM del dispositivo:
+```sql
+WITH RECURSIVE
+  date_series(d, idx) AS (
+    SELECT :refDate, 0
+    UNION ALL
+    SELECT DATE(d, '-1 day'), idx + 1 FROM date_series
+    LIMIT 365
+  ),
+  active_days AS (
+    SELECT 
+      ds.d,
+      ds.idx,
+      EXISTS (
+        SELECT 1 FROM habit_logs 
+        WHERE habitId = :habitId AND completado = 1 AND fecha = ds.d
+      ) AS is_completed
+    FROM date_series ds
+  ),
+  streak_calc AS (
+    SELECT 
+      CASE 
+        WHEN (SELECT is_completed FROM active_days WHERE idx = 0) = 1 THEN
+          COALESCE(
+            (SELECT idx FROM active_days WHERE is_completed = 0 ORDER BY idx ASC LIMIT 1), 
+            (SELECT COUNT(*) FROM active_days)
+          )
+        ELSE
+          COALESCE(
+            (SELECT idx FROM active_days WHERE idx >= 1 AND is_completed = 0 ORDER BY idx ASC LIMIT 1), 
+            (SELECT COUNT(*) FROM active_days)
+          ) - 1
+      END AS current_streak
+  )
+SELECT current_streak FROM streak_calc;
+```
+*   **Análisis del Plan (`EXPLAIN QUERY PLAN`)**:
+    ```text
+    |--CO-ROUTINE date_series
+    |--SCAN active_days
+    `--CORRELATED SUBQUERY
+       `--SEARCH TABLE habit_logs USING INDEX idx_habit_logs_habit_completado_fecha (habitId=? AND completado=? AND fecha=?)
+    ```
+    Cada comprobación de existencia es un Index Seek puntual ultra rápido de $O(\log n)$.
+
+## 3. Gestión de Memoria por Data Chunking con Parada Temprana
+Para evitar la carga masiva e innecesaria de miles de filas a memoria RAM de golpe, se implementó una estrategia híbrida en los repositorios y hooks de estadísticas:
+*   **Consultas por Lotes en Repositorio**: Se agregaron los métodos `getLogsForRangePaginated` y `getLogsForRangeGlobalPaginated` en [LogRepository.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/storage/LogRepository.ts) para realizar lecturas paginadas y descendentes (`ORDER BY fecha DESC LIMIT ? OFFSET ?`).
+*   **Algoritmo de Parada Temprana (Early Exit)**: El hook [useHabitStats.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useHabitStats.ts) realiza la lectura de logs en lotes de 100 de forma descendente. Al finalizar cada lote, calcula de manera provisional la racha actual; si esta es menor que la cantidad de días activos transcurridos hasta el log más antiguo del lote, se deduce matemáticamente que la racha ya se ha roto y se detiene la carga de más lotes de la base de datos.
+*   **Prevención de Concurrencia en Caché**: Se optimizó la carga del hook bloqueando ejecuciones paralelas duplicadas de la consulta `load()` cuando el caché de la clave está en estado `loading: true`, resolviendo condiciones de carrera y consumo de recursos innecesario.
