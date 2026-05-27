@@ -24,7 +24,8 @@
       "snoozed": "· 30 min"
     },
     "empty": {
-      "no_habits": "No hay hábitos programados para este día."
+      "no_habits": "No hay hábitos programados para este día.",
+      "cta": "Crear mi primer hábito"
     }
   },
   "habits": {
@@ -32,7 +33,8 @@
       "titulo": "Sin hábitos aún",
       "subtitulo": "Crea tu primer hábito para empezar",
       "active_title": "No tienes hábitos activos.",
-      "active_subtitle": "¡Presiona el botón + para crear uno!"
+      "active_subtitle": "¡Presiona el botón + para crear uno!",
+      "cta": "Explorar biblioteca"
     },
     "archive": {
       "title": "Archivar Hábito",
@@ -228,6 +230,11 @@
       "global": "Vista Global",
       "visualizing": "Visualizando estadísticas de:"
     },
+    "empty": {
+      "title": "Aún no hay datos suficientes",
+      "description": "Empieza a completar hábitos para ver tus estadísticas.",
+      "cta": "Ver hábitos"
+    },
     "tabs": {
       "weekly": "Semanal",
       "monthly": "Mensual",
@@ -286,7 +293,12 @@
       "purchase_success_title": "¡Compra exitosa!",
       "purchase_success_msg": "Has comprado {{name}}.",
       "equipped_title": "Equipado",
-      "equipped_msg": "Has equipado {{name}}."
+      "equipped_msg": "¡{{name}} se ha equipado con éxito!"
+    },
+    "empty": {
+      "title": "Aún no hay accesorios",
+      "description": "Sigue completando hábitos para ganar puntos y desbloquear accesorios.",
+      "cta": "Ver hoy"
     },
     "items": {
       "skin_default": "Gato Naranja",
@@ -314,6 +326,9 @@
     "headerTitle": "Librería de Ideas",
     "all": "Todos",
     "emptyText": "No hay ideas en esta categoría.",
+    "empty": {
+      "cta": "Ver todas las categorías"
+    },
     "presets": {
       "1": {
         "nombre": "Beber Agua",

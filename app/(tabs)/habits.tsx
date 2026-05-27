@@ -133,9 +133,11 @@ export default function HabitsScreen() {
         )}
         ListEmptyComponent={
           <EmptyState
-            title={t('habits.empty.active_title')}
-            description={t('habits.empty.active_subtitle')}
-            icon="🌱"
+            title={habits.length === 0 ? t('habits.empty.titulo') : t('habits.empty.active_title')}
+            description={habits.length === 0 ? t('habits.empty.subtitulo') : t('habits.empty.active_subtitle')}
+            icon="leaf-outline"
+            actionLabel={t('habits.empty.cta', { defaultValue: 'Explorar biblioteca' })}
+            onAction={() => router.push('/habit-library')}
           />
         }
         contentContainerStyle={styles.listContent}

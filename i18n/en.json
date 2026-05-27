@@ -24,7 +24,8 @@
       "snoozed": "· 30 min"
     },
     "empty": {
-      "no_habits": "No habits scheduled for this day."
+      "no_habits": "No habits scheduled for today.",
+      "cta": "Create my first habit"
     }
   },
   "habits": {
@@ -32,7 +33,8 @@
       "titulo": "No habits yet",
       "subtitulo": "Create your first habit to get started",
       "active_title": "You have no active habits.",
-      "active_subtitle": "Press the + button to create one!"
+      "active_subtitle": "Press the + button to create one!",
+      "cta": "Explore library"
     },
     "archive": {
       "title": "Archive Habit",
@@ -228,6 +230,11 @@
       "global": "Global View",
       "visualizing": "Visualizing statistics for:"
     },
+    "empty": {
+      "title": "Not enough data yet",
+      "description": "Start completing habits to see your statistics.",
+      "cta": "View habits"
+    },
     "tabs": {
       "weekly": "Weekly",
       "monthly": "Monthly",
@@ -286,7 +293,12 @@
       "purchase_success_title": "Purchase successful!",
       "purchase_success_msg": "You bought {{name}}.",
       "equipped_title": "Equipped",
-      "equipped_msg": "You equipped {{name}}."
+      "equipped_msg": "You have equipped {{name}}."
+    },
+    "empty": {
+      "title": "No accessories yet",
+      "description": "Keep completing habits to earn points and unlock accessories.",
+      "cta": "View today"
     },
     "items": {
       "skin_default": "Orange Cat",
@@ -314,6 +326,9 @@
     "headerTitle": "Ideas Library",
     "all": "All",
     "emptyText": "No ideas in this category.",
+    "empty": {
+      "cta": "View all categories"
+    },
     "presets": {
       "1": {
         "nombre": "Drink Water",

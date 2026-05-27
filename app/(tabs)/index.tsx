@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { Colors } from '../../constants/colors';
 import { useHabitStore } from '../../store/useHabitStore';
@@ -74,6 +75,7 @@ export default function HomeScreen() {
   const lastRefreshFromAppState = useRef(false);
 
   const { t } = useTranslation();
+  const router = useRouter();
 
   const allHabits = useHabitStore((state) => state.habits);
   const addLog = useLogStore((state) => state.addLog);
@@ -361,9 +363,11 @@ export default function HomeScreen() {
             )}
             ListEmptyComponent={
               <EmptyState
-                title={t('home.empty.title', { defaultValue: 'Día Libre' })}
-                description={t('home.empty.no_habits')}
-                icon="🏝️"
+                icon="calendar-clear-outline"
+                title={t('home.empty.no_habits', { defaultValue: 'No hay hábitos programados para este día.' })}
+                description={t('home.empty.subtitulo', { defaultValue: '¡Tómate un descanso o crea un nuevo hábito!' })}
+                actionLabel={t('home.empty.cta', { defaultValue: 'Crear mi primer hábito' })}
+                onAction={() => router.push('/add-habit/basic-info')}
               />
             }
           />
