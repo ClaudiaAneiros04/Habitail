@@ -16,10 +16,10 @@ interface StatCardProps {
 export const StatCard: React.FC<StatCardProps> = ({ title, value }) => {
   return (
     <View style={styles.card}>
-      <Text style={styles.title} numberOfLines={1}>
+      <Text style={styles.title} numberOfLines={2} adjustsFontSizeToFit>
         {title}
       </Text>
-      <Text style={styles.value} numberOfLines={1}>
+      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
     </View>
