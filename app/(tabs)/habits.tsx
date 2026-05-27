@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, Alert, Animated, SafeAreaView } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Habit } from '../../types';
@@ -114,7 +114,7 @@ export default function HabitsScreen() {
   }, [habits]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
@@ -161,7 +161,7 @@ export default function HabitsScreen() {
           <Ionicons name="add" size={32} color="#FFF" />
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   listContent: {
-    paddingBottom: 100, // padding for FAB
+    paddingBottom: 120, // padding for FAB
     paddingTop: 16,
   },
   sectionHeader: {

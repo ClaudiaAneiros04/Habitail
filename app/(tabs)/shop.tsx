@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, Alert, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { useUserStore } from '../../store/useUserStore';
@@ -166,7 +166,7 @@ export default function ShopScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Cabecera: Saldo de Puntos */}
       <View style={styles.header}>
         <View style={styles.pointsBadge}>
@@ -214,7 +214,7 @@ export default function ShopScreen() {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -300,6 +300,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 8,
+    paddingBottom: 40,
   },
   itemCard: {
     flex: 1,
