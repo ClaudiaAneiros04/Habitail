@@ -18,6 +18,7 @@ import { formatDateDB, generateLogId, formatDateLocally, formatShortDate } from 
 import { useTranslation } from 'react-i18next';
 import { ToastConfirmation } from '../../components/ToastConfirmation';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
+import { EmptyState } from '../../components/empty-states/EmptyState';
 
 // Native Date Helpers (Moved to utils/dateUtils.ts)
 
@@ -359,10 +360,11 @@ export default function HomeScreen() {
               />
             )}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="leaf-outline" size={48} color={Colors.inactive} />
-                <Text style={styles.emptyText}>{t('home.empty.no_habits')}</Text>
-              </View>
+              <EmptyState
+                title={t('home.empty.title', { defaultValue: 'Día Libre' })}
+                description={t('home.empty.no_habits')}
+                icon="🏝️"
+              />
             }
           />
         )}
@@ -452,17 +454,5 @@ const styles = StyleSheet.create({
   flatListContent: {
     paddingBottom: 40,
     paddingTop: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 60,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: Colors.text,
-    opacity: 0.5,
-    textAlign: 'center',
   },
 });

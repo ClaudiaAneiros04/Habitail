@@ -76,25 +76,37 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
 
   // Efecto para transición suave de estados
   useEffect(() => {
+    let isMounted = true;
+
     if (pet && displayedState && pet.estadoActual !== displayedState) {
+      // Detener cualquier animación en curso
+      fadeAnim.stopAnimation();
+
       // Fade out
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 300,
+        duration: 200,
         useNativeDriver: true,
-      }).start(() => {
-        // Cambiar el estado una vez que está invisible
-        setDisplayedState(pet.estadoActual);
-        // Fade in
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
+      }).start(({ finished }) => {
+        // Solo continuar si el componente sigue montado y la animación no fue interrumpida
+        if (finished && isMounted) {
+          setDisplayedState(pet.estadoActual);
+          // Fade in
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
       });
     } else if (pet && !displayedState) {
       setDisplayedState(pet.estadoActual);
+      fadeAnim.setValue(1);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [pet?.estadoActual, displayedState, fadeAnim]);
 
   // Exponer métodos imperativos (trigger animations) a componentes padres

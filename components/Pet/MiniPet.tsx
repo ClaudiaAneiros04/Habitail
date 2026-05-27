@@ -20,22 +20,33 @@ export const MiniPet = () => {
 
   // Efecto para transición suave de estados (Fade In/Out)
   useEffect(() => {
+    let isMounted = true;
+
     if (pet && displayedState && pet.estadoActual !== displayedState) {
+      fadeAnim.stopAnimation();
+
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
-      }).start(() => {
-        setDisplayedState(pet.estadoActual);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
+      }).start(({ finished }) => {
+        if (finished && isMounted) {
+          setDisplayedState(pet.estadoActual);
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
       });
     } else if (pet && !displayedState) {
       setDisplayedState(pet.estadoActual);
+      fadeAnim.setValue(1);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [pet?.estadoActual, displayedState, fadeAnim]);
 
   if (!pet || !displayedState) return null;

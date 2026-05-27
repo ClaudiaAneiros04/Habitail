@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { EmptyState } from '../../components/empty-states/EmptyState';
 
 // Helper for UI
 const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }) => {
@@ -131,10 +132,11 @@ export default function HabitsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>{t('habits.empty.active_title')}</Text>
-            <Text style={styles.emptySubText}>{t('habits.empty.active_subtitle')}</Text>
-          </View>
+          <EmptyState
+            title={t('habits.empty.active_title')}
+            description={t('habits.empty.active_subtitle')}
+            icon="🌱"
+          />
         }
         contentContainerStyle={styles.listContent}
       />
@@ -275,23 +277,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
-  },
-  emptyContainer: {
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: Colors.inactive,
-    textAlign: 'center',
   },
 });
