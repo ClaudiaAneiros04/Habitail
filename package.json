@@ -31,6 +31,7 @@
     "date-fns": "^2.30.0",
     "expo": "^54.0.0",
     "expo-constants": "~18.0.13",
+    "expo-haptics": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-localization": "~17.0.8",
     "expo-notifications": "~0.32.17",
