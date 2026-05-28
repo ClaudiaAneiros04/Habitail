@@ -16,6 +16,8 @@ import { HabitSelector } from '../../components/stats/HabitSelector';
 import { HabitHeatmap } from '../../components/stats/HabitHeatmap';
 import { BarChartComponent } from '../../components/stats/BarChartComponent';
 import { EmptyState } from '../../components/empty-states/EmptyState';
+import { StatCardSkeleton } from '../../components/skeletons/StatCardSkeleton';
+import { SkeletonItem } from '../../components/skeletons/SkeletonItem';
 import { useRouter } from 'expo-router';
 
 // Lógica e integración
@@ -158,7 +160,7 @@ export default function StatsScreen() {
               <Text style={styles.sectionTitle}>{t('stats.charts.complianceAnalysis')}</Text>
               {isLogsLoading ? (
                 <View style={styles.loaderContainer}>
-                  <ActivityIndicator color={Theme.colors.primary} />
+                  <SkeletonItem width="100%" height={240} borderRadius={24} />
                 </View>
               ) : (
                 <BarChartComponent 
@@ -173,30 +175,48 @@ export default function StatsScreen() {
               <Text style={styles.sectionTitle}>{t('stats.metrics.title')}</Text>
               <View style={styles.grid}>
                 <View style={styles.row}>
-                  <StatCard 
-                    title={t('stats.metrics.currentStreak')} 
-                    value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: currentStreak })} 🔥`} 
-                  />
-                  <StatCard 
-                    title={t('stats.metrics.maxStreak')} 
-                    value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: maxStreak })} 🏆`} 
-                  />
+                  {isStatsLoading ? (
+                    <>
+                      <StatCardSkeleton />
+                      <StatCardSkeleton />
+                    </>
+                  ) : (
+                    <>
+                      <StatCard 
+                        title={t('stats.metrics.currentStreak')} 
+                        value={`${t('stats.metrics.days', { count: currentStreak })} 🔥`} 
+                      />
+                      <StatCard 
+                        title={t('stats.metrics.maxStreak')} 
+                        value={`${t('stats.metrics.days', { count: maxStreak })} 🏆`} 
+                      />
+                    </>
+                  )}
                 </View>
                 <View style={styles.row}>
-                  <StatCard 
-                    title={period === 'total' ? t('stats.metrics.totalRate') : t('stats.metrics.periodRate')} 
-                    value={isStatsLoading ? "..." : `${completionRate.toFixed(1)}%`} 
-                  />
-                  <StatCard 
-                    title={t('stats.metrics.status')} 
-                    value={
-                      completionRate > 80 
-                        ? t('stats.metrics.statusExcellent') 
-                        : completionRate > 50 
-                          ? t('stats.metrics.statusRegular') 
-                          : t('stats.metrics.statusImproveable')
-                    } 
-                  />
+                  {isStatsLoading ? (
+                    <>
+                      <StatCardSkeleton />
+                      <StatCardSkeleton />
+                    </>
+                  ) : (
+                    <>
+                      <StatCard 
+                        title={period === 'total' ? t('stats.metrics.totalRate') : t('stats.metrics.periodRate')} 
+                        value={`${completionRate.toFixed(1)}%`} 
+                      />
+                      <StatCard 
+                        title={t('stats.metrics.status')} 
+                        value={
+                          completionRate > 80 
+                            ? t('stats.metrics.statusExcellent') 
+                            : completionRate > 50 
+                              ? t('stats.metrics.statusRegular') 
+                              : t('stats.metrics.statusImproveable')
+                        } 
+                      />
+                    </>
+                  )}
                 </View>
               </View>
             </View>

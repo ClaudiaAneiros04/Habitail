@@ -22,6 +22,8 @@ import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
 import { EmptyState } from '../../components/empty-states/EmptyState';
 import { useCompletionCelebration } from '../../hooks/useCompletionCelebration';
 import ConfettiOverlay from '../../components/ConfettiOverlay';
+import { HabitItemSkeleton } from '../../components/skeletons/HabitItemSkeleton';
+import { SkeletonItem } from '../../components/skeletons/SkeletonItem';
 
 // Native Date Helpers (Moved to utils/dateUtils.ts)
 
@@ -289,9 +291,23 @@ export default function HomeScreen() {
 
   if (!hasHydrated) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      <SafeAreaView style={[styles.safeArea, { paddingTop: 48 }]}>
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+          <SkeletonItem width={150} height={32} borderRadius={8} style={{ marginBottom: 8 }} />
+          <SkeletonItem width={100} height={20} borderRadius={6} />
+        </View>
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <SkeletonItem width="100%" height={60} borderRadius={20} />
+        </View>
+        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+          <SkeletonItem width="100%" height={12} borderRadius={6} />
+        </View>
+        <View style={{ paddingTop: 8 }}>
+          {[1, 2, 3, 4].map((key) => (
+            <HabitItemSkeleton key={key} />
+          ))}
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -352,8 +368,10 @@ export default function HomeScreen() {
       {/* FlatList Hábitos */}
       <View style={styles.listContainer}>
         {isLoadingLogs ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="small" color={Colors.primary} />
+          <View style={{ paddingTop: 8 }}>
+            {[1, 2, 3].map((key) => (
+              <HabitItemSkeleton key={key} />
+            ))}
           </View>
         ) : (
           <FlatList

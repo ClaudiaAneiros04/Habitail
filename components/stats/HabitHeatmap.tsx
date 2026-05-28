@@ -5,6 +5,7 @@ import { Theme } from '../../constants/theme';
 import { useHeatmapData } from '../../hooks/useHeatmapData';
 import { useUserStore } from '../../store/useUserStore';
 import { useTranslation } from 'react-i18next';
+import { HeatmapSkeleton } from '../skeletons/HeatmapSkeleton';
 
 /**
  * Props para HabitHeatmap
@@ -51,12 +52,7 @@ export const HabitHeatmap: React.FC<HabitHeatmapProps> = ({ habitId }) => {
   };
 
   if (isLoading && data.length === 0) {
-    return (
-      <View style={[styles.card, styles.loadingContainer]}>
-        <ActivityIndicator color={Theme.colors.primary} />
-        <Text style={styles.loadingText}>{t('stats.charts.loadingActivity', { defaultValue: 'Cargando actividad...' })}</Text>
-      </View>
-    );
+    return <HeatmapSkeleton />;
   }
 
   if (error) {
