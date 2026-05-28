@@ -312,6 +312,47 @@ export async function hasNotificationPermissionSilently(): Promise<boolean> {
 }
 
 /**
+ * Wrapper de seguridad para ejecutar operaciones de notificaciones de forma segura.
+ * Captura excepciones no controladas de la API nativa de Expo y verifica permisos,
+ * actualizando el estado de los permisos en el store de hábitos de manera silenciosa.
+ * Evita lanzar excepciones no controladas hacia el hilo principal o el store.
+ *
+ * @param operation Función asíncrona que contiene la operación a realizar.
+ * @param fallbackValue Valor de retorno por defecto en caso de fallo o falta de permisos.
+ */
+export async function runSafeNotificationOperation<T>(
+  operation: () => Promise<T>,
+  fallbackValue: T
+): Promise<T> {
+  if (Platform.OS === 'web') {
+    return fallbackValue;
+  }
+  try {
+    const hasPermission = await hasNotificationPermissionSilently();
+    
+    // Sincronizar el estado del store de manera silenciosa
+    try {
+      const habitStore = useHabitStore.getState();
+      if (habitStore && typeof habitStore.setNotificationsEnabled === 'function') {
+        habitStore.setNotificationsEnabled(hasPermission);
+      }
+    } catch (storeError) {
+      console.warn('[NotificationService] No se pudo sincronizar el estado del permiso con el store:', storeError);
+    }
+
+    if (!hasPermission) {
+      console.log('[NotificationService] Operación omitida debido a la falta de permisos de notificación.');
+      return fallbackValue;
+    }
+
+    return await operation();
+  } catch (error) {
+    console.error('[NotificationService] Excepción capturada y controlada en wrapper de seguridad:', error);
+    return fallbackValue;
+  }
+}
+
+/**
  * Programa una notificación diaria para un hábito específico a la hora establecida en su configuración.
  * Aplica la "Regla de Oro": no se envía ni se programa para hoy si el hábito ya fue completado
  * hoy o si ya se envió una notificación para este hábito en el día actual. En esos casos,
@@ -320,19 +361,7 @@ export async function hasNotificationPermissionSilently(): Promise<boolean> {
  * @param habit Objeto hábito que contiene la configuración del recordatorio.
  */
 export async function scheduleHabitReminder(habit: Habit): Promise<void> {
-  if (Platform.OS === 'web') {
-    console.log('[NotificationService] Notificaciones nativas no soportadas en web. Omitiendo programación.');
-    return;
-  }
-
-  try {
-    // Verificar permisos silenciosamente antes de interactuar con expo-notifications
-    const hasPermission = await hasNotificationPermissionSilently();
-    if (!hasPermission) {
-      console.log(`[NotificationService] Permisos de notificación ausentes o revocados. Omitiendo programación para el hábito: ${habit.id}`);
-      return;
-    }
-
+  return runSafeNotificationOperation(async () => {
     // Obtenemos la hora de recordatorio (admite el campo en español o el alias en inglés)
     const reminderTime = habit.horaRecordatorio || habit.reminderTime;
 
@@ -358,7 +387,6 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
     const todayStr = formatDateDB(new Date());
 
     // 1. REGLA DE ORO - Validación A: ¿Ya se completó el hábito hoy?
-    // Buscamos en el almacén de logs global y también en el campo opcional completedDays.
     const logs = useLogStore.getState().logs;
     const isCompletedTodayInLogs = logs.some(
       (log) => log.habitId === habit.id && log.fecha === todayStr && log.completado
@@ -371,8 +399,13 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
     const lastSentDate = await AsyncStorage.getItem(lastSentKey);
     const isAlreadySentToday = lastSentDate === todayStr;
 
-    // Cancelamos cualquier notificación previa para este hábito para evitar duplicados
-    await cancelHabitReminder(habit.id);
+    // Cancelamos cualquier notificación previa para este hábito nativamente
+    // Nota: llamamos directamente a la API nativa de cancelación interna para evitar doble check de permisos redundante o recursiones
+    try {
+      await Notifications.cancelScheduledNotificationAsync(habit.id);
+    } catch (e) {
+      // Ignorar fallos de cancelación individual
+    }
 
     if (isAlreadyCompletedToday || isAlreadySentToday) {
       console.log(
@@ -380,8 +413,6 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
         `Motivo: Completado hoy = ${isAlreadyCompletedToday}, Notificado hoy = ${isAlreadySentToday}.`
       );
 
-      // Si ya se cumplió la regla de oro para hoy, programamos un disparador único para MAÑANA a la misma hora.
-      // De esta forma, aseguramos que la primera notificación real le llegue mañana sin molestar hoy.
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(hours, minutes, 0, 0);
@@ -402,7 +433,6 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
 
       console.log(`[NotificationService] Recordatorio programado para mañana (${tomorrow.toLocaleString()}) para el hábito: ${habit.id}`);
     } else {
-      // Programamos una notificación recurrente diaria normal
       await Notifications.scheduleNotificationAsync({
         identifier: habit.id,
         content: {
@@ -421,9 +451,7 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
 
       console.log(`[NotificationService] Recordatorio diario programado con éxito a las ${reminderTime} para el hábito: ${habit.id}`);
     }
-  } catch (error) {
-    console.error(`[NotificationService] Error al programar recordatorio para el hábito ${habit.id}:`, error);
-  }
+  }, undefined);
 }
 
 /**
@@ -432,33 +460,20 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
  * @param habitId ID del hábito cuyo recordatorio se desea cancelar.
  */
 export async function cancelHabitReminder(habitId: string): Promise<void> {
-  if (Platform.OS === 'web') {
-    console.log('[NotificationService] Cancelar recordatorio no soportado en web.');
-    return;
-  }
-
-  try {
-    // Verificar permisos silenciosamente antes de interactuar con expo-notifications
-    const hasPermission = await hasNotificationPermissionSilently();
-    if (!hasPermission) {
-      console.log(`[NotificationService] Permisos de notificación ausentes o revocados. Omitiendo cancelación para el hábito: ${habitId}`);
-      return;
-    }
-
+  return runSafeNotificationOperation(async () => {
     await Notifications.cancelScheduledNotificationAsync(habitId);
     console.log(`[NotificationService] Recordatorio cancelado con éxito para el hábito: ${habitId}`);
-  } catch (error) {
-    console.error(`[NotificationService] Error al cancelar recordatorio para el hábito ${habitId}:`, error);
-  }
+  }, undefined);
 }
 
 /**
- * Cancela todas las notificaciones activas y vuelve a programarlas de forma síncrona y segura.
+ * Cancela todas las notificaciones activas y las vuelve a programar de forma síncrona y segura.
+ * Limpia el stack de triggers del sistema operativo de manera determinista utilizando promesas nativas (Promise.all).
  * Útil para cuando el usuario edita sus hábitos globales o inicia la aplicación.
  * 
  * @param habits Lista de todos los hábitos a reprogramar.
  */
-export function rescheduleAll(habits: Habit[]): Promise<void> {
+export function rescheduleAllNotifications(habits: Habit[]): Promise<void> {
   if (Platform.OS === 'web') {
     console.log('[NotificationService] Reprogramación no soportada en web.');
     return Promise.resolve();
@@ -467,21 +482,19 @@ export function rescheduleAll(habits: Habit[]): Promise<void> {
   // Encadenamos en la cola para asegurar ejecución serializada secuencial
   rescheduleQueue = rescheduleQueue.then(async () => {
     console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios...');
-    try {
-      // 1. Verificar permisos silenciosamente antes de interactuar con expo-notifications
-      const hasPermission = await hasNotificationPermissionSilently();
-      if (!hasPermission) {
-        console.log('[NotificationService] Permisos de notificación ausentes o revocados. Cancelando reprogramación masiva.');
-        return;
-      }
-
-      // 2. Limpieza síncrona y segura de identificadores antiguos:
-      // Cancelamos individualmente y en paralelo todas las notificaciones específicas de los hábitos en la lista,
-      // asegurando que se liberen los IDs nativos.
-      const cancelPromises = habits.map(h => cancelHabitReminder(h.id));
+    
+    await runSafeNotificationOperation(async () => {
+      // 1. Obtener todas las notificaciones agendadas nativamente
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      
+      // 2. Limpiar el stack de triggers del sistema de manera determinista utilizando Promise.all
+      const cancelPromises = scheduled.map(notification => {
+        console.log(`[NotificationService] Cancelando trigger nativo: ${notification.identifier}`);
+        return Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      });
       await Promise.all(cancelPromises);
 
-      // 3. Adicionalmente cancelamos todas las programadas para barrer cualquier huérfana de forma general.
+      // 3. Adicionalmente cancelamos todas las programadas para barrer cualquier huérfana.
       await Notifications.cancelAllScheduledNotificationsAsync();
       console.log('[NotificationService] Todas las notificaciones previas han sido canceladas de forma segura.');
 
@@ -492,10 +505,15 @@ export function rescheduleAll(habits: Habit[]): Promise<void> {
         }
       }
       console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
-    } catch (error) {
-      console.error('[NotificationService] Error durante la reprogramación masiva:', error);
-    }
+    }, undefined);
   });
 
   return rescheduleQueue;
+}
+
+/**
+ * Alias de compatibilidad para rescheduleAllNotifications.
+ */
+export function rescheduleAll(habits: Habit[]): Promise<void> {
+  return rescheduleAllNotifications(habits);
 }
