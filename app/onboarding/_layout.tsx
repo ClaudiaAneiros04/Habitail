@@ -3,6 +3,7 @@ import { Stack, Redirect } from 'expo-router';
 import { Category } from '../../types';
 import { Habit } from '../../types';
 import { useOnboarding } from '../../hooks/useOnboarding';
+import { fadeScale } from '../../navigation/transitions';
 
 export interface OnboardingContextType {
   petName: string;
@@ -58,7 +59,7 @@ export default function OnboardingLayout() {
         setSelectedHabits,
       }}
     >
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack screenOptions={{ headerShown: false, ...fadeScale() }}>
         <Stack.Screen name="welcome" />
         <Stack.Screen name="interests" />
         <Stack.Screen name="habits" />
