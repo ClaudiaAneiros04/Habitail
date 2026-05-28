@@ -20,6 +20,8 @@ import { useTranslation } from 'react-i18next';
 import { ToastConfirmation } from '../../components/ToastConfirmation';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
 import { EmptyState } from '../../components/empty-states/EmptyState';
+import { useCompletionCelebration } from '../../hooks/useCompletionCelebration';
+import ConfettiOverlay from '../../components/ConfettiOverlay';
 
 // Native Date Helpers (Moved to utils/dateUtils.ts)
 
@@ -194,6 +196,13 @@ export default function HomeScreen() {
   // Calculamos el valor del progress bar asegurando que medimos solo true flags.
   const completedCount = sortedHabits.filter(h => completedHabitsObj[h.id]?.completado).length;
   const progress = totalHabits > 0 ? completedCount / totalHabits : 0;
+
+  // Confetti: disparar celebración al completar todos los hábitos del día
+  const { shouldFire, isReduceMotion, onCelebrationComplete } = useCompletionCelebration({
+    completedCount,
+    totalCount: totalHabits,
+    selectedDate,
+  });
 
   /**
    * Dispara o revierte el estado 'completado' de un hábito para el "selectedDate" actual.
@@ -374,6 +383,11 @@ export default function HomeScreen() {
         )}
       </View>
       <ToastConfirmation message={toastMessage} visible={toastVisible} />
+      <ConfettiOverlay
+        visible={shouldFire}
+        isReduceMotion={isReduceMotion}
+        onComplete={onCelebrationComplete}
+      />
     </SafeAreaView>
   );
 }
