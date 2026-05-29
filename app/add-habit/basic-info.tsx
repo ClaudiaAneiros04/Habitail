@@ -8,9 +8,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Category } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { useHabitStore } from '../../store/useHabitStore';
 
 // Opciones de categoría predefinidas con colores e iconos curados
 const CATEGORY_DATA = [
@@ -25,10 +26,15 @@ const CATEGORY_DATA = [
 export default function BasicInfoScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const params = useLocalSearchParams();
+  
+  const editHabitId = params.habitId as string | undefined;
+  const habits = useHabitStore(state => state.habits);
+  const editingHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
   
   // Estado local para los campos de este paso
-  const [nombre, setNombre] = useState('');
-  const [categoria, setCategoria] = useState<Category | null>(null);
+  const [nombre, setNombre] = useState(editingHabit?.nombre || '');
+  const [categoria, setCategoria] = useState<Category | null>(editingHabit ? (editingHabit.categoria as Category) : null);
 
   // Validación robusta: El nombre debe tener significado (longitud >= 2 sin contar espacios)
   // y debe haberse seleccionado obligatoriamente un bloque de categoría.
@@ -39,7 +45,11 @@ export default function BasicInfoScreen() {
     if (isValid) {
       router.push({ 
         pathname: '/add-habit/appearance', 
-        params: { nombre, categoria: categoria! } 
+        params: { 
+          nombre, 
+          categoria: categoria!,
+          ...(editHabitId ? { habitId: editHabitId } : {})
+        } 
       });
     }
   };
@@ -54,7 +64,11 @@ export default function BasicInfoScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 1, total: 3, defaultValue: 'Nuevo Hábito (1/3)' })}</Text>
+          <Text style={styles.headerTitle}>
+            {editHabitId 
+              ? t('addHabit.wizard.stepEdit', { step: 1, total: 3, defaultValue: 'Editar Hábito (1/3)' })
+              : t('addHabit.wizard.step', { step: 1, total: 3, defaultValue: 'Nuevo Hábito (1/3)' })}
+          </Text>
           <View style={{ width: 32 }} /> {/* Espaciador invisible para centrar título correctamente frente a la flacha */}
         </View>
 

@@ -26,12 +26,17 @@ export default function SettingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const addHabit = useHabitStore(state => state.addHabit);
+  const updateHabit = useHabitStore(state => state.updateHabit);
+  const habits = useHabitStore(state => state.habits);
   const { t } = useTranslation();
 
-  const [frequency, setFrequency] = useState<Frequency>(Frequency.DAILY);
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // L-V por defecto
-  const [priority, setPriority] = useState<Priority>(Priority.NORMAL);
-  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const editHabitId = params.habitId as string | undefined;
+  const editingHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
+
+  const [frequency, setFrequency] = useState<Frequency>(editingHabit ? (editingHabit.frecuencia as Frequency) : Frequency.DAILY);
+  const [selectedDays, setSelectedDays] = useState<number[]>(editingHabit ? editingHabit.diasSemana : [1, 2, 3, 4, 5]); // L-V por defecto
+  const [priority, setPriority] = useState<Priority>(editingHabit ? (editingHabit.nivelPrioridad as Priority) : Priority.NORMAL);
+  const [reminderEnabled, setReminderEnabled] = useState(editingHabit ? Boolean(editingHabit.horaRecordatorio) : false);
 
   const toggleDay = (dayId: number) => {
     if (selectedDays.includes(dayId)) {
@@ -52,21 +57,35 @@ export default function SettingsScreen() {
     }
 
     try {
-      await addHabit({
-        userId: 'default-user', // MVP: offline sin cuenta
-        nombre: params.nombre as string,
-        descripcion: params.descripcion as string,
-        categoria: params.categoria as string,
-        icono: params.icono as string,
-        colorHex: params.colorHex as string,
-        frecuencia: frequency,
-        diasSemana,
-        horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
-        tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
-        nivelPrioridad: priority,
-        fechaInicio: new Date().toISOString(),
-        activo: true,
-      });
+      if (editHabitId) {
+        await updateHabit(editHabitId, {
+          nombre: params.nombre as string,
+          descripcion: params.descripcion as string,
+          categoria: params.categoria as string,
+          icono: params.icono as string,
+          colorHex: params.colorHex as string,
+          frecuencia: frequency,
+          diasSemana,
+          horaRecordatorio: reminderEnabled ? (editingHabit?.horaRecordatorio || '09:00') : undefined,
+          nivelPrioridad: priority,
+        });
+      } else {
+        await addHabit({
+          userId: 'default-user', // MVP: offline sin cuenta
+          nombre: params.nombre as string,
+          descripcion: params.descripcion as string,
+          categoria: params.categoria as string,
+          icono: params.icono as string,
+          colorHex: params.colorHex as string,
+          frecuencia: frequency,
+          diasSemana,
+          horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
+          tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
+          nivelPrioridad: priority,
+          fechaInicio: new Date().toISOString(),
+          activo: true,
+        });
+      }
     } catch (error) {
       console.error('Error saving habit:', error);
     }
@@ -81,7 +100,11 @@ export default function SettingsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 3, total: 3, defaultValue: 'Configuración (3/3)' })}</Text>
+          <Text style={styles.headerTitle}>
+            {editHabitId 
+              ? t('addHabit.wizard.stepEdit', { step: 3, total: 3, defaultValue: 'Configuración (3/3)' })
+              : t('addHabit.wizard.step', { step: 3, total: 3, defaultValue: 'Configuración (3/3)' })}
+          </Text>
           <View style={{ width: 32 }} />
         </View>
 

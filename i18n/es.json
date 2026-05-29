@@ -258,6 +258,30 @@
       "statusExcellent": "Excelente",
       "statusRegular": "Regular",
       "statusImproveable": "Mejorable"
+    },
+    "achievements": {
+      "title": "Logros Obtenidos",
+      "unlocked": "Desbloqueado",
+      "first_week": {
+        "title": "Primera Semana",
+        "desc": "Completa 7 días desde tu registro y realiza al menos 1 check-in."
+      },
+      "streak_7": {
+        "title": "Racha de 7 días",
+        "desc": "Consigue una racha de 7 días consecutivos en cualquier hábito."
+      },
+      "streak_30": {
+        "title": "Racha de 30 días",
+        "desc": "Consigue una racha de 30 días consecutivos en cualquier hábito."
+      },
+      "perfect_week": {
+        "title": "100% Semanal",
+        "desc": "Completa todos tus hábitos activos todos los días de una semana natural (Lu–Do)."
+      },
+      "one_month_active": {
+        "title": "1 Mes Activo",
+        "desc": "Realiza al menos 1 check-in en 28 de los últimos 30 días calendario."
+      }
     }
   },
   "history": {
@@ -361,6 +385,54 @@
       "8": {
         "nombre": "Aprender idioma",
         "descripcion": "Superar 1 lección diaria en una app de idiomas."
+      },
+      "9": {
+        "nombre": "Estirar 10 min",
+        "descripcion": "Realizar estiramientos ligeros al despertar."
+      },
+      "10": {
+        "nombre": "Escribir Diario",
+        "descripcion": "Anotar pensamientos, agradecimientos o metas diarias."
+      },
+      "11": {
+        "nombre": "Limitar azúcar",
+        "descripcion": "Evitar alimentos y bebidas ultraprocesados con azúcar."
+      },
+      "12": {
+        "nombre": "Presupuesto Diario",
+        "descripcion": "Revisar gastos del día y mantener el límite establecido."
+      },
+      "13": {
+        "nombre": "Estudiar Código",
+        "descripcion": "Dedicar al menos 30 minutos a practicar programación."
+      },
+      "14": {
+        "nombre": "Pomodoro de Enfoque",
+        "descripcion": "Completar 1 ciclo de trabajo sin distracciones."
+      },
+      "15": {
+        "nombre": "Comer verdura",
+        "descripcion": "Asegurar al menos dos porciones de vegetales hoy."
+      },
+      "16": {
+        "nombre": "Cardio 30 min",
+        "descripcion": "Hacer ciclismo, correr o nadar a intensidad moderada."
+      },
+      "17": {
+        "nombre": "Desconectar pantallas",
+        "descripcion": "Apagar pantallas 1 hora antes de ir a dormir."
+      },
+      "18": {
+        "nombre": "Sin compras inútiles",
+        "descripcion": "Evitar realizar compras impulsivas o gastos innecesarios."
+      },
+      "19": {
+        "nombre": "Inbox Zero",
+        "descripcion": "Clasificar, responder o archivar todos los emails pendientes."
+      },
+      "20": {
+        "nombre": "Leer Noticias",
+        "descripcion": "Informarse de la actualidad a través de medios de calidad."
       }
     }
   },

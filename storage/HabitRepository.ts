@@ -8,6 +8,7 @@ export interface IHabitRepository {
   save(habit: Habit): Promise<void>;
   update(id: string, changes: Partial<Habit>): Promise<void>;
   archive(id: string): Promise<void>;
+  delete(id: string): Promise<void>;
 }
 
 export class HabitRepository implements IHabitRepository {
@@ -72,5 +73,10 @@ export class HabitRepository implements IHabitRepository {
 
   async archive(id: string): Promise<void> {
     await this.update(id, { activo: false });
+  }
+
+  async delete(id: string): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM habits WHERE id = ?', [id]);
   }
 }

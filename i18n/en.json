@@ -258,6 +258,30 @@
       "statusExcellent": "Excellent",
       "statusRegular": "Regular",
       "statusImproveable": "Needs improvement"
+    },
+    "achievements": {
+      "title": "Achievements",
+      "unlocked": "Unlocked",
+      "first_week": {
+        "title": "First Week",
+        "desc": "Complete 7 days since your registration and perform at least 1 check-in."
+      },
+      "streak_7": {
+        "title": "7-Day Streak",
+        "desc": "Get a streak of 7 consecutive days in any habit."
+      },
+      "streak_30": {
+        "title": "30-Day Streak",
+        "desc": "Get a streak of 30 consecutive days in any habit."
+      },
+      "perfect_week": {
+        "title": "100% Weekly",
+        "desc": "Complete all your active habits every day of a natural week (Mon–Sun)."
+      },
+      "one_month_active": {
+        "title": "1 Month Active",
+        "desc": "Perform at least 1 check-in on 28 of the last 30 calendar days."
+      }
     }
   },
   "history": {
@@ -361,6 +385,54 @@
       "8": {
         "nombre": "Learn a language",
         "descripcion": "Complete 1 daily lesson on a language app."
+      },
+      "9": {
+        "nombre": "Stretch 10 min",
+        "descripcion": "Do light stretching upon waking up."
+      },
+      "10": {
+        "nombre": "Write Journal",
+        "descripcion": "Write down thoughts, gratitude, or daily goals."
+      },
+      "11": {
+        "nombre": "Limit sugar",
+        "descripcion": "Avoid ultra-processed foods and sugary drinks."
+      },
+      "12": {
+        "nombre": "Daily Budget",
+        "descripcion": "Review today's spending and stick to your limits."
+      },
+      "13": {
+        "nombre": "Study Coding",
+        "descripcion": "Dedicate at least 30 minutes to practicing coding."
+      },
+      "14": {
+        "nombre": "Focus Pomodoro",
+        "descripcion": "Complete 1 focused work cycle without distraction."
+      },
+      "15": {
+        "nombre": "Eat Veggies",
+        "descripcion": "Ensure at least two servings of vegetables today."
+      },
+      "16": {
+        "nombre": "30m Cardio",
+        "descripcion": "Cycle, run, or swim at a moderate intensity."
+      },
+      "17": {
+        "nombre": "Screen Unplug",
+        "descripcion": "Turn off screens 1 hour before going to bed."
+      },
+      "18": {
+        "nombre": "No Useless Buys",
+        "descripcion": "Avoid impulse purchases or unnecessary spending."
+      },
+      "19": {
+        "nombre": "Inbox Zero",
+        "descripcion": "Sort, reply, or archive all pending emails."
+      },
+      "20": {
+        "nombre": "Read News",
+        "descripcion": "Get informed on current events from quality sources."
       }
     }
   },

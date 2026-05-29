@@ -10,17 +10,29 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/empty-states/EmptyState';
 
 // Helper for UI
-const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }) => {
+const HabitItem = ({ habit, onArchive, onDelete }: { habit: Habit, onArchive: () => void, onDelete: () => void }) => {
   const { t } = useTranslation();
+  const router = useRouter();
 
   // Swipe to archive with confirmation
   const archiveWithConfirmation = () => {
     Alert.alert(
-      t('habits.archive.title'),
-      t('habits.archive.confirm', { name: habit.nombre }),
+      t('habits.archive.title', { defaultValue: 'Archivar Hábito' }),
+      t('habits.archive.confirm', { name: habit.nombre, defaultValue: '¿Estás seguro de que quieres archivar "{{name}}"?' }),
       [
-        { text: t('common.cancelar'), style: "cancel" },
-        { text: t('habits.archive.action'), style: "destructive", onPress: onArchive }
+        { text: t('common.cancelar', { defaultValue: 'Cancelar' }), style: "cancel" },
+        { text: t('habits.archive.action', { defaultValue: 'Archivar' }), style: "destructive", onPress: onArchive }
+      ]
+    );
+  };
+
+  const deleteWithConfirmation = () => {
+    Alert.alert(
+      t('habits.delete.title', { defaultValue: 'Eliminar Hábito' }),
+      t('habits.delete.confirm', { name: habit.nombre, defaultValue: '¿Estás seguro de que quieres eliminar permanentemente "{{name}}"? Esto borrará de forma irreversible todo su historial, logs y estadísticas de racha.' }),
+      [
+        { text: t('common.cancelar', { defaultValue: 'Cancelar' }), style: "cancel" },
+        { text: t('common.eliminar', { defaultValue: 'Eliminar' }), style: "destructive", onPress: onDelete }
       ]
     );
   };
@@ -39,7 +51,7 @@ const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }
       <TouchableOpacity onPress={archiveWithConfirmation} style={styles.deleteAction}>
         <Animated.View style={[styles.actionContent, { transform: [{ scale }] }]}>
           <Ionicons name="archive" size={24} color="#FFF" />
-          <Text style={styles.actionText}>{t('habits.archive.action')}</Text>
+          <Text style={styles.actionText}>{t('habits.archive.action', { defaultValue: 'Archivar' })}</Text>
         </Animated.View>
       </TouchableOpacity>
     );
@@ -47,12 +59,13 @@ const HabitItem = ({ habit, onArchive }: { habit: Habit, onArchive: () => void }
 
   const onLongPress = () => {
     Alert.alert(
-      t('habits.options.title'),
-      t('habits.options.message', { name: habit.nombre }),
+      t('habits.options.title', { defaultValue: 'Opciones de Hábito' }),
+      t('habits.options.message', { name: habit.nombre, defaultValue: 'Elige una acción para "{{name}}"' }),
       [
-        { text: t('common.editar'), onPress: () => console.log('Editar', habit.id) },
-        { text: t('habits.archive.action'), style: "destructive", onPress: archiveWithConfirmation },
-        { text: t('common.cancelar'), style: "cancel" }
+        { text: t('common.editar', { defaultValue: 'Editar' }), onPress: () => router.push({ pathname: '/add-habit/basic-info', params: { habitId: habit.id } }) },
+        { text: t('habits.archive.action', { defaultValue: 'Archivar' }), onPress: archiveWithConfirmation },
+        { text: t('common.eliminar', { defaultValue: 'Eliminar' }), style: "destructive", onPress: deleteWithConfirmation },
+        { text: t('common.cancelar', { defaultValue: 'Cancelar' }), style: "cancel" }
       ]
     );
   };
@@ -122,6 +135,7 @@ export default function HabitsScreen() {
           <HabitItem
             habit={item}
             onArchive={() => archiveHabit(item.id)}
+            onDelete={() => useHabitStore.getState().removeHabit(item.id)}
           />
         )}
         renderSectionHeader={({ section: { title } }) => (

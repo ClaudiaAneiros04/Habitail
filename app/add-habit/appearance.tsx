@@ -43,12 +43,16 @@ export default function AppearanceScreen() {
   
   // Extraemos parámetros (nombre y categoría) enviados desde el Paso 1 (basic-info)
   const params = useLocalSearchParams();
+  const editHabitId = params.habitId as string | undefined;
+  const habits = useHabitStore(state => state.habits);
+  const editingHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
+
   const nombreHabito = params.nombre as string || t('addHabit.appearance.defaultName', { defaultValue: 'Hábito' });
   
   // Estado local para el Paso 2
-  const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState(PREDEFINED_COLORS[7]); // Por defecto: Azul
-  const [selectedIcon, setSelectedIcon] = useState(ICONS[0]); // Por defecto: 'fitness'
+  const [description, setDescription] = useState(editingHabit?.descripcion || '');
+  const [selectedColor, setSelectedColor] = useState(editingHabit?.colorHex || PREDEFINED_COLORS[7]); // Por defecto: Azul
+  const [selectedIcon, setSelectedIcon] = useState(editingHabit?.icono || ICONS[0]); // Por defecto: 'fitness'
 
   const addHabit = useHabitStore(state => state.addHabit);
 
@@ -63,6 +67,7 @@ export default function AppearanceScreen() {
         descripcion: description,
         icono: selectedIcon,
         colorHex: selectedColor,
+        ...(editHabitId ? { habitId: editHabitId } : {})
       }
     });
   };
@@ -77,7 +82,11 @@ export default function AppearanceScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('addHabit.wizard.step', { step: 2, total: 3, defaultValue: 'Apariencia (2/3)' })}</Text>
+          <Text style={styles.headerTitle}>
+            {editHabitId 
+              ? t('addHabit.wizard.stepEdit', { step: 2, total: 3, defaultValue: 'Apariencia (2/3)' })
+              : t('addHabit.wizard.step', { step: 2, total: 3, defaultValue: 'Apariencia (2/3)' })}
+          </Text>
           <View style={{ width: 32 }} />
         </View>
 

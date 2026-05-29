@@ -87,16 +87,30 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
   },
 
   removeHabit: async (id: string) => {
-    // Nota: El repo debería tener un delete, pero si no, usamos update activo: false
-    // Para borrar físicamente de SQLite si el repo no lo tiene (añadir si necesario)
+    await habitRepo.delete(id);
     set((state) => ({
       habits: state.habits.filter((h) => h.id !== id),
     }));
-    saveToStorage(get().habits);
+    await saveToStorage(get().habits);
 
     // Cancelar recordatorio programado al remover si notificaciones habilitadas
     if (get().notificationsEnabled) {
       await cancelHabitReminder(id);
+    }
+
+    try {
+      // Limpiar caches de logs y estadísticas asociados para mantener sincronía
+      const { useLogStore } = require('./useLogStore');
+      const { useStatsStore } = require('./useStatsStore');
+      const { useHeatmapStore } = require('./useHeatmapStore');
+
+      useLogStore.setState((state: any) => ({
+        logs: state.logs.filter((l: any) => l.habitId !== id)
+      }));
+      useStatsStore.getState().clearAll();
+      useHeatmapStore.getState().clearAll();
+    } catch (e) {
+      console.warn('[HabitStore] Error al invalidar cachés tras eliminación:', e);
     }
   },
 

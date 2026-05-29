@@ -18,6 +18,18 @@ const SUGGESTED_HABITS: SuggestedHabit[] = [
   { id: '6', nombre: 'Meditar', categoria: Category.BIENESTAR, icono: 'leaf', descripcion: 'Sesión de 5-10 min de respiración profunda.', locale: 'es' },
   { id: '7', nombre: 'Dormir 8 horas', categoria: Category.SALUD, icono: 'moon', descripcion: 'Desconectar temprano y priorizar el sueño.', locale: 'es' },
   { id: '8', nombre: 'Aprender idioma', categoria: Category.APRENDIZAJE, icono: 'language', descripcion: 'Superar 1 lección diaria en una app de idiomas.', locale: 'es' },
+  { id: '9', nombre: 'Estirar 10 min', categoria: Category.DEPORTE, icono: 'fitness', descripcion: 'Realizar estiramientos ligeros al despertar.', locale: 'es' },
+  { id: '10', nombre: 'Escribir Diario', categoria: Category.BIENESTAR, icono: 'journal', descripcion: 'Anotar pensamientos, agradecimientos o metas diarias.', locale: 'es' },
+  { id: '11', nombre: 'Limitar azúcar', categoria: Category.SALUD, icono: 'nutrition', descripcion: 'Evitar alimentos y bebidas ultraprocesados con azúcar.', locale: 'es' },
+  { id: '12', nombre: 'Presupuesto Diario', categoria: Category.FINANZAS, icono: 'cash', descripcion: 'Revisar gastos del día y mantener el límite establecido.', locale: 'es' },
+  { id: '13', nombre: 'Estudiar Código', categoria: Category.APRENDIZAJE, icono: 'code-slash', descripcion: 'Dedicar al menos 30 minutos a practicar programación.', locale: 'es' },
+  { id: '14', nombre: 'Pomodoro de Enfoque', categoria: Category.PRODUCTIVIDAD, icono: 'hourglass', descripcion: 'Completar 1 ciclo de trabajo sin distracciones.', locale: 'es' },
+  { id: '15', nombre: 'Comer verdura', categoria: Category.SALUD, icono: 'restaurant', descripcion: 'Asegurar al menos dos porciones de vegetales hoy.', locale: 'es' },
+  { id: '16', nombre: 'Cardio 30 min', categoria: Category.DEPORTE, icono: 'bicycle', descripcion: 'Hacer ciclismo, correr o nadar a intensidad moderada.', locale: 'es' },
+  { id: '17', nombre: 'Desconectar pantallas', categoria: Category.BIENESTAR, icono: 'desktop', descripcion: 'Apagar pantallas 1 hora antes de ir a dormir.', locale: 'es' },
+  { id: '18', nombre: 'Sin compras inútiles', categoria: Category.FINANZAS, icono: 'cart', descripcion: 'Evitar realizar compras impulsivas o gastos innecesarios.', locale: 'es' },
+  { id: '19', nombre: 'Inbox Zero', categoria: Category.PRODUCTIVIDAD, icono: 'mail', descripcion: 'Clasificar, responder o archivar todos los emails pendientes.', locale: 'es' },
+  { id: '20', nombre: 'Leer Noticias', categoria: Category.APRENDIZAJE, icono: 'newspaper', descripcion: 'Informarse de la actualidad a través de medios de calidad.', locale: 'es' },
 ];
 
 export default function HabitLibraryScreen() {
