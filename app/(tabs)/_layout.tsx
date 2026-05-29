@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { useTranslation } from 'react-i18next';
+import { Text } from 'react-native';
 
 /**
  * Componente principal de enrutamiento basado en pestañas (Bottom Navigation).
@@ -37,6 +38,15 @@ export default function TabLayout() {
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.inactive,
+        tabBarLabel: ({ focused, color, children }) => (
+          <Text 
+            style={{ color, fontSize: 10, textAlign: 'center', fontWeight: focused ? '600' : '500', width: '100%' }} 
+            numberOfLines={1} 
+            adjustsFontSizeToFit
+          >
+            {children}
+          </Text>
+        ),
       }}>
       <Tabs.Screen
         name="index"

@@ -176,7 +176,7 @@ export default function HabitsScreen() {
               accessibilityRole="button"
             >
               <Ionicons name="arrow-back" size={16} color={Colors.primary} style={styles.changeInterestsIcon} />
-              <Text style={styles.changeInterestsText}>{t('onboarding.habits.changeInterests')}</Text>
+              <Text style={[styles.changeInterestsText, { flexShrink: 1 }]} adjustsFontSizeToFit numberOfLines={1}>{t('onboarding.habits.changeInterests')}</Text>
             </TouchableOpacity>
           </MotiView>
         )}

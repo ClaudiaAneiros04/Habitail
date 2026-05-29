@@ -15,6 +15,10 @@ import { StatsTabs, TabType } from '../../components/stats/StatsTabs';
 import { HabitSelector } from '../../components/stats/HabitSelector';
 import { HabitHeatmap } from '../../components/stats/HabitHeatmap';
 import { BarChartComponent } from '../../components/stats/BarChartComponent';
+import { EmptyState } from '../../components/empty-states/EmptyState';
+import { StatCardSkeleton } from '../../components/skeletons/StatCardSkeleton';
+import { SkeletonItem } from '../../components/skeletons/SkeletonItem';
+import { useRouter } from 'expo-router';
 
 // Lógica e integración
 import { useHabitStore } from '../../store/useHabitStore';
@@ -23,6 +27,7 @@ import { useHabitStats } from '../../hooks/useHabitStats';
 import { aggregateChartData } from '../../utils/chartAggregator';
 import { LogRepository } from '../../storage/LogRepository';
 import { HabitLog } from '../../types';
+import { useLogStore } from '../../store/useLogStore';
 
 const logRepo = new LogRepository();
 
@@ -31,8 +36,10 @@ const logRepo = new LogRepository();
  */
 export default function StatsScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { user } = useUserStore();
   const { habits } = useHabitStore();
+  const { lastUpdate } = useLogStore();
 
   // Estado para el periodo seleccionado
   const [activeTab, setActiveTab] = useState<TabType>('weekly');
@@ -81,7 +88,7 @@ export default function StatsScreen() {
       }
     }
     loadLogs();
-  }, [selectedHabitId, user?.id]);
+  }, [selectedHabitId, user?.id, lastUpdate]);
 
   // 3. Procesar datos para el BarChartComponent
   const chartData = useMemo(() => {
@@ -115,81 +122,111 @@ export default function StatsScreen() {
           <Text style={styles.screenSubtitle}>{t('stats.subtitle')}</Text>
         </View>
 
-        {/* Selector de Hábito Real */}
-        <HabitSelector 
-          selectedHabit={selectedHabitName} 
-          onSelect={() => {
-            // Aquí se debería abrir un BottomSheet o Modal con la lista de 'habits'
-            // Por simplicidad en este paso, rotamos entre los disponibles o volvemos a global
-            if (habits.length > 0) {
-              const currentIndex = habits.findIndex(h => h.id === selectedHabitId);
-              const nextIndex = (currentIndex + 1);
-              if (nextIndex >= habits.length) {
-                setSelectedHabitId(undefined); // Volver a Global
-              } else {
-                setSelectedHabitId(habits[nextIndex].id);
-              }
-            }
-          }} 
-        />
-
-        <StatsTabs 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
-        />
-
-        {/* Gráfico de Barras Detallado */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('stats.charts.complianceAnalysis')}</Text>
-          {isLogsLoading ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator color={Theme.colors.primary} />
-            </View>
-          ) : (
-            <BarChartComponent 
-              mode={period} 
-              data={chartData} 
+        {habits.length === 0 ? (
+          <EmptyState
+            icon="stats-chart-outline"
+            title={t('stats.empty.title', { defaultValue: 'Aún no hay datos suficientes' })}
+            description={t('stats.empty.description', { defaultValue: 'Empieza a completar hábitos para ver tus estadísticas.' })}
+            actionLabel={t('stats.empty.cta', { defaultValue: 'Ver hábitos' })}
+            onAction={() => router.push('/(tabs)/habits')}
+          />
+        ) : (
+          <>
+            {/* Selector de Hábito Real */}
+            <HabitSelector 
+              selectedHabit={selectedHabitName} 
+              onSelect={() => {
+                // Aquí se debería abrir un BottomSheet o Modal con la lista de 'habits'
+                // Por simplicidad en este paso, rotamos entre los disponibles o volvemos a global
+                if (habits.length > 0) {
+                  const currentIndex = habits.findIndex(h => h.id === selectedHabitId);
+                  const nextIndex = (currentIndex + 1);
+                  if (nextIndex >= habits.length) {
+                    setSelectedHabitId(undefined); // Volver a Global
+                  } else {
+                    setSelectedHabitId(habits[nextIndex].id);
+                  }
+                }
+              }} 
             />
-          )}
-        </View>
 
-        {/* Métricas clave */}
-        <View style={styles.gridSection}>
-          <Text style={styles.sectionTitle}>{t('stats.metrics.title')}</Text>
-          <View style={styles.grid}>
-            <View style={styles.row}>
-              <StatCard 
-                title={t('stats.metrics.currentStreak')} 
-                value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: currentStreak })} 🔥`} 
-              />
-              <StatCard 
-                title={t('stats.metrics.maxStreak')} 
-                value={isStatsLoading ? "..." : `${t('stats.metrics.days', { count: maxStreak })} 🏆`} 
-              />
-            </View>
-            <View style={styles.row}>
-              <StatCard 
-                title={period === 'total' ? t('stats.metrics.totalRate') : t('stats.metrics.periodRate')} 
-                value={isStatsLoading ? "..." : `${completionRate.toFixed(1)}%`} 
-              />
-              <StatCard 
-                title={t('stats.metrics.status')} 
-                value={
-                  completionRate > 80 
-                    ? t('stats.metrics.statusExcellent') 
-                    : completionRate > 50 
-                      ? t('stats.metrics.statusRegular') 
-                      : t('stats.metrics.statusImproveable')
-                } 
-              />
-            </View>
-          </View>
-        </View>
+            <StatsTabs 
+              activeTab={activeTab} 
+              onTabChange={setActiveTab} 
+            />
 
-        {/* Heatmap Anual */}
-        <View style={styles.section}>
-          <HabitHeatmap habitId={selectedHabitId} />
-        </View>
+            {/* Gráfico de Barras Detallado */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('stats.charts.complianceAnalysis')}</Text>
+              {isLogsLoading ? (
+                <View style={styles.loaderContainer}>
+                  <SkeletonItem width="100%" height={240} borderRadius={24} />
+                </View>
+              ) : (
+                <BarChartComponent 
+                  mode={period} 
+                  data={chartData} 
+                />
+              )}
+            </View>
+
+            {/* Métricas clave */}
+            <View style={styles.gridSection}>
+              <Text style={styles.sectionTitle}>{t('stats.metrics.title')}</Text>
+              <View style={styles.grid}>
+                <View style={styles.row}>
+                  {isStatsLoading ? (
+                    <>
+                      <StatCardSkeleton />
+                      <StatCardSkeleton />
+                    </>
+                  ) : (
+                    <>
+                      <StatCard 
+                        title={t('stats.metrics.currentStreak')} 
+                        value={`${t('stats.metrics.days', { count: currentStreak })} 🔥`} 
+                      />
+                      <StatCard 
+                        title={t('stats.metrics.maxStreak')} 
+                        value={`${t('stats.metrics.days', { count: maxStreak })} 🏆`} 
+                      />
+                    </>
+                  )}
+                </View>
+                <View style={styles.row}>
+                  {isStatsLoading ? (
+                    <>
+                      <StatCardSkeleton />
+                      <StatCardSkeleton />
+                    </>
+                  ) : (
+                    <>
+                      <StatCard 
+                        title={period === 'total' ? t('stats.metrics.totalRate') : t('stats.metrics.periodRate')} 
+                        value={`${completionRate.toFixed(1)}%`} 
+                      />
+                      <StatCard 
+                        title={t('stats.metrics.status')} 
+                        value={
+                          completionRate > 80 
+                            ? t('stats.metrics.statusExcellent') 
+                            : completionRate > 50 
+                              ? t('stats.metrics.statusRegular') 
+                              : t('stats.metrics.statusImproveable')
+                        } 
+                      />
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Heatmap Anual */}
+            <View style={styles.section}>
+              <HabitHeatmap habitId={selectedHabitId} />
+            </View>
+          </>
+        )}
 
       </ScrollView>
     </SafeAreaView>

@@ -95,19 +95,19 @@ export default function SettingsScreen() {
               style={[styles.optionButton, frequency === Frequency.DAILY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.DAILY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.DAILY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.daily')}</Text>
+              <Text style={[styles.optionText, frequency === Frequency.DAILY && styles.optionTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.frequencies.daily')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.optionButton, frequency === Frequency.WEEKLY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.WEEKLY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.WEEKLY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.weekly')}</Text>
+              <Text style={[styles.optionText, frequency === Frequency.WEEKLY && styles.optionTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.frequencies.weekly')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.optionButton, frequency === Frequency.MONTHLY && styles.optionSelected]}
               onPress={() => setFrequency(Frequency.MONTHLY)}
             >
-              <Text style={[styles.optionText, frequency === Frequency.MONTHLY && styles.optionTextSelected]}>{t('addHabit.settings.frequencies.monthly')}</Text>
+              <Text style={[styles.optionText, frequency === Frequency.MONTHLY && styles.optionTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.frequencies.monthly')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -142,8 +142,8 @@ export default function SettingsScreen() {
               style={[styles.priorityCard, priority === Priority.FLEXIBLE && styles.prioritySelected]}
               onPress={() => setPriority(Priority.FLEXIBLE)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.flexible')}</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.FLEXIBLE && styles.priorityTextSelected]}>
+              <Text style={[styles.priorityTitle, priority === Priority.FLEXIBLE && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.priorities.flexible')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.FLEXIBLE && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('addHabit.settings.priorities.healthValue', { points: 5, defaultValue: '±5 de vida' })}
               </Text>
             </TouchableOpacity>
@@ -151,8 +151,8 @@ export default function SettingsScreen() {
               style={[styles.priorityCard, priority === Priority.NORMAL && styles.prioritySelected]}
               onPress={() => setPriority(Priority.NORMAL)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.NORMAL && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.normal')}</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.NORMAL && styles.priorityTextSelected]}>
+              <Text style={[styles.priorityTitle, priority === Priority.NORMAL && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.priorities.normal')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.NORMAL && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('addHabit.settings.priorities.healthValue', { points: 10, defaultValue: '±10 de vida' })}
               </Text>
             </TouchableOpacity>
@@ -160,8 +160,8 @@ export default function SettingsScreen() {
               style={[styles.priorityCard, priority === Priority.ESSENTIAL && styles.prioritySelected]}
               onPress={() => setPriority(Priority.ESSENTIAL)}
             >
-              <Text style={[styles.priorityTitle, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>{t('addHabit.settings.priorities.essential')}</Text>
-              <Text style={[styles.priorityDesc, priority === Priority.ESSENTIAL && styles.priorityTextSelected]}>
+              <Text style={[styles.priorityTitle, priority === Priority.ESSENTIAL && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>{t('addHabit.settings.priorities.essential')}</Text>
+              <Text style={[styles.priorityDesc, priority === Priority.ESSENTIAL && styles.priorityTextSelected]} adjustsFontSizeToFit numberOfLines={1}>
                 {t('addHabit.settings.priorities.healthValue', { points: 20, defaultValue: '±20 de vida' })}
               </Text>
             </TouchableOpacity>

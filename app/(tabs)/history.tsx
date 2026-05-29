@@ -9,6 +9,7 @@ import { HabitLog } from '../../types';
 import { getHabitsForToday } from '../../utils/frequencyEngine';
 import { isFutureDate, startOfDayDate, formatDateDB, formatDateLocally } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
+import { EmptyState } from '../../components/empty-states/EmptyState';
 
 /**
  * Pantalla del Historial (HistoryScreen) para revisar retrospectivamente los registros.
@@ -173,10 +174,11 @@ export default function HistoryScreen() {
               );
             }}
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Ionicons name="documents-outline" size={48} color={Colors.inactive} />
-                <Text style={styles.emptyText}>{t('history.empty')}</Text>
-              </View>
+              <EmptyState
+                title={t('history.empty.title', { defaultValue: 'Sin registros' })}
+                description={t('history.empty')}
+                icon="📜"
+              />
             }
           />
         )}
@@ -258,7 +260,4 @@ const styles = StyleSheet.create({
   completedIcon: { backgroundColor: '#10B981' }, // Verde esmeralda exitoso
   failedIcon: { backgroundColor: '#FB7185' },     // Rojo rosa pastel (no punitivo)
   statusNone: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: Colors.inactive, opacity: 0.3, borderStyle: 'dashed' },
-
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
-  emptyText: { marginTop: 16, fontSize: 16, color: Colors.text, opacity: 0.5, textAlign: 'center' },
 });

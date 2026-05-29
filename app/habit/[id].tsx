@@ -75,13 +75,13 @@ export default function HabitDetailScreen() {
 
         <View style={styles.statsContainer}>
           <View style={styles.statTilePrimary}>
-            <Text style={styles.statTileLabelPrimary}>{t('habitDetails.currentStreakLabel', { defaultValue: 'Racha Actual' })}</Text>
+            <Text style={styles.statTileLabelPrimary} adjustsFontSizeToFit numberOfLines={1}>{t('habitDetails.currentStreakLabel', { defaultValue: 'Racha Actual' })}</Text>
             {loading ? (
               <ActivityIndicator size="small" color="#FFF" style={{ marginTop: 8 }} />
             ) : (
               <View style={styles.streakRow}>
-                <Text style={styles.statTileValuePrimary}>🔥 {currentStreak}</Text>
-                <Text style={styles.statTileSubPrimary}>
+                <Text style={styles.statTileValuePrimary} adjustsFontSizeToFit numberOfLines={1}>🔥 {currentStreak}</Text>
+                <Text style={styles.statTileSubPrimary} adjustsFontSizeToFit numberOfLines={1}>
                   {t('habitDetails.consecutiveDays', { count: currentStreak, defaultValue: currentStreak === 1 ? 'día consecutivo' : 'días consecutivos' })}
                 </Text>
               </View>
@@ -90,13 +90,13 @@ export default function HabitDetailScreen() {
 
           <View style={styles.secondaryStatsRow}>
             <View style={styles.statTileSmall}>
-              <Text style={styles.statTileLabel}>{t('habitDetails.bestStreakLabel', { defaultValue: 'Mejor Racha' })}</Text>
-              <Text style={styles.statTileValue}>{maxStreak}</Text>
+              <Text style={styles.statTileLabel} adjustsFontSizeToFit numberOfLines={1}>{t('habitDetails.bestStreakLabel', { defaultValue: 'Mejor Racha' })}</Text>
+              <Text style={styles.statTileValue} adjustsFontSizeToFit numberOfLines={1}>{maxStreak}</Text>
             </View>
 
             <View style={styles.statTileSmall}>
-              <Text style={styles.statTileLabel}>{t('habitDetails.totalSuccessLabel', { defaultValue: 'Éxito Total' })}</Text>
-              <Text style={styles.statTileValue}>{completionRate.toFixed(1)}%</Text>
+              <Text style={styles.statTileLabel} adjustsFontSizeToFit numberOfLines={1}>{t('habitDetails.totalSuccessLabel', { defaultValue: 'Éxito Total' })}</Text>
+              <Text style={styles.statTileValue} adjustsFontSizeToFit numberOfLines={1}>{completionRate.toFixed(1)}%</Text>
             </View>
           </View>
         </View>

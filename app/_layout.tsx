@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
 import { Colors } from '../constants/colors';
+import { slideFromRight, fadeScale } from '../navigation/transitions';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDb } from '../storage/database';
 import { useUserStore } from '../store/useUserStore';
@@ -105,12 +106,16 @@ export default function RootLayout() {
           - initialRouteName        → dirige al usuario a la ruta correcta al inicio
         */}
         <Stack
-          screenOptions={{ headerShown: false }}
+          screenOptions={{ headerShown: false, ...slideFromRight() }}
           initialRouteName={onboardingCompleted ? '(tabs)' : 'onboarding'}
         >
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false, ...fadeScale() }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
+          <Stack.Screen name="permissions" options={{ presentation: 'modal', headerShown: false, ...fadeScale() }} />
+          <Stack.Screen name="habit-library" options={{ headerShown: false }} />
+          <Stack.Screen name="add-habit/basic-info" options={{ headerShown: false, ...fadeScale() }} />
+          <Stack.Screen name="add-habit/appearance" options={{ headerShown: false, ...fadeScale() }} />
+          <Stack.Screen name="add-habit/settings" options={{ headerShown: false, ...fadeScale() }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
