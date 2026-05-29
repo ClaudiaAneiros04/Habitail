@@ -1381,10 +1381,10 @@ Se simplificó la estructura de assets eliminando los archivos legacy con nombre
 
 | Antes (Expo default) | Después (Producción) | Motivo |
 | :--- | :--- | :--- |
-| `splash-icon.png` (1024×1024, placeholder) | `splash.png` (1024×1024, branded) | Nombre estándar del prompt; `resizeMode: "contain"` escala sobre `backgroundColor` |
+| `splash-icon.png` (1024×1024, placeholder) | `splash.png` (1284×2778, branded) | Nombre estándar del prompt. Redimensionado y centrado sobre color de fondo para cumplir el tamaño recomendado exacto. |
 | `android-icon-foreground.png` + `android-icon-background.png` + `android-icon-monochrome.png` (512×512) | `adaptive-icon.png` (1024×1024) | Un solo archivo foreground + `backgroundColor` sólido. Más simple y mantenible |
 
-> **Nota sobre `splash.png` a 1024×1024 vs 1284×2778**: Expo con `resizeMode: "contain"` centra y escala la imagen dentro de la pantalla, rellenando el espacio restante con `backgroundColor`. Usar 1024×1024 para el splash es perfectamente válido y produce un resultado visual limpio. Si en el futuro se necesita un splash que ocupe toda la pantalla sin bordes, se deberá regenerar a 1284×2778 (resolución iPhone 14 Pro Max) con `resizeMode: "cover"`.
+> **Nota sobre `splash.png` a 1284×2778**: Inicialmente se generó a 1024×1024, lo cual funciona bien con `resizeMode: "contain"` porque Expo centra y escala rellenando el espacio con `backgroundColor`. Sin embargo, para cumplir 100% con las especificaciones del diseño base, se redimensionó el canvas a `1284×2778px` (resolución recomendada para iPhone 14 Pro Max) rellenando los bordes con el color del tema (`#f8fafc`).
 
 ---
 
