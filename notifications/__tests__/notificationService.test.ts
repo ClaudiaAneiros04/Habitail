@@ -2,6 +2,7 @@ import {
   scheduleHabitReminder, 
   cancelHabitReminder, 
   rescheduleAll,
+  rescheduleAllNotifications,
   HABIT_REMINDER_CATEGORY
 } from '../notificationService';
 import * as Notifications from 'expo-notifications';
@@ -15,6 +16,8 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   scheduleNotificationAsync: jest.fn().mockResolvedValue('mock-notification-id'),
   cancelAllScheduledNotificationsAsync: jest.fn().mockResolvedValue(undefined),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
   setNotificationHandler: jest.fn(),
   setNotificationCategoryAsync: jest.fn(),
   addNotificationResponseReceivedListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
@@ -54,7 +57,11 @@ jest.mock('../../storage/LogRepository', () => {
 describe('NotificationService - Pruebas Unitarias', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    useHabitStore.setState({ habits: [] });
+    useHabitStore.setState({ 
+      habits: [],
+      notificationsEnabled: true,
+      setNotificationsEnabled: jest.fn()
+    });
     useUserStore.setState({ user: null });
     usePetStore.setState({ pet: null });
     useLogStore.setState({ logs: [] });
@@ -65,6 +72,7 @@ describe('NotificationService - Pruebas Unitarias', () => {
       id: 'habit-1',
       userId: 'user-1',
       nombre: 'Hábito de prueba',
+      categoria: 'General',
       icono: 'heart',
       colorHex: '#FF0000',
       frecuencia: 'DAILY',
@@ -121,13 +129,20 @@ describe('NotificationService - Pruebas Unitarias', () => {
     });
   });
 
-  describe('rescheduleAll', () => {
+  describe('rescheduleAll / rescheduleAllNotifications', () => {
     test('Debe cancelar todas las notificaciones y reprogramar las activas', async () => {
+      // Mockear que hay algunas notificaciones ya programadas en el sistema para desduplicar
+      (Notifications.getAllScheduledNotificationsAsync as jest.Mock).mockResolvedValueOnce([
+        { identifier: 'old-habit-1' },
+        { identifier: 'old-habit-2' }
+      ]);
+
       const habits: Habit[] = [
         {
           id: 'habit-active',
           userId: 'user-1',
           nombre: 'Activo',
+          categoria: 'General',
           icono: 'heart',
           colorHex: '#FF0000',
           frecuencia: 'DAILY',
@@ -142,6 +157,7 @@ describe('NotificationService - Pruebas Unitarias', () => {
           id: 'habit-inactive',
           userId: 'user-1',
           nombre: 'Inactivo',
+          categoria: 'General',
           icono: 'heart',
           colorHex: '#FF0000',
           frecuencia: 'DAILY',
@@ -154,8 +170,11 @@ describe('NotificationService - Pruebas Unitarias', () => {
         }
       ];
 
-      await rescheduleAll(habits);
+      await rescheduleAllNotifications(habits);
 
+      expect(Notifications.getAllScheduledNotificationsAsync).toHaveBeenCalled();
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-habit-1');
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('old-habit-2');
       expect(Notifications.cancelAllScheduledNotificationsAsync).toHaveBeenCalled();
       expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
       expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
@@ -163,6 +182,71 @@ describe('NotificationService - Pruebas Unitarias', () => {
           identifier: 'habit-active',
         })
       );
+    });
+  });
+
+  describe('Permisos revocados y manejo de errores silencioso', () => {
+    const mockHabit: Habit = {
+      id: 'habit-1',
+      userId: 'user-1',
+      nombre: 'Hábito de prueba',
+      categoria: 'General',
+      icono: 'heart',
+      colorHex: '#FF0000',
+      frecuencia: 'DAILY',
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
+      horaRecordatorio: '08:00',
+      nivelPrioridad: 'NORMAL',
+      tipoVerificacion: 'BOOLEAN',
+      fechaInicio: '2026-05-20',
+      activo: true,
+    };
+
+    test('Debe retornar silenciosamente si los permisos están denegados', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'denied' });
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Debe tragar errores nativos silenciosamente si falla getPermissionsAsync', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockRejectedValueOnce(new Error('Native error'));
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Debe actualizar el store deshabilitando notificaciones si los permisos son denegados', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'denied' });
+      
+      const mockSetNotificationsEnabled = jest.fn();
+      useHabitStore.setState({ 
+        habits: [],
+        notificationsEnabled: true,
+        setNotificationsEnabled: mockSetNotificationsEnabled
+      } as any);
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(mockSetNotificationsEnabled).toHaveBeenCalledWith(false);
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Debe actualizar el store habilitando notificaciones si los permisos son concedidos', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'granted' });
+      
+      const mockSetNotificationsEnabled = jest.fn();
+      useHabitStore.setState({ 
+        habits: [],
+        notificationsEnabled: false,
+        setNotificationsEnabled: mockSetNotificationsEnabled
+      } as any);
+
+      await scheduleHabitReminder(mockHabit);
+
+      expect(mockSetNotificationsEnabled).toHaveBeenCalledWith(true);
     });
   });
 });

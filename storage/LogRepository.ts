@@ -24,6 +24,17 @@ export interface ILogRepository {
   getByDate(fecha: string): Promise<HabitLog[]>;
   getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
   /**
+   * Obtiene logs de un hábito dentro de un rango de fechas de forma paginada.
+   * Ordenados por fecha DESC (más reciente primero).
+   */
+  getLogsForRangePaginated(
+    habitId: string,
+    fromDate: string,
+    toDate: string,
+    limit: number,
+    offset: number
+  ): Promise<HabitLog[]>;
+  /**
    * Devuelve estadísticas agregadas (sin filas individuales) para un hábito
    * en un rango de fechas. Ideal para alimentar useHabitStats.
    */
@@ -45,6 +56,17 @@ export interface ILogRepository {
    */
   getHeatmapGlobal(userId: string, fromDate: string, toDate: string): Promise<HeatmapRawRow[]>;
   getLogsForRangeGlobal(userId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
+  /**
+   * Obtiene logs de todos los hábitos de un usuario de forma paginada.
+   * Ordenados por fecha DESC (más reciente primero).
+   */
+  getLogsForRangeGlobalPaginated(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+    limit: number,
+    offset: number
+  ): Promise<HabitLog[]>;
   getAll(): Promise<HabitLog[]>;
   /**
    * Identifica qué hábitos de la lista proporcionada no tienen log completado en la fecha indicada.
@@ -160,7 +182,30 @@ export class LogRepository implements ILogRepository {
     );
     
     // Mapea la base de datos cruda al modelo tipado resolviendo booleanos y otros casteos
-    return rows.map(this.mapRowToLog);
+    return rows.map(row => this.mapRowToLog(row));
+  }
+
+  /**
+   * Obtiene logs de un hábito dentro de un rango de fechas de forma paginada.
+   * La query está optimizada mediante el índice compuesto idx_habit_logs_habit_completado_fecha 
+   * y idx_habit_logs_habit_fecha, y se ordena en sentido descendente para priorizar los logs recientes.
+   */
+  async getLogsForRangePaginated(
+    habitId: string,
+    fromDate: string,
+    toDate: string,
+    limit: number,
+    offset: number
+  ): Promise<HabitLog[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(
+      `SELECT * FROM habit_logs 
+       WHERE habitId = ? AND fecha >= ? AND fecha <= ? 
+       ORDER BY fecha DESC 
+       LIMIT ? OFFSET ?`,
+      [habitId, fromDate, toDate, limit, offset]
+    );
+    return rows.map(row => this.mapRowToLog(row));
   }
 
   /**
@@ -327,6 +372,29 @@ export class LogRepository implements ILogRepository {
     const rows = await db.getAllAsync<HabitLogRow>(
       'SELECT * FROM habit_logs WHERE userId = ? AND fecha >= ? AND fecha <= ? ORDER BY fecha ASC',
       [userId, fromDate, toDate]
+    );
+    return rows.map(row => this.mapRowToLog(row));
+  }
+
+  /**
+   * Obtiene logs de todos los hábitos de un usuario de forma paginada.
+   * La query está optimizada mediante el índice compuesto idx_habit_logs_user_completado_fecha 
+   * y idx_habit_logs_user_fecha, y se ordena en sentido descendente.
+   */
+  async getLogsForRangeGlobalPaginated(
+    userId: string,
+    fromDate: string,
+    toDate: string,
+    limit: number,
+    offset: number
+  ): Promise<HabitLog[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<any>(
+      `SELECT * FROM habit_logs 
+       WHERE userId = ? AND fecha >= ? AND fecha <= ? 
+       ORDER BY fecha DESC 
+       LIMIT ? OFFSET ?`,
+      [userId, fromDate, toDate, limit, offset]
     );
     return rows.map(row => this.mapRowToLog(row));
   }

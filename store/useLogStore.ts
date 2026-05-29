@@ -32,6 +32,11 @@ export const useLogStore = create<LogStore>((set, get) => ({
   },
   getLogsForDay: async (date: string) => {
     const dayLogs = await logRepo.getByDate(date);
+    set((state) => {
+      const dayLogIds = new Set(dayLogs.map((l) => l.id));
+      const otherLogs = state.logs.filter((l) => !dayLogIds.has(l.id));
+      return { logs: [...otherLogs, ...dayLogs] };
+    });
     return dayLogs;
   },
 }));

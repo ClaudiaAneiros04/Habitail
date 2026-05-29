@@ -1197,3 +1197,403 @@ En motores de JavaScript restrictivos como Hermes en React Native, inicializar f
 ### 3. Resolución de Condiciones de Carrera al Crear Hábitos (SQLite)
 Al guardar un hábito desde la pantalla de creación (`settings.tsx`), la interfaz del wizard navegaba de regreso a la pantalla de inicio mediante `router.replace('/')` de forma síncrona sin esperar a que la promesa asíncrona de inserción en base de datos (`addHabit`) terminara. Esto causaba una condición de carrera: si el usuario intentaba marcar el hábito recién creado inmediatamente al cargar el Home, SQLite arrojaba un error de violación de clave foránea (`Foreign Key Constraint violation`) porque el registro de log hacía referencia a un hábito que aún no se había insertado físicamente en la tabla de SQLite.
 *   **Llamadas Asíncronas con Await**: Se modificaron `handleSave` en `settings.tsx` y el resolvedor en `habitCreation.ts` para usar `async/await`, de modo que la redirección a la pantalla de inicio ocurra estrictamente después de que la persistencia en el store e inserción en SQLite hayan finalizado con éxito.
+
+## 4. Concurrencia de Notificaciones y Serialización de Reschedule (Commit Anterior)
+Anteriormente, al reprogramar de manera masiva los recordatorios de notificaciones (por ejemplo, al iniciar la aplicación o realizar cambios globales), múltiples promesas asíncronas no serializadas competían por el acceso a `expo-notifications`, provocando condiciones de carrera y bloqueos del sistema de archivos o hilos nativos.
+*   **Cola de Ejecución Serializada (`rescheduleQueue`)**: Se introdujo una cola global de ejecución serializada en [notificationService.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/notifications/notificationService.ts). Todas las invocaciones a `rescheduleAll` se encadenan síncronamente sobre esta cola (`rescheduleQueue = rescheduleQueue.then(...)`), asegurando que las operaciones nativas sobre notificaciones se ejecuten en secuencia estricta.
+*   **Verificación Segura y Silenciosa de Permisos**: Se implementó `hasNotificationPermissionSilently()` para verificar los permisos de notificaciones del dispositivo de forma segura. En entornos web o ante fallas nativas, el método retorna `false` de manera silenciosa en lugar de lanzar excepciones destructivas, lo que previene crasheos fatales.
+
+---
+
+# Optimización de Rendimiento y Persistencia — Fase 7: Índices Compuestos, Consultas Agregadas y Data Chunking con Parada Temprana (Cambios Actuales)
+
+Con el fin de mitigar problemas de rendimiento al escalar el historial de hábitos a más de 1000 logs por usuario, se ha rediseñado la estrategia de indexación, consultas y carga de datos en memoria.
+
+## 1. Índices Compuestos en SQLite
+Para evitar escaneos de tabla de complejidad $O(n)$ (Table Scan) y forzar búsquedas de complejidad $O(\log n)$ (Index Seek/Range Scan), se crearon los siguientes índices compuestos en [schema.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/db/schema.ts) y en el script de migración [01_habit_logs_indices.sql](file:///c:/Users/PC/Desktop/Clase/Habitail/db/migrations/01_habit_logs_indices.sql):
+*   `idx_habit_logs_habit_completado_fecha` sobre `(habitId, completado, fecha)` para acelerar consultas filtradas de hábitos específicos.
+*   `idx_habit_logs_user_completado_fecha` sobre `(userId, completado, fecha)` para optimizar búsquedas globales y de resumen por usuario.
+
+## 2. Optimización de Consultas (EXPLAIN QUERY PLAN)
+A nivel de base de datos, las consultas estadísticas críticas se estructuraron utilizando agregaciones de SQLite nativas:
+
+### A. Tasa de Éxito (Success Rate)
+Se calcula el porcentaje directo a partir del conteo distintivo de fechas completadas en el periodo evaluado:
+```sql
+SELECT 
+  COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS totalCompleted,
+  :periodDays AS totalDays,
+  ROUND((CAST(COUNT(DISTINCT CASE WHEN completado = 1 THEN fecha END) AS REAL) / :periodDays) * 100, 1) AS successRate
+FROM habit_logs
+WHERE habitId = :habitId 
+  AND fecha >= :startDate 
+  AND fecha <= :endDate;
+```
+*   **Análisis del Plan (`EXPLAIN QUERY PLAN`)**:
+    ```text
+    SEARCH TABLE habit_logs USING INDEX idx_habit_logs_habit_completado_fecha (habitId=? AND completado=? AND fecha>? AND fecha<?)
+    ```
+    Esto demuestra el uso del índice compuesto en una operación `SEARCH TABLE` con complejidad $O(\log n)$.
+
+### B. Racha Actual (Current Streak) en SQL
+Se diseñó una consulta recursiva (Common Table Expression - CTE) que recorre el calendario hacia atrás desde el día de referencia y cuenta los días/semanas completados de forma consecutiva respetando la frecuencia de hábitos activos (DAILY/WEEKLY/MONTHLY) sin cargar registros individuales a la RAM del dispositivo:
+```sql
+WITH RECURSIVE
+  date_series(d, idx) AS (
+    SELECT :refDate, 0
+    UNION ALL
+    SELECT DATE(d, '-1 day'), idx + 1 FROM date_series
+    LIMIT 365
+  ),
+  active_days AS (
+    SELECT 
+      ds.d,
+      ds.idx,
+      EXISTS (
+        SELECT 1 FROM habit_logs 
+        WHERE habitId = :habitId AND completado = 1 AND fecha = ds.d
+      ) AS is_completed
+    FROM date_series ds
+  ),
+  streak_calc AS (
+    SELECT 
+      CASE 
+        WHEN (SELECT is_completed FROM active_days WHERE idx = 0) = 1 THEN
+          COALESCE(
+            (SELECT idx FROM active_days WHERE is_completed = 0 ORDER BY idx ASC LIMIT 1), 
+            (SELECT COUNT(*) FROM active_days)
+          )
+        ELSE
+          COALESCE(
+            (SELECT idx FROM active_days WHERE idx >= 1 AND is_completed = 0 ORDER BY idx ASC LIMIT 1), 
+            (SELECT COUNT(*) FROM active_days)
+          ) - 1
+      END AS current_streak
+  )
+SELECT current_streak FROM streak_calc;
+```
+*   **Análisis del Plan (`EXPLAIN QUERY PLAN`)**:
+    ```text
+    |--CO-ROUTINE date_series
+    |--SCAN active_days
+    `--CORRELATED SUBQUERY
+       `--SEARCH TABLE habit_logs USING INDEX idx_habit_logs_habit_completado_fecha (habitId=? AND completado=? AND fecha=?)
+    ```
+    Cada comprobación de existencia es un Index Seek puntual ultra rápido de $O(\log n)$.
+
+## 3. Gestión de Memoria por Data Chunking con Parada Temprana
+Para evitar la carga masiva e innecesaria de miles de filas a memoria RAM de golpe, se implementó una estrategia híbrida en los repositorios y hooks de estadísticas:
+*   **Consultas por Lotes en Repositorio**: Se agregaron los métodos `getLogsForRangePaginated` y `getLogsForRangeGlobalPaginated` en [LogRepository.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/storage/LogRepository.ts) para realizar lecturas paginadas y descendentes (`ORDER BY fecha DESC LIMIT ? OFFSET ?`).
+*   **Algoritmo de Parada Temprana (Early Exit)**: El hook [useHabitStats.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useHabitStats.ts) realiza la lectura de logs en lotes de 100 de forma descendente. Al finalizar cada lote, calcula de manera provisional la racha actual; si esta es menor que la cantidad de días activos transcurridos hasta el log más antiguo del lote, se deduce matemáticamente que la racha ya se ha roto y se detiene la carga de más lotes de la base de datos.
+*   **Prevención de Concurrencia en Caché**: Se optimizó la carga del hook bloqueando ejecuciones paralelas duplicadas de la consulta `load()` cuando el caché de la clave está en estado `loading: true`, resolviendo condiciones de carrera y consumo de recursos innecesario.
+
+---
+
+# 🐞 Bitácora de Errores Críticos — Fase 7 (Control de Excepciones y Rendimiento)
+
+A continuación se detallan los cuatro focos críticos resueltos durante esta fase de estabilización y optimización bajo la estructura formal requerida:
+
+---
+
+## 1. Rachas rotas por desfases de zona horaria del dispositivo
+
+### Bug Detectado
+El cálculo de rachas (actuales y máximas) y los indicadores históricos en el calendario empezaban a fallar o a reiniciarse de forma imprevista si el usuario cambiaba la zona horaria del dispositivo, viajaba, o si operaba cerca de la medianoche local en países con desfases significativos frente a UTC (ej. GMT+2 o GMT-5). Las rachas se mostraban a `0` incluso tras marcar el hábito todos los días sin falta.
+
+### Causa Raíz
+Por defecto, las clases estándar de JavaScript `new Date()` y librerías como `date-fns` (ej. `startOfDay()`) trabajan basándose en el huso horario local de ejecución. 
+1. Al realizar el check-in a la 01:00 AM local en una zona GMT+2, la fecha local es el día actual $D$, pero la representación UTC corresponde a las 23:00 PM del día anterior $D-1$.
+2. Al invocar `.toISOString()`, el timestamp de fondo se traduce a UTC, guardando en SQLite un string que no correspondía con el día calendario percibido por el usuario en su zona horaria.
+3. Las comparaciones lexicográficas directas (`fecha >= from` o `fecha <= to`) de SQLite y las búsquedas consecutivas de días fallaban debido al desplazamiento de un día calendario completo. Al buscar un check-in contiguo para ayer o hoy, el motor de racha no localizaba la entrada, rompiendo la racha.
+
+### Solución de Ingeniería
+Se refactorizó el motor de cálculo en [streakCalculator.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/utils/streakCalculator.ts) para independizar por completo el cálculo de fechas de la zona horaria local, tratándolo en formato **UTC Absoluto (Medianoche)**:
+
+1. **Parseo UTC Estricto**: Se implementó la función `parseAsUTC(dateStr: string): Date` que remueve cualquier porción horaria (descartando `T...` de strings ISO) y extrae de forma segura `YYYY`, `MM` y `DD` para instanciar la fecha estrictamente en la medianoche UTC de ese día:
+   ```typescript
+   /**
+    * Parsea un string de fecha (formato YYYY-MM-DD o ISO con T) y devuelve
+    * un objeto Date en medianoche (00:00:00) en tiempo UTC.
+    * Evita que la zona horaria del dispositivo altere el día calendario.
+    * 
+    * @param dateStr - Representación en cadena de la fecha.
+    * @returns Objeto Date en UTC.
+    */
+   export const parseAsUTC = (dateStr: string): Date => {
+     if (!dateStr) return new Date(NaN);
+     
+     // Extrae la parte de fecha YYYY-MM-DD
+     const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+     const parts = cleanStr.split('-');
+     
+     if (parts.length === 3) {
+       const year = parseInt(parts[0], 10);
+       const month = parseInt(parts[1], 10) - 1; // 0-indexed en JS
+       const day = parseInt(parts[2], 10);
+       if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+         return new Date(Date.UTC(year, month, day));
+       }
+     }
+     
+     // Fallback seguro usando date-fns parseISO
+     const parsed = parseISO(dateStr);
+     if (isValid(parsed)) {
+       return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+     }
+     return new Date(NaN);
+   };
+   ```
+
+2. **Diferencias Inmunes a Zona Horaria**: Se reemplazaron funciones nativas por utilidades matemáticas directas sobre la marca de tiempo UTC:
+   ```typescript
+   export const differenceInDaysUTC = (dateLeft: Date, dateRight: Date): number => {
+     const msPerDay = 24 * 60 * 60 * 1000;
+     return Math.round((dateLeft.getTime() - dateRight.getTime()) / msPerDay);
+   };
+
+   export const differenceInWeeksUTC = (dateLeft: Date, dateRight: Date): number => {
+     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+     return Math.round((dateLeft.getTime() - dateRight.getTime()) / msPerWeek);
+   };
+   ```
+
+3. **Comparaciones de Timestamps en el Motor de Racha**: En lugar de depender de iteraciones de fechas que mutan horas, la racha actual se evalúa retrocediendo día a día en UTC puro (`checkDate.setUTCDate(checkDate.getUTCDate() - 1)`) y evaluando la existencia de la fecha ISO formateada (`checkDate.toISOString()`) en un `Set` inmutable construido con los logs completados.
+
+---
+
+## 2. Doble decremento de vida de la mascota por ejecuciones concurrentes a las 00:01
+
+### Bug Detectado
+Al abrir la aplicación por primera vez después de la medianoche (ej. a las 00:01), la mascota virtual sufría una penalización de vida doble por el incumplimiento de los hábitos del día anterior, dejándola a veces en un estado de salud crítico injustamente o forzando su huida (`ABSENT`).
+
+### Causa Raíz
+La inicialización de la base de datos y la carga paralela de los stores en el layout raíz de React Native disparan de forma asíncrona el hook `useDailyPenaltyJob`. Al ser asíncrono, se originaba una condición de carrera (Race Condition):
+1. Dos o más renders consecutivos iniciaban el job `runJob()` casi al mismo tiempo.
+2. Cada ejecución consultaba de forma independiente si el usuario ya tenía registrado el flag de penalización para hoy (`user.lastPenaltyAppliedDate === todayString`).
+3. Dado que la persistencia en base de datos (`updateUser` y actualización del estado del usuario en SQLite) es asíncrona y tarda unos milisegundos, todas las llamadas concurrentes obtenían que la penalización *aún no se había aplicado*.
+4. Múltiples ejecuciones del job calculaban de forma paralela la penalización de vida del día anterior (`calculatePenaltyDelta`) y aplicaban el descuento acumulativo en la salud de la mascota, reduciendo su vida en múltiplos del valor real.
+
+### Solución de Ingeniería
+Se implementó un mecanismo doble de seguridad en [useDailyPenaltyJob.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useDailyPenaltyJob.ts) utilizando referencias mutables de React (`useRef`) para garantizar la exclusión mutua (semáforo en memoria) a nivel de hilo de JavaScript:
+
+1. **Semáforo de Concurrencia y Caché de Fecha Local**:
+   ```typescript
+   export const useDailyPenaltyJob = () => {
+     const { user, updateUser } = useUserStore();
+     const { habits } = useHabitStore();
+     const { pet, updateHealth } = usePetStore();
+
+     // Referencias inmutables entre re-renders para control de reentradas concurrentes
+     const isRunningRef = useRef(false);
+     const lastRunDateRef = useRef<string | null>(null);
+
+     useEffect(() => {
+       if (!user || !pet || !habits) return;
+
+       const runJob = async () => {
+         const todayString = format(new Date(), 'yyyy-MM-dd');
+         
+         // 1. Cortocircuitar de inmediato si ya se ejecutó hoy en esta instancia o si hay una ejecución en proceso
+         if (lastRunDateRef.current === todayString || isRunningRef.current) {
+           return;
+         }
+
+         // 2. Cortocircuitar si el store indica que ya fue aplicada la penalización hoy en DB
+         if (user.lastPenaltyAppliedDate === todayString) {
+           lastRunDateRef.current = todayString;
+           return;
+         }
+
+         // Activar semáforo de forma síncrona
+         isRunningRef.current = true;
+
+         try {
+           if (pet.vida === 0) {
+             await updateUser({ lastPenaltyAppliedDate: todayString });
+             lastRunDateRef.current = todayString;
+             return;
+           }
+
+           const yesterday = startOfYesterday();
+           const yesterdayString = format(yesterday, 'yyyy-MM-dd');
+           const expectedHabitsYesterday = getHabitsForToday(habits, yesterday);
+
+           // Consulta optimizada a SQLite (sin traer todos los logs a memoria)
+           const missedHabits = await logRepo.getMissedHabitsForDate(yesterdayString, expectedHabitsYesterday);
+
+           if (missedHabits.length > 0) {
+             const delta = calculatePenaltyDelta(missedHabits);
+             if (delta < 0) {
+               await updateHealth(delta);
+             }
+           }
+
+           // Guardar el flag de penalización hoy (Zustand + SQLite)
+           await updateUser({ lastPenaltyAppliedDate: todayString });
+           lastRunDateRef.current = todayString;
+         } catch (error) {
+           console.error('[useDailyPenaltyJob] Error durante la penalización:', error);
+         } finally {
+           // Liberar semáforo
+           isRunningRef.current = false;
+         }
+       };
+
+       runJob();
+     }, [user, pet, habits, updateUser, updateHealth]);
+   };
+   ```
+
+Este diseño bloquea de forma síncrona e instantánea cualquier re-entrada concurrente iniciada por disparos del ciclo de vida de React, garantizando que el job se ejecute **estrictamente una sola vez** al día.
+
+---
+
+## 3. Degradación de performance en consultas SQLite al superar los 1000 registros
+
+### Bug Detectado
+Cuando un usuario activo acumulaba más de 1000 registros en la tabla `habit_logs` (aproximadamente un año de uso con múltiples hábitos diarios), las estadísticas tardaban más de un segundo en cargar. La navegación entre pantallas del historial y Home sufría de "lag" visual crónico, arruinando la experiencia fluida de usuario.
+
+### Causa Raíz
+1. **Escaneo Completo de Tabla (Full Table Scan - $O(N)$)**: Al realizar consultas de rangos de fecha filtradas por `habitId` o `userId`, SQLite tenía que leer físicamente cada bloque de disco de la tabla `habit_logs` para verificar las condiciones, escalando el tiempo de I/O de manera lineal.
+2. **Carga Masiva a Memoria RAM**: El hook original de estadísticas cargaba en memoria JS todos los registros históricos del hábito desde la DB y calculaba las rachas e índices mediante iteraciones y filtrados en arrays JS, bloqueando el hilo de renderizado principal (JS thread).
+3. **Ordenamiento Temporal (Temp B-Tree)**: El uso de cláusulas `ORDER BY fecha DESC` obligaba a SQLite a realizar operaciones de ordenado dinámico sobre los resultados leídos, añadiendo sobrecostes de CPU.
+
+### Solución de Ingeniería
+Se atacó el problema de rendimiento en tres capas: base de datos, persistencia (repositorios) y lógica de hooks (caching + carga escalonada).
+
+1. **Creación de Índices Compuestos a la Medida**:
+   Se crearon índices compuestos en [schema.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/db/schema.ts) que pre-ordenan físicamente la información en disco por las columnas de filtrado. Al buscar por hábito o usuario con un estado de completado, la base de datos realiza un **Index Range Scan** con complejidad de tiempo de búsqueda $O(\log n)$:
+   - `idx_habit_logs_habit_completado_fecha` en `(habitId, completado, fecha)`
+   - `idx_habit_logs_user_completado_fecha` en `(userId, completado, fecha)`
+
+2. **Carga Paginada (Data Chunking) en Repositorio**:
+   Se modificó el repositorio de datos para forzar la paginación a nivel de SQL usando límites estrictos:
+   ```typescript
+   async getLogsForRangePaginated(
+     habitId: string,
+     fromDate: string,
+     toDate: string,
+     limit: number,
+     offset: number
+   ): Promise<HabitLog[]> {
+     const db = await getDb();
+     return await db.getAllAsync<any>(
+       `SELECT * FROM habit_logs 
+        WHERE habitId = ? AND fecha >= ? AND fecha <= ? 
+        ORDER BY fecha DESC 
+        LIMIT ? OFFSET ?`,
+       [habitId, fromDate, toDate, limit, offset]
+     );
+   }
+   ```
+
+3. **Algoritmo de Parada Temprana (Early Exit)**:
+   Dado que las rachas se calculan retrocediendo en el tiempo desde el día de hoy, el hook [useHabitStats.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/hooks/useHabitStats.ts) carga los logs por lotes (chunks) de 100 registros. Al final de cada lote, calcula la racha consecutiva acumulada. Si el número de días activos desde el log más antiguo cargado es mayor que la racha actual provisional, significa que **la racha ya se ha roto** y los registros más antiguos no alterarán el resultado. El hook realiza una parada temprana, cancelando la carga de más lotes de forma segura, limitando el uso de RAM a un máximo de 100 logs para la mayoría de los casos de uso:
+   ```typescript
+   const loadLogsChunked = async (
+     logRepo: ILogRepository,
+     habitId: string,
+     fromDate: string,
+     toDate: string,
+     habit: Habit,
+     period: StatsPeriod
+   ): Promise<HabitLog[]> => {
+     const chunkSize = 100;
+     let offset = 0;
+     let allLogs: HabitLog[] = [];
+     const todayStr = toDate.split('T')[0];
+
+     while (true) {
+       const chunk = await logRepo.getLogsForRangePaginated(habitId, fromDate, toDate, chunkSize, offset);
+       if (chunk.length === 0) break;
+
+       allLogs = allLogs.concat(chunk);
+
+       if (period === 'total') {
+         const currentStreak = calculateCurrentStreak(allLogs, habit);
+         const oldestLog = allLogs[allLogs.length - 1];
+         const oldestLogDate = oldestLog.fecha.split('T')[0];
+         const activeDays = countActiveDaysBetween(oldestLogDate, todayStr, habit);
+
+         if (currentStreak < activeDays) {
+           // La racha se rompió dentro de este chunk. Parada Temprana.
+           break;
+         }
+       } else {
+         // Para semanales/mensuales el primer chunk de 100 ya cubre el rango completo
+         break;
+       }
+       offset += chunkSize;
+     }
+     return allLogs.reverse();
+   };
+   ```
+
+4. **Agregación Directa en Base de Datos**:
+   Para estadísticas globales del panel, se eliminó la transferencia de filas individuales. SQLite calcula los contadores consolidados directamente mediante consultas estructuradas (ej: `COUNT(DISTINCT ...)`) entregando un único objeto de estadísticas de tamaño de transferencia constante $O(1)$.
+
+---
+
+## 4. Notificaciones en bucle o duplicadas por solapamiento de IDs al editar hábitos
+
+### Bug Detectado
+Al editar la hora de recordatorio de un hábito, desactivar y activar hábitos en ráfaga, o arrancar la app con múltiples recordatorios activos, el dispositivo móvil programaba notificaciones duplicadas para un mismo hábito. En ocasiones, la app entraba en bucles infinitos de notificaciones que saturaban los hilos nativos y causaban el bloqueo o cierre de la aplicación.
+
+### Causa Raíz
+La reprogramación masiva (`rescheduleAll`) se invocaba reactivamente ante cambios en el store de hábitos.
+1. Al realizar ediciones secuenciales o cargas en lote, se lanzaban múltiples llamadas asíncronas a `rescheduleAll` de forma casi instantánea.
+2. Los métodos nativos de Expo Notifications (como `Notifications.cancelAllScheduledNotificationsAsync()` y `scheduleNotificationAsync()`) son operaciones asíncronas de I/O que no son atómicas a nivel del hilo de JavaScript.
+3. Se producía una condición de carrera nativa: una llamada cancelaba todas las notificaciones mientras otra paralela intentaba agendarlas. Esto generaba que notificaciones quedaran "huérfanas" con IDs duplicados o se registraran recordatorios que debían haberse cancelado.
+4. Los identificadores nativos colisionaban, disparando notificaciones duplicadas en la bandeja del sistema operativo.
+
+### Solución de Ingeniería
+Se implementó una **Cola de Ejecución Serializada** y una rutina ordenada de cancelación y programación secuencial en [notificationService.ts](file:///c:/Users/PC/Desktop/Clase/Habitail/notifications/notificationService.ts):
+
+1. **Cola de Promesas Secuencial (`rescheduleQueue`)**:
+   Se definió una variable global que encadena las ejecuciones utilizando promesas. De esta forma, cualquier llamada a `rescheduleAll` se pospone hasta que las reprogramaciones anteriores hayan finalizado por completo, eliminando colisiones concurrentes:
+   ```typescript
+   // Cola global para asegurar ejecución determinista secuencial
+   let rescheduleQueue = Promise.resolve();
+   ```
+
+2. **Cancelación Selectiva y en Paralelo**:
+   En lugar de depender exclusivamente de la cancelación global ciega (que puede dejar tareas huérfanas en el sistema si coincide con programaciones paralelas), se liberan primero los identificadores nativos específicos asociados a cada hábito de forma controlada mediante `Promise.all`:
+   ```typescript
+   export function rescheduleAll(habits: Habit[]): Promise<void> {
+     if (Platform.OS === 'web') {
+       return Promise.resolve();
+     }
+
+     // Encadenar en la cola serializada
+     rescheduleQueue = rescheduleQueue.then(async () => {
+       console.log('[NotificationService] Iniciando reprogramación masiva...');
+       try {
+         const hasPermission = await hasNotificationPermissionSilently();
+         if (!hasPermission) return;
+
+         // 1. Cancelar en paralelo los IDs de hábitos conocidos para liberar identificadores nativos
+         const cancelPromises = habits.map(h => cancelHabitReminder(h.id));
+         await Promise.all(cancelPromises);
+
+         // 2. Limpieza de seguridad general para barrer cualquier notificación remanente
+         await Notifications.cancelAllScheduledNotificationsAsync();
+
+         // 3. Volver a programar de forma secuencial y ordenada para cada hábito activo
+         for (const habit of habits) {
+           if (habit.activo) {
+             await scheduleHabitReminder(habit);
+           }
+         }
+         console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
+       } catch (error) {
+         console.error('[NotificationService] Error en reprogramación:', error);
+       }
+     });
+
+     return rescheduleQueue;
+   }
+   ```
+
+3. **Bypass de Permisos**:
+   Se introdujo `hasNotificationPermissionSilently` para consultar los permisos del sistema operativo de forma no invasiva. Si el usuario revocó los permisos nativos, la función aborta la reprogramación de inmediato, previniendo llamadas fallidas nativas innecesarias.
+

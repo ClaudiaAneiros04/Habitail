@@ -8,6 +8,8 @@ const habitRepo = new HabitRepository();
 
 interface HabitState {
   habits: Habit[];
+  notificationsEnabled: boolean;
+  setNotificationsEnabled: (enabled: boolean) => void;
   addHabit: (habitData: Omit<Habit, 'id'> & { id?: string }) => Promise<void>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   archiveHabit: (id: string) => Promise<void>;
@@ -17,6 +19,11 @@ interface HabitState {
 
 export const useHabitStore = create<HabitState>()((set, get) => ({
   habits: [],
+  notificationsEnabled: true,
+
+  setNotificationsEnabled: (enabled: boolean) => {
+    set({ notificationsEnabled: enabled });
+  },
 
   addHabit: async (habitData) => {
     const newId = habitData.id || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -36,9 +43,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
     saveToStorage(get().habits);
 
-    // Programar recordatorio si está activo y tiene hora de recordatorio
+    // Programar recordatorio si está activo, tiene hora de recordatorio y las notificaciones están habilitadas
     const reminderTime = newHabit.horaRecordatorio || (newHabit as any).reminderTime;
-    if (newHabit.activo && reminderTime) {
+    if (get().notificationsEnabled && newHabit.activo && reminderTime) {
       await scheduleHabitReminder(newHabit);
     }
   },
@@ -52,13 +59,13 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
     saveToStorage(get().habits);
 
-    // Programar/actualizar o cancelar recordatorio
+    // Programar/actualizar o cancelar recordatorio si notificaciones habilitadas
     const updatedHabit = get().habits.find((h) => h.id === id);
     if (updatedHabit) {
       const reminderTime = updatedHabit.horaRecordatorio || (updatedHabit as any).reminderTime;
-      if (updatedHabit.activo && reminderTime) {
+      if (get().notificationsEnabled && updatedHabit.activo && reminderTime) {
         await scheduleHabitReminder(updatedHabit);
-      } else {
+      } else if (get().notificationsEnabled) {
         await cancelHabitReminder(id);
       }
     }
@@ -73,8 +80,10 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
     saveToStorage(get().habits);
 
-    // Cancelar recordatorio programado al archivar
-    await cancelHabitReminder(id);
+    // Cancelar recordatorio programado al archivar si notificaciones habilitadas
+    if (get().notificationsEnabled) {
+      await cancelHabitReminder(id);
+    }
   },
 
   removeHabit: async (id: string) => {
@@ -85,8 +94,10 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
     saveToStorage(get().habits);
 
-    // Cancelar recordatorio programado al remover
-    await cancelHabitReminder(id);
+    // Cancelar recordatorio programado al remover si notificaciones habilitadas
+    if (get().notificationsEnabled) {
+      await cancelHabitReminder(id);
+    }
   },
 
   loadHabits: async () => {

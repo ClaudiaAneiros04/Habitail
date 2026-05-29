@@ -140,7 +140,7 @@ export const computeStats = (
   // Math.round(x * 1000) / 10 = redondea a 1 decimal en porcentaje (misma lógica que streakCalculator)
 
   const currentStreak = calculateCurrentStreak(logs, habit, referenceDate);
-  const maxStreak = calculateMaxStreak(logs);
+  const maxStreak = calculateMaxStreak(logs, habit);
 
   return {
     completionRate,
@@ -169,38 +169,38 @@ export const computeGlobalStats = (
   periodStats: PeriodStats,
   logs: HabitLog[],
   referenceDate: Date = new Date()
-): HabitStatsResult => {
-  const { totalCompleted, totalDays } = periodStats;
-
-  const completionRate =
-    totalDays > 0 ? Math.round((totalCompleted / totalDays) * 1000) / 10 : 0;
-
-  // Hábito sintético para reutilizar calculateCurrentStreak en modo global.
-  // diasSemana vacío y fechaInicio en el pasado son valores seguros porque
-  // la función solo los usa para hábitos WEEKLY; en DAILY los ignora.
-  const syntheticHabit: Habit = {
-    id: '__global__',
-    userId: '__global__',
-    nombre: '__global__',
-    categoria: 'SALUD',
-    icono: '',
-    colorHex: '',
-    frecuencia: 'DAILY',
-    diasSemana: [],
-    tipoVerificacion: 'BOOLEAN',
-    nivelPrioridad: 'NORMAL',
-    fechaInicio: '1970-01-01',
-    activo: true,
-  };
-
-  const currentStreak = calculateCurrentStreak(logs, syntheticHabit, referenceDate);
-  const maxStreak = calculateMaxStreak(logs);
-
-  return {
-    completionRate,
-    currentStreak,
-    maxStreak,
-    totalCompleted,
-    totalDays,
-  };
-};
+ ): HabitStatsResult => {
+   const { totalCompleted, totalDays } = periodStats;
+ 
+   const completionRate =
+     totalDays > 0 ? Math.round((totalCompleted / totalDays) * 1000) / 10 : 0;
+ 
+   // Hábito sintético para reutilizar calculateCurrentStreak en modo global.
+   // diasSemana vacío y fechaInicio en el pasado son valores seguros porque
+   // la función solo los usa para hábitos WEEKLY; en DAILY los ignora.
+   const syntheticHabit: Habit = {
+     id: '__global__',
+     userId: '__global__',
+     nombre: '__global__',
+     categoria: 'SALUD',
+     icono: '',
+     colorHex: '',
+     frecuencia: 'DAILY',
+     diasSemana: [],
+     tipoVerificacion: 'BOOLEAN',
+     nivelPrioridad: 'NORMAL',
+     fechaInicio: '1970-01-01',
+     activo: true,
+   };
+ 
+   const currentStreak = calculateCurrentStreak(logs, syntheticHabit, referenceDate);
+   const maxStreak = calculateMaxStreak(logs, syntheticHabit);
+ 
+   return {
+     completionRate,
+     currentStreak,
+     maxStreak,
+     totalCompleted,
+     totalDays,
+   };
+ };

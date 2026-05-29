@@ -58,8 +58,8 @@ export const useHabitCheckIn = () => {
     // Busca en el estado global el log que concuerde en fecha y ID de hábito
     const log = logs.find(l => {
       if (l.habitId !== habitId) return false;
-      // Normalizamos la fecha del log a YYYY-MM-DD para la comparación
-      const logDateStr = l.fecha.includes('T') ? formatDateDB(parseISO(l.fecha)) : l.fecha;
+      // Normalizamos la fecha del log a YYYY-MM-DD para la comparación de forma agnóstica a timezone
+      const logDateStr = l.fecha.split('T')[0];
       return logDateStr === targetDateStr;
     });
 
