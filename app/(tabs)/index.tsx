@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { ToastConfirmation } from '../../components/ToastConfirmation';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
 import { EmptyState } from '../../components/empty-states/EmptyState';
+import { useMidnightRefresh } from '../../hooks/useMidnightRefresh';
 import { useCompletionCelebration } from '../../hooks/useCompletionCelebration';
 import ConfettiOverlay from '../../components/ConfettiOverlay';
 import { HabitItemSkeleton } from '../../components/skeletons/HabitItemSkeleton';
@@ -111,6 +112,12 @@ export default function HomeScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   useAppStateRefresh(() => {
     lastRefreshFromAppState.current = true;
+    setRefreshTrigger(prev => prev + 1);
+  });
+  useMidnightRefresh(() => {
+    // Si la fecha cambia, actualizamos el trigger y aseguramos que selectedDate vuelva a "hoy"
+    const hoy = startOfDayDate(new Date());
+    setSelectedDate(hoy);
     setRefreshTrigger(prev => prev + 1);
   });
 

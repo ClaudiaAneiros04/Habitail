@@ -62,6 +62,27 @@ describe('streakCalculator', () => {
       expect(calculateCurrentStreak(logsBroken, dummyHabit, referenceDate)).toBe(0);
     });
 
+    it('debería mantener la racha en días inactivos para hábitos con días específicos', () => {
+      // referenceDate es Martes 2026-04-21T12:00:00Z. Lunes es 20, Miércoles es 22.
+      // Hábito activo solo Lunes, Miércoles, Viernes (1, 3, 5)
+      const inactiveDaysHabit = { ...dummyHabit, frecuencia: Frequency.DAILY, diasSemana: [1, 3, 5] };
+      
+      const createLogByDate = (dateString: string): HabitLog => ({
+        id: `log-custom`,
+        habitId: 'habit-1',
+        userId: 'user-1',
+        fecha: dateString,
+        completado: true,
+        timestampRegistro: formatISO(new Date())
+      });
+
+      // El usuario hizo el hábito el Lunes (2026-04-20)
+      const logs = [createLogByDate('2026-04-20')];
+      
+      // Hoy es Martes 21 (Día inactivo). La racha DEBE ser 1, no 0.
+      expect(calculateCurrentStreak(logs, inactiveDaysHabit, new Date('2026-04-21T12:00:00Z'))).toBe(1);
+    });
+
     it('debería calcular correctamente para hábitos semanales (racha contando semanas)', () => {
       const weeklyHabit = { ...dummyHabit, frecuencia: Frequency.WEEKLY };
       

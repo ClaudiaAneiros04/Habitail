@@ -104,4 +104,19 @@ describe('useDailyPenaltyJob', () => {
     expect(mockGetMissedHabits).not.toHaveBeenCalled();
     expect(mockUpdateHealth).not.toHaveBeenCalled();
   });
+
+  test('Semaphore prevents double execution when rendered concurrently at 00:01', async () => {
+    mockGetMissedHabits.mockResolvedValue([]); // No missed habits
+
+    // Simulamos que el componente se monta/actualiza dos veces seguidas súper rápido
+    const { rerender } = renderHook(() => useDailyPenaltyJob());
+    rerender();
+    
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // A pesar del renderizado múltiple, la llamada de actualización debería ocurrir solo 1 vez
+    // porque el semáforo "hasRunToday" frena la segunda pasada en la misma sesión
+    expect(mockUpdateUser).toHaveBeenCalledTimes(1);
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+  });
 });

@@ -11,6 +11,14 @@ export function PermissionBanner() {
   const { status } = useNotificationPermission();
   const [isVisible, setIsVisible] = useState(true);
 
+  // Si el usuario cambia los permisos a "denied" desde los ajustes de su teléfono,
+  // volvemos a mostrar el banner aunque lo hubiera cerrado antes.
+  React.useEffect(() => {
+    if (status === 'denied') {
+      setIsVisible(true);
+    }
+  }, [status]);
+
   if (status !== 'denied' || !isVisible) {
     return null;
   }

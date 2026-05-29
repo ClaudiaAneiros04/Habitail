@@ -4,6 +4,7 @@ import { useLogStore } from '../store/useLogStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useStatsStore } from '../store/useStatsStore';
+import { useHeatmapStore } from '../store/useHeatmapStore';
 import { HabitLog } from '../types';
 import { formatISO, startOfDay, parseISO } from 'date-fns';
 import { getHabitsForToday } from '../utils/frequencyEngine';
@@ -172,6 +173,7 @@ export const useHabitCheckIn = () => {
 
     // Invalida el caché de estadísticas (tanto global como del hábito) para que la pantalla Stats refleje los cambios
     useStatsStore.getState().clearAll();
+    useHeatmapStore.getState().clearAll();
 
     return { shouldLaunchConfetti };
   }, [addLog, getStatusForDay, updateHealth, habits, updatePoints, user, logs, addBadges]);
@@ -224,6 +226,7 @@ export const useHabitCheckIn = () => {
 
     // Invalida el caché para reflejar la eliminación del log en las estadísticas
     useStatsStore.getState().clearAll();
+    useHeatmapStore.getState().clearAll();
 
   }, [addLog, deleteLog, getStatusForDay, updateHealth, habits, updatePoints]);
 
