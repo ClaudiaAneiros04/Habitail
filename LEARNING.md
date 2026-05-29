@@ -30,6 +30,12 @@
   21. [Post-Merge Fixes y Calidad: Sincronización en Segundo Plano, Permisos e Internacionalización](#post-merge-fixes-y-calidad-sincronización-en-segundo-plano-permisos-e-internacionalización)
 - **FASE 7: Lógica de Negocio y Robustez**
   22. [Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos](#cambios-de-salud-por-prioridad-parseo-de-fechas-en-hermes-y-sincronización-de-base-de-datos)
+- **FASE 7: Build y Entrega**
+  23. [Diferencia entre `eas build` y `eas update`](#diferencia-entre-eas-build-y-eas-update)
+  24. [Configuración de `app.json` — Decisiones y Requisitos](#configuración-de-appjson--decisiones-y-requisitos)
+  25. [Configuración de `eas.json` — Perfiles de Build](#configuración-de-easjson--perfiles-de-build)
+  26. [Warnings y Mejoras Detectadas Durante la Configuración](#warnings-y-mejoras-detectadas-durante-la-configuración)
+  27. [Casos Borde y Troubleshooting de Build](#casos-borde-y-troubleshooting-de-build)
 
  
 
@@ -1170,7 +1176,6 @@ Se erradicaron por completo las cadenas de texto en español hardcodeadas a lo l
 *   **Pruebas Consolidadas**: Se movieron todos los archivos de tests unitarios a subcarpetas dedicadas `__tests__` y se eliminaron scripts temporales locales como `test-pet.ts`.
 
 ---
-
 # FASE 7: Lógica de Negocio y Robustez
 
 ## Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos
@@ -1208,3 +1213,198 @@ Durante la fase de Auditoría de QA Estática (Testing Manual Simulado de Fase 7
 *   **Feature Fantasma: Confetti Inexistente**:
     *   **Problema**: El hook `useHabitCheckIn.ts` implementa con éxito la lógica para calcular y retornar el flag `{ shouldLaunchConfetti: true }` cuando se completan todas las tareas del día. Sin embargo, no se ha importado ni renderizado ningún componente de Lottie o Confetti en la UI principal (`HomeScreen`).
     *   **Impacto Visual**: El retorno de la lógica es ignorado por la interfaz. Se requiere integrar una librería dedicada en el frontend y reaccionar a esta promesa del check-in para cumplir con el efecto visual esperado (Feedback UX).
+
+---
+
+# FASE 7: Build y Entrega — Configuración de Distribución
+
+## Diferencia entre `eas build` y `eas update`
+
+### `eas build` — Binario Nativo
+`eas build` genera un **binario nativo completo** (`.ipa` para iOS, `.aab`/`.apk` para Android) compilando todo el código nativo de la aplicación en los servidores cloud de EAS. Este proceso:
+
+- Compila el código nativo (Swift/Kotlin + todas las dependencias nativas como `expo-sqlite`, `expo-notifications`, etc.)
+- Genera un archivo firmado listo para subir a la App Store (TestFlight) o Google Play
+- Es **obligatorio** cuando:
+  - Se añade o actualiza una librería con código nativo (ej: `expo-sqlite`, `react-native-reanimated`)
+  - Se cambian plugins en `app.json` (ej: añadir `expo-notifications`)
+  - Se modifican `bundleIdentifier`, `package`, permisos o configuración nativa
+  - Es la primera vez que se distribuye la app
+- **Tiempo de build**: ~10-20 minutos dependiendo de la cola y la plataforma
+- **Coste**: Los builds son limitados en el plan free de EAS (30 builds/mes)
+
+### `eas update` — Actualización OTA (Over-The-Air)
+`eas update` envía una actualización **sin generar un nuevo binario nativo**. Solo reemplaza el bundle de JavaScript y assets estáticos que se ejecutan sobre el runtime nativo ya instalado en el dispositivo del usuario. Este proceso:
+
+- Publica un nuevo bundle JS + assets en los servidores de EAS
+- El dispositivo descarga la actualización en segundo plano y la aplica en el próximo arranque
+- Es **válido** cuando:
+  - Se corrige un bug en la lógica TypeScript/JavaScript
+  - Se modifican textos, colores, traducciones (`i18n/`)
+  - Se ajustan estilos CSS-in-JS o layouts de componentes React
+  - Se actualizan assets estáticos (imágenes, fuentes)
+- **No es válido** cuando se cambian dependencias con módulos nativos o configuración de `app.json`
+- **Tiempo**: ~30 segundos
+- **Coste**: Actualizaciones ilimitadas incluso en plan free
+
+### Resumen Comparativo
+
+| Aspecto | `eas build` | `eas update` |
+| :--- | :--- | :--- |
+| **Qué genera** | Binario nativo (.ipa / .aab) | Bundle JS + assets |
+| **Velocidad** | ~10-20 min | ~30 seg |
+| **Cuándo es necesario** | Cambio nativo, plugin, permisos, primera subida | Fix de JS, UI, textos, lógica |
+| **Requiere review de la store** | Sí (primera vez y builds nuevos) | No |
+| **Límite plan free** | 30 builds/mes | Ilimitado |
+| **Canal de entrega** | App Store / Google Play / TestFlight | OTA silencioso al usuario |
+
+---
+
+## Configuración de `app.json` — Decisiones y Requisitos
+
+### 1. `slug` en kebab-case
+Se corrigió de `"Habitail"` (PascalCase) a `"habitail"` (kebab-case). El slug es el identificador único del proyecto en expo.dev y forma parte de la URL pública del proyecto (ej: `expo.dev/@owner/habitail`). **Debe coincidir exactamente** con el slug del proyecto creado en la consola de EAS para que `eas build` y `eas update` funcionen correctamente.
+
+### 2. `icon.png` — Verificación de canal alfa
+Se verificó programáticamente que `assets/icon.png` cumple **ambos requisitos** de Apple:
+- **Dimensiones**: 1024×1024 píxeles ✅
+- **Formato**: `Format24bppRgb` — PNG sin canal alfa (transparencia) ✅
+
+> **Requisito Apple**: Los iconos con canal alfa (`Format32bppArgb` o similar) son **rechazados automáticamente** por App Store Connect durante la validación del build. No hay revisión humana: el sistema binario detecta la presencia del canal alfa y devuelve un error inmediato que bloquea la subida.
+
+### 3. `splash.backgroundColor`
+Se cambió de `#ffffff` (blanco puro) a `#f8fafc` (Slate 50), que es el `Colors.background` definido en `constants/colors.ts`. Esto garantiza una **transición visual suave** entre la splash screen y la primera pantalla de la app, evitando un "flash" blanco perceptible.
+
+### 4. `ios.bundleIdentifier` y `android.package`
+Se establecieron ambos como `com.habitail.app` (formato reverse-domain). Antes:
+- iOS: **no tenía** `bundleIdentifier` → `eas build` fallaría al intentar compilar
+- Android: usaba `com.anonymous.Habitail` → aceptable para desarrollo, pero no profesional para publicación
+
+> ⚠️ **ADVERTENCIA CRÍTICA**: Una vez que la app se suba a App Store Connect o Google Play Console, **no se puede cambiar** ni el `bundleIdentifier` ni el `package`. Hacerlo crearía una app completamente nueva en la store, perdiendo reseñas, descargas y usuarios existentes.
+
+### 5. Plugin `expo-notifications`
+Se añadió la configuración del plugin con:
+- `icon`: `./assets/android-icon-monochrome.png` — icono monocromático para notificaciones en la barra de estado de Android
+- `color`: `#6366f1` — color primario de la app (Indigo 500) para el tinte del icono de notificación
+
+Sin esta configuración de plugin, las notificaciones en Android mostrarían un icono genérico blanco en lugar del icono personalizado de Habitail.
+
+### 6. Permisos Android
+Se añadieron:
+- `RECEIVE_BOOT_COMPLETED`: permite reprogramar notificaciones tras reinicio del dispositivo
+- `SCHEDULE_EXACT_ALARM`: necesario en Android 12+ para alarmas exactas (recordatorios de hábitos a hora fija)
+
+---
+
+## Configuración de `eas.json` — Perfiles de Build
+
+Se crearon tres perfiles de build alineados con el ciclo de vida estándar de distribución:
+
+### `development`
+- **Propósito**: Desarrollo local con development client (reemplaza Expo Go)
+- **`developmentClient: true`**: Genera un build que incluye herramientas de debug (inspector, fast refresh, etc.)
+- **`distribution: "internal"`**: No se sube a las stores; se descarga por enlace directo
+- **`ios.simulator: true`**: Genera build para simulador de iOS (más rápido, no requiere perfil de provisioning)
+- **`channel: "development"`**: Canal OTA separado para que `eas update` solo afecte a builds de desarrollo
+
+### `preview`
+- **Propósito**: Testing interno antes de publicar en stores (equivalente a TestFlight)
+- **`distribution: "internal"`**: Se distribuye por enlace Ad Hoc, no por store
+- **`ios.simulator: false`**: Genera build para dispositivo físico (requiere perfil de provisioning y dispositivos registrados)
+- **`android.buildType: "apk"`**: Genera un archivo `.apk` instalable directamente en dispositivos Android (en lugar de `.aab` que requiere Google Play)
+- **`channel: "preview"`**: Canal OTA independiente para actualizaciones de testing
+- **Comando sugerido**: `eas build --platform all --profile preview` para generar versiones probables de ambos OS.
+
+### `production`
+- **Propósito**: Build final para subir a App Store y Google Play
+- **`autoIncrement: true`**: Incrementa automáticamente `buildNumber` (iOS) y `versionCode` (Android) en cada build, evitando rechazos por versión duplicada
+- **`channel: "production"`**: Canal OTA para actualizaciones a usuarios finales
+
+---
+
+## Warnings y Mejoras Detectadas Durante la Configuración
+
+| # | Problema Detectado | Severidad | Resolución |
+| :--- | :--- | :--- | :--- |
+| 1 | `slug` no estaba en kebab-case | ⚠️ Media | Corregido a `"habitail"` |
+| 2 | Faltaba `ios.bundleIdentifier` | 🔴 Crítica | Añadido `"com.habitail.app"` |
+| 3 | `android.package` usaba `com.anonymous.*` | ⚠️ Media | Cambiado a `"com.habitail.app"` |
+| 4 | `splash.backgroundColor` no casaba con el tema | 🟡 Baja | Cambiado a `#f8fafc` (Slate 50) |
+| 5 | Plugin `expo-notifications` no configurado | ⚠️ Media | Añadido con icono monocromático y color primario |
+| 6 | `eas.json` inexistente | 🔴 Crítica | Creado con 3 perfiles (dev/preview/prod) |
+| 7 | `icon.png` con posible canal alfa | ✅ Verificado | Confirmado: `Format24bppRgb`, sin alfa |
+| 8 | Faltaban permisos Android para notificaciones programadas | ⚠️ Media | Añadidos `RECEIVE_BOOT_COMPLETED` y `SCHEDULE_EXACT_ALARM` |
+| 9 | `predictiveBackGestureEnabled: false` eliminado | 🟡 Baja | Removido por ser el valor por defecto — reduce ruido en config |
+| 10 | `extra.eas.projectId` sin configurar | ⚠️ Media | Añadido placeholder — requiere `eas init` para vincular |
+| 11 | Assets generados eran JPEG internamente con extensión `.png` | 🔴 Crítica | `expo doctor` detectó discrepancia de formato — convertidos a PNG real con `System.Drawing` |
+| 12 | Faltaba peer dependency `expo-font` (requerida por `@expo/vector-icons`) | ⚠️ Media | Instalada con `npm install expo-font --legacy-peer-deps` |
+| 13 | `expo-linear-gradient` en versión mayor incorrecta (56.0.4 vs ~15.0.8) | ⚠️ Media | Documentado — requiere `npx expo install --check` en rama dedicada |
+| 14 | Assets originales eran placeholders de Expo (gridlines, targets) | 🔴 Crítica | Generados assets de producción con identidad visual de Habitail |
+
+---
+
+## Generación y Validación de Assets de Producción
+
+### 1. Problema: Assets Placeholder de Expo
+Los assets incluidos en el proyecto por defecto (`icon.png`, `splash-icon.png`, `android-icon-foreground.png`, etc.) eran **plantillas/placeholders de Expo** que contenían:
+- `icon.png`: Grid de alineación con líneas de guía y un símbolo genérico de chevron azul
+- `splash-icon.png`: Target de calibración con círculos concéntricos grises
+- `android-icon-*`: Versiones de 512×512 del mismo placeholder
+
+Estos assets no son adecuados para distribución en stores. Provocarían un aspecto genérico e imposibilitarían la identificación de la app.
+
+### 2. Generación de Assets de Marca
+Se generaron tres assets de producción alineados con la identidad visual de Habitail:
+
+| Asset | Dimensiones | Formato | Contenido |
+| :--- | :--- | :--- | :--- |
+| `icon.png` | 1024×1024 | PNG, sin alfa | Criatura mascota pixel-art en gradiente indigo (#6366f1 → #8b5cf6) sobre fondo #E6F4FE |
+| `splash.png` | 1024×1024 | PNG, sin alfa | Mascota centrada con nombre "Habitail" sobre fondo Slate 50 (#f8fafc) |
+| `adaptive-icon.png` | 1024×1024 | PNG, sin alfa | Mascota centrada con 25% de margen de seguridad para Android adaptive icons |
+
+### 3. Conversión de Formato: JPEG → PNG Real
+`expo doctor` detectó que los archivos generados tenían extensión `.png` pero contenido interno JPEG. Esto ocurre porque el generador de imágenes produce archivos en formato JPEG, lo que provocaba:
+
+```
+✖ Check Expo config schema
+Field: icon - the file extension should match the content,
+but the file extension is .png while the file content is of type jpg.
+```
+
+**Solución**: Se convirtieron los tres archivos de JPEG a PNG genuino usando `System.Drawing.Image.Save()` con `ImageFormat.Png`, verificando posteriormente que:
+- `RawFormat.Guid` coincide con el GUID de PNG (`b96b3cab-...`)
+- `PixelFormat` es `Format24bppRgb` (sin canal alfa)
+- La imagen no pierde calidad visual tras la conversión
+
+### 4. Reorganización de Nombres de Assets
+Se simplificó la estructura de assets eliminando los archivos legacy con nombres Expo por defecto:
+
+| Antes (Expo default) | Después (Producción) | Motivo |
+| :--- | :--- | :--- |
+| `splash-icon.png` (1024×1024, placeholder) | `splash.png` (1024×1024, branded) | Nombre estándar del prompt; `resizeMode: "contain"` escala sobre `backgroundColor` |
+| `android-icon-foreground.png` + `android-icon-background.png` + `android-icon-monochrome.png` (512×512) | `adaptive-icon.png` (1024×1024) | Un solo archivo foreground + `backgroundColor` sólido. Más simple y mantenible |
+
+> **Nota sobre `splash.png` a 1024×1024 vs 1284×2778**: Expo con `resizeMode: "contain"` centra y escala la imagen dentro de la pantalla, rellenando el espacio restante con `backgroundColor`. Usar 1024×1024 para el splash es perfectamente válido y produce un resultado visual limpio. Si en el futuro se necesita un splash que ocupe toda la pantalla sin bordes, se deberá regenerar a 1284×2778 (resolución iPhone 14 Pro Max) con `resizeMode: "cover"`.
+
+---
+
+## Casos Borde y Troubleshooting de Build
+
+### ¿Qué ocurre si el `bundleIdentifier` de iOS ya está registrado en otro Apple Developer account?
+Si el `ios.bundleIdentifier` configurado en `app.json` ya está registrado por otra cuenta de desarrollador en Apple, el build o el proceso de subida fallará. Apple requiere que los identificadores de aplicación sean únicos globalmente. 
+**Solución**: Deberás cambiar el `bundleIdentifier` en `app.json` a uno nuevo (ej. añadiendo un sufijo o nombre de empresa) ANTES de subir la app por primera vez a TestFlight o App Store. 
+> ⚠️ **Advertencia**: Si la app ya fue subida con éxito bajo tu propia cuenta y cambias el identificador más adelante, Apple lo considerará como una app completamente nueva.
+
+### ¿Cómo regenerar las credenciales de firma si se pierde el certificado?
+EAS gestiona automáticamente las credenciales de firma si se lo permites. Si pierdes el certificado (por ejemplo, revocado en el portal de Apple o pérdida de la keystore de Android):
+- **iOS**: Ejecuta `eas credentials`, selecciona iOS, y borra el *Distribution Certificate* y el *Provisioning Profile* actuales. En el siguiente `eas build`, EAS te pedirá generar credenciales nuevas automáticamente.
+- **Android**: En Android, si pierdes la Keystore original y la app ya está publicada, deberás usar el programa [Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756) para solicitar a Google un reseteo de la clave de subida (Upload Key). Si usas EAS, puedes usar `eas credentials` para generar una nueva keystore y descargar el certificado `.pem` para enviárselo a Google como prueba.
+
+### Diferencia entre perfil `preview` y `production`
+- **`preview` (Distribución Interna)**: Genera versiones destinadas a pruebas (QA, stakeholders) sin pasar por las tiendas oficiales. Genera un `.apk` instalable directamente para Android y un `.ipa` Ad-Hoc para iOS. No incrementa automáticamente los números de versión si no está configurado explícitamente y usa un canal OTA diferente (`channel: "preview"`).
+- **`production` (Stores Públicas)**: Genera versiones estrictamente preparadas para ser subidas a Apple App Store y Google Play. En Android genera un `.aab` (App Bundle, formato obligatorio requerido por Google Play) en lugar de `.apk`. En iOS usa un perfil de aprovisionamiento de distribución oficial de App Store. Además, autoincrementa los build numbers (`autoIncrement: true`) para evitar rechazos por versiones duplicadas.
+
+### Limitaciones del perfil `preview` en iOS
+En iOS, un build `preview` (que usa distribución *Ad Hoc* o *Enterprise*) tiene una limitación estricta impuesta por Apple: **el `.ipa` generado solo se podrá instalar en dispositivos físicos cuyo UDID esté previamente registrado en el portal de Apple Developer**. 
+Si intentas instalar el build en un dispositivo no registrado (por ejemplo, enviándole el link a un tester nuevo), la instalación fallará silenciosamente o mostrará un error genérico. 
+**Solución**: Debes registrar el UDID del dispositivo en el portal de Apple (o usar EAS para registrarlo automáticamente pidiendo a los testers que instalen un perfil) y luego **generar un nuevo build completo** (`eas build`) para que el nuevo dispositivo quede incluido y firmado en el perfil de aprovisionamiento (Provisioning Profile) integrado en la app.
