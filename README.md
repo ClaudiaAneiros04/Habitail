@@ -1,93 +1,68 @@
 # Habitail 🌿
 
-**Habitail** es una aplicación multiplataforma de seguimiento de hábitos que combina la gestión de tareas diarias con elementos de gamificación. El objetivo principal es motivar a los usuarios a mantener sus rutinas mediante el cuidado de una mascota virtual que crece y se mantiene saludable en función del cumplimiento de los hábitos.
+**Habitail** es una aplicación multiplataforma de seguimiento de hábitos que combina la gestión de rutinas diarias con elementos atractivos de gamificación. El objetivo principal es motivar a los usuarios a mantener sus hábitos mediante el cuidado de una mascota virtual "pixel-art" que evoluciona y se mantiene saludable en función del cumplimiento de las tareas.
 
-### Características Principales
-*   **Sistema de Gamificación**: Tu mascota tiene niveles de salud que se ven afectados por tus acciones. Completar hábitos cura y fortalece a tu mascota, mientras que los descuidos pueden debilitarla.
-*   **Gestión Inteligente de Hábitos**: Configura hábitos con diferentes frecuencias (diarios, semanales o específicos) y niveles de prioridad.
-*   **Seguimiento de Rachas**: Visualiza tu progreso con un motor de cálculo de rachas que distingue entre hábitos diarios y semanales, motivándote a no romper la cadena.
-*   **Historial Detallado**: Un calendario interactivo que te permite auditar tu desempeño pasado y entender tus patrones de comportamiento.
-*   **Rendimiento Nativo**: Construido sobre Expo y React Native, utilizando SQLite para una persistencia de datos local ultra rápida y segura.
+![Habitail App](assets/icon.png)
+
+## 🌟 Características Principales (MVP Finalizado)
+
+*   **Sistema de Gamificación y Mascota Virtual**: Tu mascota tiene niveles de salud que responden a tus acciones. Completar hábitos esenciales cura y fortalece a tu mascota (+20 HP), mientras que la inactividad la debilita.
+*   **Biblioteca de Hábitos y Onboarding Inteligente**: Más de 20 hábitos predefinidos agrupados por categorías (Salud, Deporte, Productividad). Un flujo de onboarding intuitivo sugiere hábitos y establece configuraciones óptimas automáticamente.
+*   **Gestión Flexible de Hábitos**: Crea, edita y archiva hábitos con diferentes frecuencias (diarios, semanales) y niveles de prioridad (Esencial, Normal, Flexible).
+*   **Motor de Rachas y Estadísticas Avanzadas**: Motor matemático que calcula la racha actual y máxima, con un *Heatmap* de cumplimiento mensual estilo GitHub y gráficos de barras interactivos.
+*   **Logros e Insignias Premium**: Desbloquea más de 20 logros interactivos categorizados por rareza (Común a Legendario) a medida que cumples hitos de rachas y consistencia.
+*   **Notificaciones Interactivas Nativas**: Recibe recordatorios en segundo plano con acciones rápidas ("Hecho", "Posponer") que actualizan el estado global sin abrir la app.
+*   **Rendimiento y Persistencia Offline**: Construido sobre **Expo** y **React Native**, utilizando **Zustand** para la gestión de estado y **SQLite** nativo con índices compuestos para consultas ultrarrápidas y disponibilidad offline total.
+*   **Internacionalización (i18n)**: Soporte completo en Español e Inglés.
+
+---
 
 ## 🏛️ Decisiones de Arquitectura
 
-Para garantizar la robustez y escalabilidad de Habitail, el proyecto se basa en tres pilares arquitectónicos:
+Para garantizar la robustez, Habitail implementa patrones arquitectónicos avanzados:
 
-### 1. Repository Pattern
-La lógica de acceso a datos está desacoplada mediante repositorios, facilitando el mantenimiento y permitiendo optimizaciones de consultas SQL (como índices compuestos) de forma centralizada.
-- [Detalles en la Memoria de Datos](./LEARNING.md#diseño-de-arquitectura-de-datos-y-optimización-índices-en-consultas-de-hábitos)
+1.  **Repository Pattern & SQLite Singleton**: Desacopla la lógica de persistencia de la UI. Implementa índices compuestos y queries eficientes para evitar full-table scans.
+2.  **State Management Híbrido**: Zustand gestiona el estado global reactivo, mientras que tareas pesadas en segundo plano hidratan o invalidan proactivamente el caché.
+3.  **Gamificación Pura (Fórmula de Vida)**: El módulo de lógica evalúa penalizaciones y recompensas de forma predecible y testeable, aplicando un *clamp* matemático a la salud de la mascota.
 
-### 2. Motor de Frecuencias
-Un motor de lógica pura que abstrae el cálculo de rachas y la programación de hábitos. Esto permite que la UI sea reactiva a reglas de negocio complejas sin duplicar lógica en los componentes.
-- [Detalles en la Memoria del Motor](./LEARNING.md#1-motor-de-cálculo-de-rachas-streakcalculatorts)
-
-### 3. Fórmula de Vida
-El sistema de gamificación utiliza una fórmula matemática ponderada por la prioridad de los hábitos (Esencial, Normal, Flexible) para calcular el impacto en la salud de la mascota.
-- [Detalles en la Memoria de Gamificación](./LEARNING.md#4-fórmula-final-y-decisiones-acordadas)
+---
 
 ## 🚀 Ejecución del Proyecto
 
-Sigue estos comandos para iniciar la aplicación en diferentes plataformas:
+### Requisitos Previos
+*   **Node.js** (LTS recomendado).
+*   **Expo Go** en tu dispositivo móvil o emuladores de Android Studio / Xcode.
 
-*   **Instalar dependencias**:
-    ```bash
-    npm install
-    ```
+### Instalación y Arranque
+```bash
+# 1. Instalar dependencias
+npm install
 
-*   **Iniciar Servidor Expo (Menú interactivo)**:
-    ```bash
-    npm run start
-    ```
+# 2. Iniciar el servidor de desarrollo de Expo
+npm run start
+```
+Presiona `a` para abrir en Android, `i` para iOS, o escanea el código QR con Expo Go.
 
-*   **Ejecutar en Android**:
-    ```bash
-    npm run android
-    ```
+---
 
-*   **Ejecutar en iOS**:
-    ```bash
-    npm run ios
-    ```
+## 📂 Estructura del Código
 
-*   **Ejecutar en Web**:
-    ```bash
-    npm run web
-    ```
+*   `app/`: Vistas principales y enrutamiento con Expo Router (Tabs, Onboarding).
+*   `components/`: Componentes UI reutilizables (Botones, Listas, Gráficos).
+*   `hooks/`: Lógica React encapsulada (`useHabitCheckIn`, `useHabitStats`).
+*   `storage/`: Persistencia de datos local, definición de DB (`schema.ts`) y repositorios SQLite.
+*   `store/`: Almacenes de estado global con Zustand (Hábitos, Logs, Mascota, Usuario).
+*   `utils/`: Motores de lógica pura agnósticos a UI (cálculo de rachas, motor de frecuencias).
+*   `i18n/`: Archivos de internacionalización (`es.json`, `en.json`).
 
-## 📋 Requisitos de Expo
-
-Para ejecutar este proyecto correctamente, asegúrate de cumplir con los siguientes requisitos:
-
-1.  **Node.js**: Versión LTS recomendada.
-2.  **Expo Go**: Descarga la aplicación en tu dispositivo móvil (Android/iOS) para previsualizar los cambios.
-3.  **Simuladores (Opcional)**: Android Studio (para Android) o Xcode (para iOS) si prefieres ejecutar en emuladores locales.
-4.  **Cuentas**: Una cuenta de Expo es recomendada para facilitar la sincronización.
-
-## 📱 Dispositivos Compatibles
-
-Habitail está diseñada para funcionar de manera fluida en las siguientes plataformas:
-
-*   **Android**: Dispositivos con Android 7.0 (API 24) o superior.
-*   **iOS**: iPhone y iPad con iOS 13.0 o superior.
-*   **Web**: Navegadores modernos (Chrome, Safari, Firefox, Edge) con diseño totalmente responsivo.
-*   **PWA**: Soporte para instalación como aplicación web progresiva para una experiencia similar a la nativa en escritorio.
-
-## 📂 Estructura de Carpetas
-
-A continuación, un resumen de la organización del código:
-
-*   `app/`: Pantallas y sistema de navegación basado en archivos (Expo Router).
-*   `components/`: Componentes visuales reutilizables (Botones, Items, Barras de progreso).
-*   `hooks/`: Lógica de React encapsulada (ej. `useHabitCheckIn`).
-*   `storage/`: Implementación de persistencia con **SQLite** y patrones de repositorio.
-*   `store/`: Estado global de la aplicación gestionado con **Zustand** (Hábitos, Logs, Mascota).
-*   `utils/`: Motores de lógica pura (cálculo de rachas, motor de frecuencias).
-*   `constants/`: Configuración de temas, colores y constantes de diseño.
-*   `types/`: Interfaces y definiciones de TypeScript para todo el proyecto.
+---
 
 ## 🧠 Bitácora de Aprendizaje
 
-Para detalles técnicos profundos, optimizaciones de base de datos y registro de errores resueltos, consulta nuestro:
+Este proyecto mantiene un registro profundo de aprendizajes, incluyendo:
+*   Optimizaciones SQL (Índices y Queries).
+*   Estrategias de gamificación y retención.
+*   Casos borde de Expo Notifications.
+*   Sistemas de testing y CI.
 
-👉 [**LEARNING.md**](./LEARNING.md)
-
+👉 [**Consulta LEARNING.md para todos los detalles técnicos**](./LEARNING.md)
