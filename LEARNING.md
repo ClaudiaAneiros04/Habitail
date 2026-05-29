@@ -1,46 +1,49 @@
 # Bitácora de Aprendizaje — Habitail
  
+
+
 ## Índice de Contenidos
 
-- **FASE 2: Diseño de Arquitectura de Datos y Optimización**
-  1. [Índices en Consultas de Hábitos](#índices-en-consultas-de-hábitos)
-- **FASE 3: Rachas y Check-in**
-  2. [Lógica de Negocio: Rachas y Check-in](#lógica-de-negocio-rachas-y-check-in)
-  3. [Errores y Aprendizajes](#errores-y-aprendizajes)
-- **FASE 4: Estadísticas, Heatmap y Agregación**
-  4. [Lógica de Negocio: useHabitStats](#lógica-de-negocio-usehabitstats)
-  5. [Lógica de Negocio: useHeatmapData](#lógica-de-negocio-useheatmapdata)
-  6. [Lógica de Negocio: chartAggregator](#lógica-de-negocio-chartaggregator)
-  7. [Lógica de Negocio: Definición y Prompts de la Mascota](#lógica-de-negocio-definición-y-prompts-de-la-mascota)
-  8. [Gestión de Dependencias: Incidente de Revert](#gestión-de-dependencias-incidente-de-revert)
-- **FASE 5: Mascota y Gamificación**
-  9. [Gestión de Assets: Fuentes y Recursos](#gestión-de-assets-fuentes-y-recursos)
-  10. [Lógica de Negocio: Job de Penalización Diaria](#lógica-de-negocio-job-de-penalización-diaria)
-  11. [Lógica de Negocio: Gamificación (Puntos e Insignias)](#lógica-de-negocio-gamificación-puntos-e-insignias)
-  12. [Post-Merge Fixes: Integración Lógica & Frontend](#post-merge-fixes-integración-lógica-&-frontend)
-  13. [Lógica de Negocio: Alineación de Contratos (Tipos vs. Schema)](#lógica-de-negocio-alineación-de-contratos-tipos-vs-schema)
-  14. [Refactorización y Mejoras de Calidad: Estadísticas y Persistencia](#refactorización-y-mejoras-de-calidad-estadísticas-y-persistencia)
-- **FASE 6: Onboarding y Notificaciones**
-  15. [Lógica de Negocio: Notificaciones Interactivas y Acciones en Segundo Plano](#lógica-de-negocio-notificaciones-interactivas-y-acciones-en-segundo-plano)
-  16. [Lógica de Negocio: Programación de Recordatorios y la Regla de Oro](#lógica-de-negocio-programación-de-recordatorios-y-la-regla-de-oro)
-  17. [Lógica de Negocio: Retención por Inactividad de la Mascota](#lógica-de-negocio-retención-por-inactividad-de-la-mascota)
-  18. [Lógica de Negocio: Flujo de Onboarding, Enrutamiento Inicial y Auto-creación de Hábitos](#lógica-de-negocio-flujo-de-onboarding-enrutamiento-inicial-y-auto-creación-de-hábitos)
-  19. [Refactorización del Schema de Base de Datos: Deuda, Simplificación y Riesgos](#refactorización-del-schema-de-base-de-datos-deuda-simplificación-y-riesgos)
-  20. [UI/UX y Casos Borde: Onboarding y Notificaciones](#uiux-y-casos-borde-onboarding-y-notificaciones)
-  21. [Post-Merge Fixes y Calidad: Sincronización en Segundo Plano, Permisos e Internacionalización](#post-merge-fixes-y-calidad-sincronización-en-segundo-plano-permisos-e-internacionalización)
-- **FASE 7: Lógica de Negocio y Robustez**
-  22. [Cambios de Salud por Prioridad, Parseo de Fechas en Hermes y Sincronización de Base de Datos](#cambios-de-salud-por-prioridad-parseo-de-fechas-en-hermes-y-sincronización-de-base-de-datos)
-- **FASE 7: Build y Entrega**
-  23. [Diferencia entre `eas build` y `eas update`](#diferencia-entre-eas-build-y-eas-update)
-  24. [Configuración de `app.json` — Decisiones y Requisitos](#configuración-de-appjson--decisiones-y-requisitos)
-  25. [Configuración de `eas.json` — Perfiles de Build](#configuración-de-easjson--perfiles-de-build)
-  26. [Warnings y Mejoras Detectadas Durante la Configuración](#warnings-y-mejoras-detectadas-durante-la-configuración)
-  27. [Casos Borde y Troubleshooting de Build](#casos-borde-y-troubleshooting-de-build)
+- **FASE 7: Build y Entrega — Configuración de Distribución**
+  - [Diferencia entre `eas build` y `eas update`](#diferencia-entre-eas-build-y-eas-update)
+    - [`eas build` — Binario Nativo](#eas-build-binario-nativo)
+    - [`eas update` — Actualización OTA (Over-The-Air)](#eas-update-actualización-ota-over-the-air)
+    - [Resumen Comparativo](#resumen-comparativo)
+  - [Configuración de `app.json` — Decisiones y Requisitos](#configuración-de-appjson-decisiones-y-requisitos)
+    - [1. `slug` en kebab-case](#1-slug-en-kebab-case)
+    - [2. `icon.png` — Verificación de canal alfa](#2-iconpng-verificación-de-canal-alfa)
+    - [3. `splash.backgroundColor`](#3-splashbackgroundcolor)
+    - [4. `ios.bundleIdentifier` y `android.package`](#4-iosbundleidentifier-y-androidpackage)
+    - [5. Plugin `expo-notifications`](#5-plugin-expo-notifications)
+    - [6. Permisos Android](#6-permisos-android)
+  - [Configuración de `eas.json` — Perfiles de Build](#configuración-de-easjson-perfiles-de-build)
+    - [`development`](#development)
+    - [`preview`](#preview)
+    - [`production`](#production)
+  - [Warnings y Mejoras Detectadas Durante la Configuración](#warnings-y-mejoras-detectadas-durante-la-configuración)
+  - [Generación y Validación de Assets de Producción](#generación-y-validación-de-assets-de-producción)
+    - [1. Problema: Assets Placeholder de Expo](#1-problema-assets-placeholder-de-expo)
+    - [2. Generación de Assets de Marca](#2-generación-de-assets-de-marca)
+    - [3. Conversión de Formato: JPEG → PNG Real](#3-conversión-de-formato-jpeg-png-real)
+    - [4. Reorganización de Nombres de Assets](#4-reorganización-de-nombres-de-assets)
+  - [Casos Borde y Troubleshooting de Build](#casos-borde-y-troubleshooting-de-build)
+    - [¿Qué ocurre si el `bundleIdentifier` de iOS ya está registrado en otro Apple Developer account?](#qué-ocurre-si-el-bundleidentifier-de-ios-ya-está-registrado-en-otro-apple-developer-account)
+    - [¿Cómo regenerar las credenciales de firma si se pierde el certificado?](#cómo-regenerar-las-credenciales-de-firma-si-se-pierde-el-certificado)
+    - [Diferencia entre perfil `preview` y `production`](#diferencia-entre-perfil-preview-y-production)
+    - [Limitaciones del perfil `preview` en iOS](#limitaciones-del-perfil-preview-en-ios)
+- **FASE FINAL: Cierre de MVP**
+  - [28. Edición y Eliminación Física de Hábitos (Zustand + SQLite)](#28-edición-y-eliminación-física-de-hábitos-zustand-sqlite)
+    - [Contexto Técnico](#contexto-técnico)
+    - [La Solución de Edición](#la-solución-de-edición)
+    - [La Solución de Eliminación Física (Cascading Delete)](#la-solución-de-eliminación-física-cascading-delete)
+  - [29. Expansión de Biblioteca a 20+ Hábitos con i18n Completo](#29-expansión-de-biblioteca-a-20-hábitos-con-i18n-completo)
+    - [Contexto Técnico](#contexto-técnico)
+    - [Implementación y Localización](#implementación-y-localización)
+  - [30. Interfaz de Insignias y Logros (Gamificación Premium)](#30-interfaz-de-insignias-y-logros-gamificación-premium)
+    - [Contexto Técnico](#contexto-técnico)
+    - [Diseño y Frontend Reactivo](#diseño-y-frontend-reactivo)
 
- 
-
-
- 
+---
 ---
  
 # FASE 2: Diseño de Arquitectura de Datos y Optimización
@@ -701,6 +704,20 @@ Se validó la función pura `applyHealthDelta` con un script de test local (`tes
 - **Vida Inicial: 100**, al recibir nuevos deltas positivos (ej: +30), la función aplica el límite superior. **Resultado: 100**.
 - **Vida Inicial: 0**, al recibir deltas negativos (ej: -30), la función aplica el límite inferior. **Resultado: 0**.
 - **Recuperación desde 0**, al recibir check-ins positivos (ej: +30), levanta la vida correctamente sin quedarse estancada en negativo. **Resultado: 30**.
+
+### 4. Permisos de Notificación y Cambios de Sistema (Edge Case Resuelto)
+Se detectó un caso borde: ¿qué ocurre si el usuario aprueba los permisos inicialmente, pero luego va a los ajustes del sistema operativo y revoca el acceso a las notificaciones?
+- **Problema Inicial**: Si el usuario cerraba el `PermissionBanner` (que avisa sobre la falta de permisos), el componente se desmontaba visualmente y no volvía a aparecer, a pesar de que el estado cambiaba a "denied".
+- **Solución**: Se modificó `PermissionBanner` para que incluya un `useEffect` escuchando la variable `status` de `useNotificationPermission()`. Si el `status` cambia dinámicamente a `'denied'` (detectado a través del listener de `AppState` en el hook), la variable de visibilidad del banner vuelve a forzarse a `true`. De este modo, la app reacciona instantáneamente a la revocación del permiso mostrándole al usuario la advertencia para regresar a los ajustes.
+
+### 5. Rendimiento y Prueba de Estrés (SQLite / Lógica TS)
+El cálculo de rachas sobre un gran volumen de datos (ej. un usuario activo por años) podría resultar en lentitud si no está optimizado.
+- **Dataset de Prueba**: Se creó un script de prueba de estrés simulando 1500 logs para un hábito (aproximadamente 4 años de datos ininterrumpidos).
+- **Métricas de Rendimiento**:
+  - `calculateCurrentStreak` sobre 1500 logs: **~9.1 ms**
+  - `calculateMaxStreak` sobre 1500 logs: **~10.7 ms**
+  - `calculateCompletionRate` (365 días) sobre 1500 logs: **~6.3 ms**
+- **Conclusión**: El rendimiento del motor de cálculo implementado en TypeScript (`utils/streakCalculator.ts`) es extremadamente eficiente (complejidad lineal $O(N)$ y tiempo sub-15ms) permitiendo que no haya caídas de frames en la UI al renderizar o actualizar el store incluso para perfiles veteranos.
 
 ---
 
@@ -1615,6 +1632,7 @@ Durante la fase de Auditoría de QA Estática (Testing Manual Simulado de Fase 7
 
 ---
 
+
 # FASE 7: Build y Entrega — Configuración de Distribución
 
 ## Diferencia entre `eas build` y `eas update`
@@ -1807,3 +1825,50 @@ EAS gestiona automáticamente las credenciales de firma si se lo permites. Si pi
 En iOS, un build `preview` (que usa distribución *Ad Hoc* o *Enterprise*) tiene una limitación estricta impuesta por Apple: **el `.ipa` generado solo se podrá instalar en dispositivos físicos cuyo UDID esté previamente registrado en el portal de Apple Developer**. 
 Si intentas instalar el build en un dispositivo no registrado (por ejemplo, enviándole el link a un tester nuevo), la instalación fallará silenciosamente o mostrará un error genérico. 
 **Solución**: Debes registrar el UDID del dispositivo en el portal de Apple (o usar EAS para registrarlo automáticamente pidiendo a los testers que instalen un perfil) y luego **generar un nuevo build completo** (`eas build`) para que el nuevo dispositivo quede incluido y firmado en el perfil de aprovisionamiento (Provisioning Profile) integrado en la app.
+
+---
+
+# FASE FINAL: Cierre de MVP
+
+## 28. Edición y Eliminación Física de Hábitos (Zustand + SQLite)
+
+### Contexto Técnico
+En las fases anteriores, los hábitos contaban con un estado lógico `activo` para implementar la acción "Archivar". Sin embargo, para completar el checklist del MVP al 100%, se hacía indispensable añadir la capacidad de **Editar** (sobrescribir configuración) y **Eliminar físicamente** (borrar el registro y todo su historial de logs asociados).
+
+### La Solución de Edición
+Para evitar duplicidad de código y pantallas, se reutilizó el wizard de creación en 3 pasos de `/add-habit`:
+1. **Detección de Modo**: `basic-info.tsx` detecta el parámetro `habitId` a través de `useLocalSearchParams()`.
+2. **Hidratación Reactiva**: Si el ID existe, se recupera el hábito correspondiente de `useHabitStore` y se inicializa el estado local (`nombre` y `categoria`) con los datos del hábito.
+3. **Propagación del Contexto**: Los datos se transfieren a `appearance.tsx` y finalmente a `settings.tsx` arrastrando el `habitId`.
+4. **Guardado Inteligente**: En `settings.tsx`, al presionar "Guardar Hábito", se evalúa si existe `editHabitId`. Si existe, se invoca `updateHabit(id, updates)` del store; de lo contrario, se genera un hábito nuevo mediante `addHabit`.
+
+### La Solución de Eliminación Física (Cascading Delete)
+Dado que los registros en la base de datos local utilizan **claves foráneas (Foreign Keys)** con restricción `ON DELETE CASCADE` (`habit_logs.habitId` apunta a `habits.id`), la eliminación física de un hábito borra de forma automática e inmediata todo su historial de registros en SQLite:
+1. **Repositorio**: Se añadió el método `delete(id)` en `HabitRepository` ejecutando `DELETE FROM habits WHERE id = ?`.
+2. **Store de Sincronización**: En `useHabitStore`, se actualizó `removeHabit(id)` para que realice la eliminación física en SQLite y filtre el estado en memoria.
+3. **Invalidación de Cachés**: Al eliminar físicamente, los cachés en memoria de otras tiendas Zustand podrían quedar desactualizados. Se introdujo una limpieza dinámica que filtra el estado de logs en `useLogStore` e invalida todos los cachés derivados en `useStatsStore` y `useHeatmapStore` para evitar fugas de memoria y visualizaciones inconsistentes.
+
+---
+
+## 29. Expansión de Biblioteca a 20+ Hábitos con i18n Completo
+
+### Contexto Técnico
+Para guiar al usuario en la creación de rutinas saludables, el MVP requería una biblioteca de al menos 20 hábitos predefinidos agrupados por categoría.
+
+### Implementación y Localización
+1. **Ampliación de Plantillas**: Se modificó `app/habit-library.tsx` añadiendo 12 hábitos predefinidos nuevos (pasando de 8 a 20 en total) que cubren de manera equilibrada las 6 categorías del sistema (`Salud`, `Deporte`, `Productividad`, `Bienestar`, `Finanzas`, `Aprendizaje`).
+2. **Localización de Textos (ES/EN)**: Para mantener el soporte multiidioma nativo de la app, se crearon e insertaron todas las entradas de localización correspondientes a los IDs del `9` al `20` en `i18n/es.json` y `i18n/en.json`, asegurando que tanto el nombre como la descripción del hábito se rendericen perfectamente en el idioma seleccionado del dispositivo.
+
+---
+
+## 30. Interfaz de Insignias y Logros (Gamificación Premium)
+
+### Contexto Técnico
+El motor lógico de insignias (`badgeEngine.ts`) evaluaba y otorgaba 5 insignias MVP basadas en el rendimiento, pero no existía una interfaz gráfica para que el usuario pudiera contemplar su progreso.
+
+### Diseño y Frontend Reactivo
+1. **Integración en Stats**: Se añadió una sección premium de **Logros Obtenidos** al final de la pantalla de Estadísticas (`app/(tabs)/stats.tsx`), justo debajo del Heatmap Anual de cumplimiento.
+2. **Componente de Logros**: El nuevo subcomponente `AchievementsList` lee las insignias desbloqueadas por el usuario actual a través de `useUserStore`.
+3. **Afecto Visual de Desbloqueo (Premium)**:
+   * **Insignias Bloqueadas**: Se muestran en gris, con opacidad reducida (`opacity: 0.55`) y un candado cerrado (`lock-closed`) superpuesto, incitando al usuario a conseguir el logro mediante una descripción clara de la regla requerida.
+   * **Insignias Desbloqueadas**: Se iluminan en colores vivos de la paleta del tema, con un fondo tonal suave y una etiqueta llamativa que indica "Desbloqueado".
