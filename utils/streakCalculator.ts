@@ -1,5 +1,6 @@
 import { parseISO, isValid } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
+import { getExpectedCompletions } from './frequencyEngine';
 
 /**
  * Parsea una fecha (formato YYYY-MM-DD o ISO completo con T)
@@ -70,7 +71,7 @@ export const formatDateUTC = (date: Date): string => {
  * Determina si el hábito está programado/activo en un día específico en UTC.
  */
 export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
-  const freq = habit.frecuencia as Frequency;
+  const freq = String(habit.frecuencia);
   if (freq === Frequency.DAILY || freq === 'DAILY') {
     return true;
   }
@@ -319,9 +320,15 @@ export const calculateMaxStreak = (logs: HabitLog[], habit?: Habit): number => {
  * @param logs Lista de registros
  * @param days Número de días hacia atrás a evaluar (ej: 30)
  * @param referenceDate Fecha de referencia (hoy)
+ * @param habit Objeto Habit opcional para respetar frecuencia programada real
  * @returns Porcentaje de éxito (0 a 100)
  */
-export const calculateCompletionRate = (logs: HabitLog[], days: number, referenceDate: Date = new Date()): number => {
+export const calculateCompletionRate = (
+  logs: HabitLog[],
+  days: number,
+  referenceDate: Date = new Date(),
+  habit?: Habit
+): number => {
   if (!logs || logs.length === 0 || days <= 0) return 0;
 
   const refDayUTC = new Date(Date.UTC(
@@ -350,7 +357,15 @@ export const calculateCompletionRate = (logs: HabitLog[], days: number, referenc
   });
 
   const completedDays = uniqueDatesMap.size;
-  const percentage = (completedDays / days) * 100;
-  return Math.round(percentage * 10) / 10; // Redondea a 1 decimal
+
+  let expectedDays = days;
+  if (habit) {
+    expectedDays = getExpectedCompletions(habit, startDateUTC, refDayUTC);
+  }
+
+  if (expectedDays <= 0) return 0;
+
+  const percentage = (completedDays / expectedDays) * 100;
+  return Math.min(100, Math.round(percentage * 10) / 10); // Redondea a 1 decimal
 };
 

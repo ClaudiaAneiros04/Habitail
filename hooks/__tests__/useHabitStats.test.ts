@@ -38,6 +38,7 @@ describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
       save: jest.fn(),
       update: jest.fn(),
       archive: jest.fn(),
+      delete: jest.fn(),
     };
 
     mockLogRepo = {

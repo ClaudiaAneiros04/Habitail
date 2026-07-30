@@ -17,6 +17,7 @@ import { format, subDays, subMonths, startOfDay } from 'date-fns';
 import { HabitLog, Habit } from '../types';
 import { PeriodStats } from '../storage/LogRepository';
 import { calculateCurrentStreak, calculateMaxStreak } from './streakCalculator';
+import { getExpectedCompletions, getExpectedCompletionsForHabits } from './frequencyEngine';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -30,7 +31,7 @@ export type StatsPeriod = 'weekly' | 'monthly' | 'total';
  * Todos los valores son deterministas y derivables de los datos de la DB.
  */
 export interface HabitStatsResult {
-  /** Porcentaje de días completados sobre el total de días del periodo (0–100). */
+  /** Porcentaje de días completados sobre el total esperado de completados del periodo (0–100). */
   completionRate: number;
   /** Racha actual de días/semanas consecutivos completados. */
   currentStreak: number;
@@ -38,7 +39,9 @@ export interface HabitStatsResult {
   maxStreak: number;
   /** Número de días (o combinaciones día×hábito en vista global) completados. */
   totalCompleted: number;
-  /** Número de días calendario del periodo evaluado. */
+  /** Número esperado de completados del hábito en el periodo según su frecuencia y configuración. */
+  expectedCompletions: number;
+  /** Número de días calendario o esperado del periodo evaluado (mantenido por compatibilidad). */
   totalDays: number;
 }
 
@@ -121,23 +124,31 @@ export const buildPeriodRange = (period: StatsPeriod, referenceDate: Date = new 
  *
  * @param periodStats - Contadores {totalCompleted, totalDays} de la query SQL.
  * @param logs        - Array de HabitLog del mismo periodo (para calcular rachas).
- * @param habit       - Objeto Habit (necesario para la frecuencia en calculateCurrentStreak).
+ * @param habit       - Objeto Habit (necesario para la frecuencia en calculateCurrentStreak y expectedCompletions).
  * @param referenceDate - Fecha de referencia para "hoy" en el cálculo de racha actual.
+ * @param dateRange   - Rango de fechas {fromDate, toDate} evaluado. Si se provee, se calcula el número esperado exacto.
  * @returns HabitStatsResult listo para cachear y exponer al hook.
  */
 export const computeStats = (
   periodStats: PeriodStats,
   logs: HabitLog[],
   habit: Habit,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  dateRange?: DateRange
 ): HabitStatsResult => {
-  const { totalCompleted, totalDays } = periodStats;
+  const { totalCompleted } = periodStats;
 
-  // Evitar división por cero si el periodo calculado es 0 días (no debería ocurrir
-  // con buildPeriodRange correctamente llamado, pero se cubre por robustez).
+  // Calculamos los completados esperados respetando la frecuencia real del hábito
+  let expectedCompletions = periodStats.totalDays;
+  if (dateRange) {
+    expectedCompletions = getExpectedCompletions(habit, dateRange.fromDate, dateRange.toDate);
+  }
+
+  // completionRate: porcentaje de completados respecto a lo esperado (0-100)
   const completionRate =
-    totalDays > 0 ? Math.round((totalCompleted / totalDays) * 1000) / 10 : 0;
-  // Math.round(x * 1000) / 10 = redondea a 1 decimal en porcentaje (misma lógica que streakCalculator)
+    expectedCompletions > 0
+      ? Math.min(100, Math.round((totalCompleted / expectedCompletions) * 1000) / 10)
+      : 0;
 
   const currentStreak = calculateCurrentStreak(logs, habit, referenceDate);
   const maxStreak = calculateMaxStreak(logs, habit);
@@ -147,33 +158,42 @@ export const computeStats = (
     currentStreak,
     maxStreak,
     totalCompleted,
-    totalDays,
+    expectedCompletions,
+    totalDays: expectedCompletions,
   };
 };
 
 /**
  * Versión de computeStats para la vista GLOBAL (sin habitId).
  *
- * En la vista global no existe un único `Habit` de referencia para la frecuencia,
- * por lo que las rachas se calculan con frecuencia implícita DAILY sobre los logs
- * combinados de todos los hábitos. Esto es una simplificación aceptable para una
- * vista de resumen: se documentan las implicaciones en LEARNING.md.
- *
- * Se crea un `Habit` sintético con frecuencia DAILY para reutilizar calculateCurrentStreak.
+ * Si se proporciona la lista de hábitos del usuario y el dateRange,
+ * el número esperado de completados se calcula como la suma de los esperados
+ * de cada hábito en el rango, resolviendo el problema de denominadores incompatibles.
  *
  * @param periodStats   - Contadores SQL del periodo, modo global.
  * @param logs          - Logs del periodo de todos los hábitos del usuario.
  * @param referenceDate - Fecha de referencia.
+ * @param habits        - Lista opcional de hábitos del usuario para calcular esperado global.
+ * @param dateRange     - Rango de fechas del periodo evaluado.
  */
 export const computeGlobalStats = (
   periodStats: PeriodStats,
   logs: HabitLog[],
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  habits?: Habit[],
+  dateRange?: DateRange
  ): HabitStatsResult => {
-   const { totalCompleted, totalDays } = periodStats;
+   const { totalCompleted } = periodStats;
+
+   let expectedCompletions = periodStats.totalDays;
+   if (habits && habits.length > 0 && dateRange) {
+     expectedCompletions = getExpectedCompletionsForHabits(habits, dateRange.fromDate, dateRange.toDate);
+   }
  
    const completionRate =
-     totalDays > 0 ? Math.round((totalCompleted / totalDays) * 1000) / 10 : 0;
+     expectedCompletions > 0
+       ? Math.min(100, Math.round((totalCompleted / expectedCompletions) * 1000) / 10)
+       : 0;
  
    // Hábito sintético para reutilizar calculateCurrentStreak en modo global.
    // diasSemana vacío y fechaInicio en el pasado son valores seguros porque
@@ -201,6 +221,7 @@ export const computeGlobalStats = (
      currentStreak,
      maxStreak,
      totalCompleted,
-     totalDays,
+     expectedCompletions,
+     totalDays: expectedCompletions,
    };
  };

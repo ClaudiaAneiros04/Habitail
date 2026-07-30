@@ -16,6 +16,7 @@ import {
   format, isBefore, isAfter, max, min, subMonths
 } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
+import { isHabitScheduledForDate } from './frequencyEngine';
 import i18n from '../i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,53 +51,9 @@ const getDayLabel = (index: number): string => {
 };
 
 /**
- * Decide si el hábito está programado para un día concreto.
- *
- * Reglas aplicadas (en orden):
- * 1. Si `day` es anterior a `fechaInicio` → false (no cuenta como incumplido).
- * 2. Si `day` es posterior a `fechaFin` (si existe) → false.
- * 3. Según `frecuencia`:
- *    - DAILY   → siempre true.
- *    - WEEKLY  → true si `day.getDay()` está en `diasSemana`.
- *    - MONTHLY → true si el día-del-mes coincide con el de `fechaInicio`.
- *
- * Caso borde — cambio de `diasSemana` a mitad del periodo:
- *   Siempre se usa la configuración ACTUAL del hábito. No se trackea el historial
- *   de cambios de configuración. Documentado en LEARNING.md.
- *
- * @param day   - Día a evaluar (solo se usa la parte de fecha, no la hora).
- * @param habit - Hábito con su configuración actual.
+ * Alias de la lógica centralizada de programación para compatibilidad interna.
  */
-const isDayScheduled = (day: Date, habit: Habit): boolean => {
-  const dayStart     = startOfDay(day);
-  const habitStart   = startOfDay(parseISO(habit.fechaInicio));
-
-  if (isBefore(dayStart, habitStart)) return false;
-
-  if (habit.fechaFin) {
-    if (isAfter(dayStart, startOfDay(parseISO(habit.fechaFin)))) return false;
-  }
-
-  switch (habit.frecuencia as Frequency) {
-    case Frequency.DAILY:
-    case 'DAILY' as Frequency:
-      return true;
-
-    case Frequency.WEEKLY:
-    case 'WEEKLY' as Frequency:
-      // diasSemana usa la convención JS: 0=Dom, 1=Lun, …, 6=Sáb
-      return Array.isArray(habit.diasSemana) && habit.diasSemana.includes(day.getDay());
-
-    case Frequency.MONTHLY:
-    case 'MONTHLY' as Frequency: {
-      const startDate = parseISO(habit.fechaInicio);
-      return day.getDate() === startDate.getDate();
-    }
-
-    default:
-      return false;
-  }
-};
+const isDayScheduled = (day: Date, habit: Habit): boolean => isHabitScheduledForDate(habit, day);
 
 /**
  * Dado un conjunto de días y los logs del hábito, cuenta:

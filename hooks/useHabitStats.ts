@@ -221,6 +221,7 @@ const EMPTY_STATS: HabitStatsResult = {
   currentStreak: 0,
   maxStreak: 0,
   totalCompleted: 0,
+  expectedCompletions: 0,
   totalDays: 0,
 };
 
@@ -299,7 +300,7 @@ export const useHabitStats = ({
         // a) Query SQL agregada: solo contadores, sin filas en memoria.
         const periodStats = await logRepo.getStatsByPeriod(habitId, effectiveFrom, toDate);
 
-        const result = computeStats(periodStats, logs, habit);
+        const result = computeStats(periodStats, logs, habit, new Date(), { fromDate: effectiveFrom, toDate });
         setData(cacheKey, result);
 
       } else {
@@ -310,17 +311,17 @@ export const useHabitStats = ({
           return;
         }
 
-        // TODO: En modo global 'total', podríamos buscar el primer log o el primer hábito
-        // para ajustar fromDate. Por ahora mantenemos 1970 para evitar complejidad extra,
-        // pero totalDays será incorrecto para el porcentaje global total.
-        
+        // Obtenemos los hábitos del usuario para calcular el esperado global
+        const allHabits = await habitRepo.get();
+        const userHabits = allHabits.filter(h => h.userId === userId || !h.userId);
+
         // a) Query SQL agregada global: cuenta combinaciones (día × hábito) únicas.
         const periodStats = await logRepo.getGlobalStatsByPeriod(userId, fromDate, toDate);
 
         // b) Para las rachas globales necesitamos los logs del periodo. Usamos carga paginada con parada temprana.
         const logs = await loadLogsGlobalChunked(logRepo, userId, fromDate, toDate, period);
 
-        const result = computeGlobalStats(periodStats, logs, new Date());
+        const result = computeGlobalStats(periodStats, logs, new Date(), userHabits, { fromDate, toDate });
         setData(cacheKey, result);
       }
     } catch (err) {
