@@ -83,29 +83,81 @@ describe('streakCalculator', () => {
       expect(calculateCurrentStreak(logs, inactiveDaysHabit, new Date('2026-04-21T12:00:00Z'))).toBe(1);
     });
 
-    it('debería calcular correctamente para hábitos semanales (racha contando semanas)', () => {
-      const weeklyHabit = { ...dummyHabit, frecuencia: Frequency.WEEKLY };
+    it('debería calcular correctamente para hábitos semanales basándose en las ocurrencias (L-X-V)', () => {
+      // referenceDate: Martes 2026-04-21T12:00:00Z.
+      // Días de ocurrencia: Lunes (1), Miércoles (3), Viernes (5)
+      const weeklyHabit = { ...dummyHabit, frecuencia: Frequency.WEEKLY, diasSemana: [1, 3, 5] };
       
-      const createWeeklyLog = (weeksBack: number): HabitLog => ({
-        id: `wlog-${weeksBack}`,
+      const createLogByDate = (dateString: string): HabitLog => ({
+        id: `log-custom`,
         habitId: 'habit-1',
         userId: 'user-1',
-        fecha: formatISO(subWeeks(startOfDay(referenceDate), weeksBack)),
+        fecha: dateString,
         completado: true,
         timestampRegistro: formatISO(new Date())
       });
 
-      // Semana actual, semana pasada, hace dos semanas
-      const logs = [createWeeklyLog(0), createWeeklyLog(1), createWeeklyLog(2)];
-      expect(calculateCurrentStreak(logs, weeklyHabit, referenceDate)).toBe(3);
+      // Se hizo el viernes pasado, y el lunes de esta semana
+      const logs = [
+        createLogByDate('2026-04-17'), // Viernes pasado (Día programado)
+        createLogByDate('2026-04-20')  // Lunes actual (Día programado)
+      ];
+      
+      // Hoy es martes 21 (no programado). La racha debe ser 2 porque no se ha roto en el día programado.
+      expect(calculateCurrentStreak(logs, weeklyHabit, referenceDate)).toBe(2);
 
-      // No se hizo esta semana, pero sí la pasada y la tras pasada
-      const logsOngoing = [createWeeklyLog(1), createWeeklyLog(2)];
-      expect(calculateCurrentStreak(logsOngoing, weeklyHabit, referenceDate)).toBe(2);
+      // Si le sumamos el miércoles anterior (2026-04-15), la racha es 3
+      const logs3 = [
+        createLogByDate('2026-04-15'), // Miércoles pasado
+        createLogByDate('2026-04-17'), // Viernes pasado
+        createLogByDate('2026-04-20')  // Lunes actual
+      ];
+      expect(calculateCurrentStreak(logs3, weeklyHabit, referenceDate)).toBe(3);
 
-      // Racha rota: hizo hace 2 semanas pero faltó la 1 y 0
-      const logsBroken = [createWeeklyLog(2), createWeeklyLog(3)];
-      expect(calculateCurrentStreak(logsBroken, weeklyHabit, referenceDate)).toBe(0);
+      // Si falta el viernes pasado, la racha se rompe. Solo cuenta el Lunes actual (racha de 1)
+      const logsBroken = [
+        createLogByDate('2026-04-15'), // Miércoles pasado
+        // Falta viernes
+        createLogByDate('2026-04-20')  // Lunes actual
+      ];
+      expect(calculateCurrentStreak(logsBroken, weeklyHabit, referenceDate)).toBe(1);
+    });
+
+    it('debería calcular correctamente para hábitos mensuales, respetando final de mes corto', () => {
+      // referenceDate es el 1 de Marzo, 2026
+      const march1 = new Date('2026-03-01T12:00:00Z');
+      
+      // Hábito mensual, creado el 31 de Enero. 
+      // Por tanto, debe ejecutarse el 31 de Ene, el 28 de Feb y el 31 de Mar.
+      const monthlyHabit = { 
+        ...dummyHabit, 
+        frecuencia: Frequency.MONTHLY, 
+        fechaInicio: '2026-01-31T00:00:00Z'
+      };
+
+      const createLogByDate = (dateString: string): HabitLog => ({
+        id: `log-custom`,
+        habitId: 'habit-1',
+        userId: 'user-1',
+        fecha: dateString,
+        completado: true,
+        timestampRegistro: formatISO(new Date())
+      });
+
+      // El usuario lo hizo el 31 de enero y el 28 de febrero.
+      const logs = [
+        createLogByDate('2026-01-31'),
+        createLogByDate('2026-02-28')
+      ];
+
+      // Hoy es 1 de Marzo (Día inactivo). La racha DEBE ser 2, no 0.
+      expect(calculateCurrentStreak(logs, monthlyHabit, march1)).toBe(2);
+
+      // Si solo lo hizo el 28 de feb, pero no el 31 de ene, la racha es 1.
+      const logsBroken = [
+        createLogByDate('2026-02-28')
+      ];
+      expect(calculateCurrentStreak(logsBroken, monthlyHabit, march1)).toBe(1);
     });
   });
 

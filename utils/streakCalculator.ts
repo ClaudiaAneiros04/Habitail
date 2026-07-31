@@ -71,6 +71,21 @@ export const formatDateUTC = (date: Date): string => {
  * Determina si el hábito está programado/activo en un día específico en UTC.
  */
 export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
+  const targetDateUTC = date.getTime();
+  const habitStart = parseAsUTC(habit.fechaInicio);
+  const habitStartUTC = habitStart.getTime();
+
+  if (targetDateUTC < habitStartUTC) {
+    return false;
+  }
+
+  if (habit.fechaFin) {
+    const habitEndUTC = parseAsUTC(habit.fechaFin).getTime();
+    if (targetDateUTC > habitEndUTC) {
+      return false;
+    }
+  }
+
   const freq = String(habit.frecuencia);
   if (freq === Frequency.DAILY || freq === 'DAILY') {
     return true;
@@ -83,8 +98,10 @@ export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
     return normalizedDays.includes(day);
   }
   if (freq === Frequency.MONTHLY || freq === 'MONTHLY') {
-    const startDate = parseAsUTC(habit.fechaInicio);
-    return date.getUTCDate() === startDate.getUTCDate();
+    const creationDay = habitStart.getUTCDate();
+    const maxDaysInMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+    const targetDay = Math.min(creationDay, maxDaysInMonth);
+    return date.getUTCDate() === targetDay;
   }
   return false;
 };
@@ -135,46 +152,7 @@ export const calculateCurrentStreak = (logs: HabitLog[], habit: Habit, reference
     referenceDate.getDate()
   ));
 
-  const isWeekly = habit.frecuencia === Frequency.WEEKLY || habit.frecuencia === 'WEEKLY';
-
-  // Si es semanal, se evalúa por semanas completadas (ventanas de L-D).
-  if (isWeekly) {
-    const refWeek = startOfWeekUTC(refDayUTC, 1); // Semana empieza en Lunes
-    
-    // Obtenemos semanas únicas ordenadas desc
-    const uniqueWeeks = Array.from(new Set(sortedDates.map(d => startOfWeekUTC(d, 1).toISOString())))
-      .map(isoString => new Date(isoString))
-      .sort((a, b) => b.getTime() - a.getTime());
-
-    if (uniqueWeeks.length > 0 && differenceInWeeksUTC(refWeek, uniqueWeeks[0]) > 1) {
-      return 0; // Se rompió la racha hace más de una semana
-    }
-
-    let currentStreak = 0;
-    let currentExpectedWeek = refWeek;
-
-    for (const week of uniqueWeeks) {
-      const diff = differenceInWeeksUTC(currentExpectedWeek, week);
-      if (diff === 0) {
-        currentStreak++;
-        currentExpectedWeek = new Date(currentExpectedWeek.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else if (diff === 1) {
-        if (currentStreak === 0) {
-          // Si estamos evaluando la semana actual y no hay log, empezamos a contar desde la pasada
-          currentStreak++;
-          currentExpectedWeek = new Date(week.getTime() - 7 * 24 * 60 * 60 * 1000);
-        } else {
-          break;
-        }
-      } else {
-        break;
-      }
-    }
-
-    return currentStreak;
-  }
-
-  // Frecuencia diaria o semanal con días de semana específicos:
+  // Frecuencia diaria, semanal o mensual basándose en las ocurrencias esperadas:
   const completedDatesSet = new Set(sortedDates.map(d => d.toISOString()));
   
   let currentStreak = 0;
@@ -210,7 +188,8 @@ export const calculateCurrentStreak = (logs: HabitLog[], habit: Habit, reference
     gapDays++;
 
     // Salvaguarda para evitar bucle infinito
-    if (gapDays > 365 || (currentStreak === 0 && gapDays > 7)) {
+    // Si han pasado más de 62 días sin que estuviera activo y currentStreak es 0, asumimos roto.
+    if (gapDays > 730 || (currentStreak === 0 && gapDays > 62)) {
       streakActive = false;
       break;
     }
@@ -254,32 +233,7 @@ export const calculateMaxStreak = (logs: HabitLog[], habit?: Habit): number => {
     return maxStreak;
   }
 
-  const isWeekly = habit.frecuencia === Frequency.WEEKLY || habit.frecuencia === 'WEEKLY';
-
-  if (isWeekly) {
-    // Racha máxima en base a semanas consecutivas completadas
-    const uniqueWeeks = Array.from(new Set(sortedDates.map(d => startOfWeekUTC(d, 1).toISOString())))
-      .map(isoString => new Date(isoString))
-      .sort((a, b) => a.getTime() - b.getTime()); // Ascendente
-
-    let maxStreak = 1;
-    let currentCounter = 1;
-
-    for (let i = 1; i < uniqueWeeks.length; i++) {
-      const diff = differenceInWeeksUTC(uniqueWeeks[i], uniqueWeeks[i - 1]);
-      if (diff === 1) {
-        currentCounter++;
-      } else if (diff > 1) {
-        currentCounter = 1;
-      }
-      if (currentCounter > maxStreak) {
-        maxStreak = currentCounter;
-      }
-    }
-    return maxStreak;
-  }
-
-  // Para hábitos diarios o semanales con días de semana específicos:
+  // Para hábitos basándose en las ocurrencias específicas:
   const ascendingDates = [...sortedDates].reverse();
   const completedDatesSet = new Set(ascendingDates.map(d => d.toISOString()));
 
