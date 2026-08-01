@@ -171,14 +171,14 @@ export const computeStats = (
  * de cada hábito en el rango, resolviendo el problema de denominadores incompatibles.
  *
  * @param periodStats   - Contadores SQL del periodo, modo global.
- * @param logs          - Logs del periodo de todos los hábitos del usuario.
- * @param referenceDate - Fecha de referencia.
+ * @param activeDates   - Fechas de todos los logs globales completados ordenados DESC (ej. ['2026-09-22', '2026-09-21']).
+ * @param referenceDate - Fecha de referencia (hoy).
  * @param habits        - Lista opcional de hábitos del usuario para calcular esperado global.
  * @param dateRange     - Rango de fechas del periodo evaluado.
  */
 export const computeGlobalStats = (
   periodStats: PeriodStats,
-  logs: HabitLog[],
+  activeDates: string[],
   referenceDate: Date = new Date(),
   habits?: Habit[],
   dateRange?: DateRange
@@ -195,26 +195,7 @@ export const computeGlobalStats = (
        ? Math.min(100, Math.round((totalCompleted / expectedCompletions) * 1000) / 10)
        : 0;
  
-   // Hábito sintético para reutilizar calculateCurrentStreak en modo global.
-   // diasSemana vacío y fechaInicio en el pasado son valores seguros porque
-   // la función solo los usa para hábitos WEEKLY; en DAILY los ignora.
-   const syntheticHabit: Habit = {
-     id: '__global__',
-     userId: '__global__',
-     nombre: '__global__',
-     categoria: 'SALUD',
-     icono: '',
-     colorHex: '',
-     frecuencia: 'DAILY',
-     diasSemana: [],
-     tipoVerificacion: 'BOOLEAN',
-     nivelPrioridad: 'NORMAL',
-     fechaInicio: '1970-01-01',
-     activo: true,
-   };
- 
-   const currentStreak = calculateCurrentStreak(logs, syntheticHabit, referenceDate);
-   const maxStreak = calculateMaxStreak(logs, syntheticHabit);
+   const { currentStreak, maxStreak } = calculateGlobalStreaks(activeDates, referenceDate);
  
    return {
      completionRate,
@@ -225,3 +206,70 @@ export const computeGlobalStats = (
      totalDays: expectedCompletions,
    };
  };
+
+/**
+ * Calcula currentStreak y maxStreak dados un array de fechas únicas en formato YYYY-MM-DD
+ * donde se ha completado al menos un hábito.
+ * El array debe estar ordenado descendentemente (de la fecha más reciente a la más antigua).
+ *
+ * @param activeDates Array de fechas (ej: ['2026-09-22', '2026-09-21', '2026-09-18'])
+ * @param referenceDate Fecha actual de referencia (hoy).
+ */
+export const calculateGlobalStreaks = (
+  activeDates: string[],
+  referenceDate: Date = new Date()
+): { currentStreak: number; maxStreak: number } => {
+  if (!activeDates || activeDates.length === 0) {
+    return { currentStreak: 0, maxStreak: 0 };
+  }
+
+  const todayStr = format(referenceDate, 'yyyy-MM-dd');
+  const yesterdayStr = format(subDays(referenceDate, 1), 'yyyy-MM-dd');
+
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+  let prevDate: Date | null = null;
+  let currentStreakBroken = false;
+
+  // activeDates asume orden DESC
+  for (let i = 0; i < activeDates.length; i++) {
+    const dStr = activeDates[i];
+    const dDate = new Date(dStr + 'T00:00:00Z');
+
+    if (prevDate === null) {
+      // Es el primer elemento encontrado. Si no es hoy ni ayer, la racha actual es 0.
+      if (dStr !== todayStr && dStr !== yesterdayStr) {
+        currentStreakBroken = true;
+      }
+      tempStreak = 1;
+    } else {
+      // Comprobar si la fecha anterior era exactamente 1 día después que dDate (porque recorremos DESC)
+      const diffTime = prevDate.getTime() - dDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+      if (diffDays === 1) {
+        tempStreak++;
+      } else {
+        // La racha se rompió
+        if (!currentStreakBroken) {
+          currentStreak = tempStreak;
+          currentStreakBroken = true;
+        }
+        tempStreak = 1; // empezamos nueva racha para calcular maxStreak
+      }
+    }
+
+    if (tempStreak > maxStreak) {
+      maxStreak = tempStreak;
+    }
+
+    prevDate = dDate;
+  }
+
+  if (!currentStreakBroken) {
+    currentStreak = tempStreak;
+  }
+
+  return { currentStreak, maxStreak };
+};

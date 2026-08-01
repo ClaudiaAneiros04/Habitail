@@ -6,12 +6,12 @@ import { Habit, HabitLog, Category, Frequency, VerificationType, Priority } from
 import { useStatsStore } from '../../store/useStatsStore';
 import { format, subDays } from 'date-fns';
 
-describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
+describe('useHabitStats Hook', () => {
   let mockHabitRepo: jest.Mocked<IHabitRepository>;
   let mockLogRepo: jest.Mocked<ILogRepository>;
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const oldDateStr = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+  const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
   const mockHabit: Habit = {
     id: 'habit-123',
@@ -44,22 +44,23 @@ describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
     mockLogRepo = {
       save: jest.fn(),
       deleteById: jest.fn(),
-      getByHabit: jest.fn(),
+      getByHabit: jest.fn().mockResolvedValue([]),
       getByDate: jest.fn(),
       getLogsForRange: jest.fn(),
       getStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 5, totalDays: 30 } as PeriodStats),
-      getGlobalStatsByPeriod: jest.fn(),
+      getGlobalStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 15, totalDays: 30 } as PeriodStats),
       getHeatmapForHabit: jest.fn(),
       getHeatmapGlobal: jest.fn(),
       getLogsForRangeGlobal: jest.fn(),
       getAll: jest.fn(),
       getMissedHabitsForDate: jest.fn(),
-      getLogsForRangePaginated: jest.fn().mockResolvedValue([]),
+      getLogsForRangePaginated: jest.fn(),
       getLogsForRangeGlobalPaginated: jest.fn(),
+      getGlobalActiveDates: jest.fn().mockResolvedValue([]),
     };
   });
 
-  test('Debería cargar estadísticas usando el repositorio paginado', async () => {
+  test('Debería cargar estadísticas usando el repositorio para un hábito individual', async () => {
     // Simulamos un log completado reciente (hoy)
     const mockLogs: HabitLog[] = [
       {
@@ -72,8 +73,7 @@ describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
       },
     ];
 
-    mockLogRepo.getLogsForRangePaginated.mockResolvedValueOnce(mockLogs);
-    mockLogRepo.getLogsForRangePaginated.mockResolvedValueOnce([]); // Siguiente chunk vacío
+    mockLogRepo.getByHabit.mockResolvedValueOnce(mockLogs);
 
     const { result, waitForNextUpdate } = renderHook(() =>
       useHabitStats({
@@ -84,42 +84,26 @@ describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
       })
     );
 
-    // Esperar a que la promesa se resuelva e hidrate el caché
     await waitForNextUpdate();
 
     expect(mockHabitRepo.getById).toHaveBeenCalledWith('habit-123');
-    expect(mockLogRepo.getLogsForRangePaginated).toHaveBeenCalledWith(
-      'habit-123',
-      expect.any(String), // fromDate
-      expect.any(String), // toDate
-      100,                // limit
-      0                   // offset
-    );
+    expect(mockLogRepo.getByHabit).toHaveBeenCalledWith('habit-123');
 
     expect(result.current.currentStreak).toBe(1);
     expect(result.current.totalCompleted).toBe(5);
   });
 
-  test('Parada Temprana: Debería detener la carga de chunks si la racha se rompe en el primer chunk', async () => {
-    // Si la racha se rompe (ej. hoy no completado, ayer no completado), la racha es 0.
-    // Con 100 de límite, si el primer chunk de logs revela un gap cercano, se detiene la carga.
-    const mockLogs: HabitLog[] = [
-      {
-        id: 'log-old',
-        habitId: 'habit-123',
-        userId: 'user-456',
-        fecha: oldDateStr, // Log de hace días, dejando hoy/ayer vacíos (gap)
-        completado: true,
-        timestampRegistro: `${oldDateStr}T10:00:00Z`,
-      },
-    ];
-
-    mockLogRepo.getLogsForRangePaginated.mockResolvedValueOnce(mockLogs);
+  test('Debería cargar estadísticas globales usando getGlobalActiveDates', async () => {
+    mockHabitRepo.get.mockResolvedValueOnce([mockHabit]);
+    
+    // El usuario tiene actividad hoy y ayer
+    mockLogRepo.getGlobalActiveDates.mockResolvedValueOnce([todayStr, yesterdayStr]);
 
     const { result, waitForNextUpdate } = renderHook(() =>
       useHabitStats({
-        habitId: 'habit-123',
-        period: 'total', // Solo en 'total' se activa la evaluación de parada temprana recursiva
+        habitId: undefined, // Global
+        userId: 'user-456',
+        period: 'monthly',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
       })
@@ -127,9 +111,10 @@ describe('useHabitStats Hook - Paginated/Chunked Loading', () => {
 
     await waitForNextUpdate();
 
-    // Solo debe haber llamado una vez porque detecta que la racha actual (0) es menor
-    // que los días transcurridos hasta el log más antiguo del lote (fecha de oldDateStr).
-    expect(mockLogRepo.getLogsForRangePaginated).toHaveBeenCalledTimes(1);
-    expect(result.current.currentStreak).toBe(0);
+    expect(mockHabitRepo.get).toHaveBeenCalled();
+    expect(mockLogRepo.getGlobalActiveDates).toHaveBeenCalledWith('user-456');
+
+    expect(result.current.currentStreak).toBe(2);
+    expect(result.current.totalCompleted).toBe(15);
   });
 });

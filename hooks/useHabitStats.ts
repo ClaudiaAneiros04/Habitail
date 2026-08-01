@@ -56,138 +56,11 @@ import {
 import { format } from 'date-fns';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Helper para cálculo de racha con parada temprana (Early Exit)
+// Helpers eliminados:
+// Se eliminaron `loadLogsChunked` y `loadLogsGlobalChunked` porque la racha
+// (currentStreak y maxStreak) siempre debe ser calculada sobre el historial completo,
+// y no limitarse al periodo seleccionado en pantalla.
 // ──────────────────────────────────────────────────────────────────────────────
-
-/**
- * Cuenta los días activos entre dos fechas en formato YYYY-MM-DD para un hábito.
- * Esto se utiliza para determinar si la racha se ha roto en el fragmento cargado.
- */
-const countActiveDaysBetween = (startStr: string, endStr: string, habit: Habit): number => {
-  const start = parseAsUTC(startStr);
-  const end = parseAsUTC(endStr);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-
-  let count = 0;
-  const current = new Date(start.getTime());
-  while (current <= end) {
-    if (isHabitActiveOnUTCDate(habit, current)) {
-      count++;
-    }
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  return count;
-};
-
-/**
- * Carga logs por lotes (Data Chunking) y aplica parada temprana
- * si la racha actual del hábito ya ha sido rota en el lote actual.
- * De esta forma, evitamos cargar miles de registros en RAM.
- */
-const loadLogsChunked = async (
-  logRepo: ILogRepository,
-  habitId: string,
-  fromDate: string,
-  toDate: string,
-  habit: Habit,
-  period: StatsPeriod
-): Promise<HabitLog[]> => {
-  const chunkSize = 100;
-  let offset = 0;
-  let allLogs: HabitLog[] = [];
-  const todayStr = toDate.split('T')[0];
-
-  while (true) {
-    const chunk = await logRepo.getLogsForRangePaginated(habitId, fromDate, toDate, chunkSize, offset);
-    if (chunk.length === 0) {
-      break;
-    }
-
-    allLogs = allLogs.concat(chunk);
-
-    if (period === 'total') {
-      const currentStreak = calculateCurrentStreak(allLogs, habit);
-      const oldestLog = allLogs[allLogs.length - 1];
-      const oldestLogDate = oldestLog.fecha.split('T')[0];
-      const activeDays = countActiveDaysBetween(oldestLogDate, todayStr, habit);
-
-      if (currentStreak < activeDays) {
-        // La racha se rompió dentro del lote cargado. Parada temprana.
-        break;
-      }
-    } else {
-      // Para periodos semanales/mensuales, el primer chunk de 100 ya cubre todo el periodo
-      break;
-    }
-
-    offset += chunkSize;
-    if (offset >= 10000) break; // Límite de seguridad
-  }
-
-  // Se revierte para orden cronológico ascendente como espera el calculador de estadísticas
-  return allLogs.reverse();
-};
-
-/**
- * Carga logs globales de un usuario por lotes y aplica parada temprana
- * si la racha global ya ha sido rota.
- */
-const loadLogsGlobalChunked = async (
-  logRepo: ILogRepository,
-  userId: string,
-  fromDate: string,
-  toDate: string,
-  period: StatsPeriod
-): Promise<HabitLog[]> => {
-  const chunkSize = 100;
-  let offset = 0;
-  let allLogs: HabitLog[] = [];
-  const todayStr = toDate.split('T')[0];
-
-  const syntheticHabit: Habit = {
-    id: '__global__',
-    userId: '__global__',
-    nombre: '__global__',
-    categoria: 'SALUD',
-    icono: '',
-    colorHex: '',
-    frecuencia: 'DAILY',
-    diasSemana: [],
-    tipoVerificacion: 'BOOLEAN',
-    nivelPrioridad: 'NORMAL',
-    fechaInicio: '1970-01-01',
-    activo: true,
-  };
-
-  while (true) {
-    const chunk = await logRepo.getLogsForRangeGlobalPaginated(userId, fromDate, toDate, chunkSize, offset);
-    if (chunk.length === 0) {
-      break;
-    }
-
-    allLogs = allLogs.concat(chunk);
-
-    if (period === 'total') {
-      const currentStreak = calculateCurrentStreak(allLogs, syntheticHabit);
-      const oldestLog = allLogs[allLogs.length - 1];
-      const oldestLogDate = oldestLog.fecha.split('T')[0];
-      const activeDays = countActiveDaysBetween(oldestLogDate, todayStr, syntheticHabit);
-
-      if (currentStreak < activeDays) {
-        // La racha global se rompió. Parada temprana.
-        break;
-      }
-    } else {
-      // Para periodos semanales/mensuales, el primer chunk de 100 ya cubre todo el periodo
-      break;
-    }
-
-    offset += chunkSize;
-    if (offset >= 10000) break; // Límite de seguridad
-  }
-
-  return allLogs.reverse();
-};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tipos del hook
@@ -285,8 +158,9 @@ export const useHabitStats = ({
           baseEffectiveFrom = habit.fechaInicio.split('T')[0];
         }
 
-        // b) Logs del periodo para calcular rachas. Usamos carga paginada con parada temprana.
-        const logs = await loadLogsChunked(logRepo, habitId, fromDate, toDate, habit, period);
+        // b) Logs de todo el historial para calcular rachas reales históricas.
+        // Cargar todos los logs de un hábito único no tiene impacto real en rendimiento.
+        const logs = await logRepo.getByHabit(habitId);
 
         let effectiveFrom = baseEffectiveFrom;
         if (period === 'total' && logs.length > 0) {
@@ -297,7 +171,7 @@ export const useHabitStats = ({
           }
         }
 
-        // a) Query SQL agregada: solo contadores, sin filas en memoria.
+        // a) Query SQL agregada: solo contadores, sin filas en memoria (acotada al periodo seleccionado).
         const periodStats = await logRepo.getStatsByPeriod(habitId, effectiveFrom, toDate);
 
         const result = computeStats(periodStats, logs, habit, new Date(), { fromDate: effectiveFrom, toDate });
@@ -318,10 +192,11 @@ export const useHabitStats = ({
         // a) Query SQL agregada global: cuenta combinaciones (día × hábito) únicas.
         const periodStats = await logRepo.getGlobalStatsByPeriod(userId, fromDate, toDate);
 
-        // b) Para las rachas globales necesitamos los logs del periodo. Usamos carga paginada con parada temprana.
-        const logs = await loadLogsGlobalChunked(logRepo, userId, fromDate, toDate, period);
+        // b) Para las rachas globales necesitamos las fechas históricas donde se completó al menos un hábito.
+        // Solo traemos un array de strings desde SQLite para maximizar rendimiento global.
+        const activeDates = await logRepo.getGlobalActiveDates(userId);
 
-        const result = computeGlobalStats(periodStats, logs, new Date(), userHabits, { fromDate, toDate });
+        const result = computeGlobalStats(periodStats, activeDates, new Date(), userHabits, { fromDate, toDate });
         setData(cacheKey, result);
       }
     } catch (err) {

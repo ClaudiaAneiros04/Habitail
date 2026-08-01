@@ -72,7 +72,12 @@ export interface ILogRepository {
    * Identifica qué hábitos de la lista proporcionada no tienen log completado en la fecha indicada.
    * Evita cargar todos los logs en memoria iterando en JavaScript.
    */
-  getMissedHabitsForDate(date: string, habits: import('../types').Habit[]): Promise<import('../types').Habit[]>;
+  /**
+   * Obtiene una lista de fechas únicas (YYYY-MM-DD) en las que el usuario
+   * completó al menos un hábito. Ordenadas de más reciente a más antigua.
+   * Útil para calcular rachas globales de forma muy eficiente sin cargar filas en memoria.
+   */
+  getGlobalActiveDates(userId: string): Promise<string[]>;
 }
 
 /**
@@ -427,5 +432,23 @@ export class LogRepository implements ILogRepository {
     
     // Retornamos los hábitos que NO están en el set de completados
     return habits.filter(h => !completedIds.has(h.id));
+  }
+
+  /**
+   * Retorna fechas únicas en las que el usuario ha completado al menos un hábito.
+   * Esto permite calcular el currentStreak y maxStreak global sin cargar miles de 
+   * filas en la memoria del dispositivo.
+   */
+  async getGlobalActiveDates(userId: string): Promise<string[]> {
+    const db = await getDb();
+    // DATE(fecha) asegura que fechas como "2026-09-22T08:00:00Z" se agrupen por día correctamente.
+    const rows = await db.getAllAsync<{ date: string }>(
+      `SELECT DISTINCT DATE(fecha) as date
+       FROM habit_logs
+       WHERE userId = ? AND completado = 1
+       ORDER BY date DESC`,
+      [userId]
+    );
+    return rows.map(r => r.date);
   }
 }
