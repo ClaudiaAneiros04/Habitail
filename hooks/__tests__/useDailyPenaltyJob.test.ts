@@ -4,12 +4,14 @@ import { useUserStore } from '../../store/useUserStore';
 import { useHabitStore } from '../../store/useHabitStore';
 import { usePetStore } from '../../store/usePetStore';
 import { LogRepository } from '../../storage/LogRepository';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { calculatePenaltyDelta } from '../../utils/petLogic';
 
 // Mocks
 jest.mock('../../store/useUserStore');
 jest.mock('../../store/useHabitStore');
 jest.mock('../../store/usePetStore');
+jest.mock('../../utils/petLogic');
 
 // Mock manual de LogRepository para interceptar el constructor a nivel de módulo
 jest.mock('../../storage/LogRepository', () => {
@@ -33,6 +35,7 @@ describe('useDailyPenaltyJob', () => {
   beforeEach(() => {
     mockUpdateUser = jest.fn();
     mockUpdateHealth = jest.fn();
+    (calculatePenaltyDelta as jest.Mock).mockReturnValue(-10);
 
     // Obtener la instancia del mock creada a nivel de módulo y resetear el spy
     const mockInstance = (LogRepository as any).mock.results[0]?.value || 
@@ -48,7 +51,7 @@ describe('useDailyPenaltyJob', () => {
     });
 
     (useHabitStore as any).mockReturnValue({
-      habits: [],
+      habits: [{ id: 'h1', activo: true }],
     });
 
     (usePetStore as any).mockReturnValue({
@@ -65,8 +68,6 @@ describe('useDailyPenaltyJob', () => {
 
     renderHook(() => useDailyPenaltyJob());
 
-    // Esperar a que los efectos asíncronos (si los hubiera detectables) terminen
-    // En este caso, simplemente verificamos que no se llamó a nada
     expect(mockGetMissedHabits).not.toHaveBeenCalled();
     expect(mockUpdateHealth).not.toHaveBeenCalled();
     expect(mockUpdateUser).not.toHaveBeenCalled();
@@ -77,45 +78,63 @@ describe('useDailyPenaltyJob', () => {
 
     renderHook(() => useDailyPenaltyJob());
 
-    // El job es asíncrono dentro de useEffect. 
-    // Usamos un pequeño delay o waitFor para asegurar ejecución si fuera necesario, 
-    // pero aquí simulamos la lógica.
-    
-    // Verificamos que se intentó buscar hábitos incumplidos y se actualizó la fecha
-    // Nota: renderHook ejecuta useEffect. 
-    // Para tests reales de hooks con promesas internas se usaría waitForNextUpdate.
-    
-    // Simulamos paso del tiempo para promesas
     await new Promise(resolve => setTimeout(resolve, 0));
 
+    // First run sets today as lastPenaltyAppliedDate to avoid penalizing right after installation
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    expect(mockGetMissedHabits).not.toHaveBeenCalled();
+  });
+
+  test('Job should process multiple missing days correctly', async () => {
+    const lastDate = format(subDays(new Date(), 3), 'yyyy-MM-dd'); // 3 days ago
+
+    (useUserStore as any).mockReturnValue({
+      user: { id: 'u1', lastPenaltyAppliedDate: lastDate },
+      updateUser: mockUpdateUser,
+    });
+
+    mockGetMissedHabits.mockResolvedValue([{ id: 'h1' }]); // Always misses h1
+
+    renderHook(() => useDailyPenaltyJob());
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Should process 3 days (subDays(2), subDays(1))
+    // Wait, lastDate is 3 days ago. We process from lastDate + 1 to yesterday (inclusive).
+    // So 2 days total.
+    expect(mockGetMissedHabits).toHaveBeenCalledTimes(2);
+    
+    // Total delta should be -20 (2 days * -10)
+    expect(mockUpdateHealth).toHaveBeenCalledWith(-20);
     expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
   });
 
-  test('Job should update date but not apply delta if vida is already 0', async () => {
-    (usePetStore as any).mockReturnValue({
-      pet: { vida: 0 },
-      updateHealth: mockUpdateHealth,
+  test('Job should update date but not apply delta if there are no missed habits', async () => {
+    const lastDate = format(subDays(new Date(), 1), 'yyyy-MM-dd'); // Yesterday
+
+    (useUserStore as any).mockReturnValue({
+      user: { id: 'u1', lastPenaltyAppliedDate: lastDate },
+      updateUser: mockUpdateUser,
     });
 
-    renderHook(() => useDailyPenaltyJob());
-    await new Promise(resolve => setTimeout(resolve, 0));
+    mockGetMissedHabits.mockResolvedValue([]); // No missed habits
 
+    renderHook(() => useDailyPenaltyJob());
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(mockGetMissedHabits).toHaveBeenCalledTimes(0); // Since we process up to yesterday, wait, lastProcessed = yesterday, so currentDate = today. Loop is while (current < today), so 0 iterations.
+    
     expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
-    expect(mockGetMissedHabits).not.toHaveBeenCalled();
     expect(mockUpdateHealth).not.toHaveBeenCalled();
   });
 
   test('Semaphore prevents double execution when rendered concurrently at 00:01', async () => {
-    mockGetMissedHabits.mockResolvedValue([]); // No missed habits
+    mockGetMissedHabits.mockResolvedValue([]);
 
-    // Simulamos que el componente se monta/actualiza dos veces seguidas súper rápido
     const { rerender } = renderHook(() => useDailyPenaltyJob());
     rerender();
     
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    // A pesar del renderizado múltiple, la llamada de actualización debería ocurrir solo 1 vez
-    // porque el semáforo "hasRunToday" frena la segunda pasada en la misma sesión
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
     expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
   });

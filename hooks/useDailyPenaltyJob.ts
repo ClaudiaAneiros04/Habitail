@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { format, startOfYesterday } from 'date-fns';
+import { format, startOfYesterday, startOfDay, isBefore, addDays, parseISO, startOfToday } from 'date-fns';
 import { useUserStore } from '../store/useUserStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { usePetStore } from '../store/usePetStore';
@@ -39,32 +39,47 @@ export const useDailyPenaltyJob = () => {
       isRunningRef.current = true;
 
       try {
-        // 3. Si la mascota ya tiene 0 de vida, solo actualizamos la fecha sin recalcular
-        if (pet.vida === 0) {
+        let lastProcessedDateStr = user.lastPenaltyAppliedDate;
+
+        // Si es un usuario nuevo sin lastPenaltyAppliedDate, marcamos hoy como su inicio
+        // para que empiece a ser penalizado por los incumplimientos a partir de mañana.
+        if (!lastProcessedDateStr) {
           await updateUser({ lastPenaltyAppliedDate: todayString });
           lastRunDateRef.current = todayString;
           return;
         }
 
-        // 4. Obtener todos los hábitos activos que debían cumplirse ayer
-        const yesterday = startOfYesterday();
-        const yesterdayString = format(yesterday, 'yyyy-MM-dd');
-        const expectedHabitsYesterday = getHabitsForToday(habits, yesterday);
+        // Empezamos a revisar a partir del día siguiente al último procesado
+        let currentDate = startOfDay(addDays(parseISO(lastProcessedDateStr), 1));
+        const today = startOfToday();
+        
+        let totalDelta = 0;
 
-        // 5. Para cada hábito, consultar si existe un HabitLog con completado = true para la fecha de ayer
-        const missedHabits = await logRepo.getMissedHabitsForDate(yesterdayString, expectedHabitsYesterday);
-
-        if (missedHabits.length > 0) {
-          // 6. Calcular el delta negativo
-          const delta = calculatePenaltyDelta(missedHabits);
+        // Bucle para procesar cada día desde lastProcessedDate + 1 hasta ayer (inclusive)
+        while (isBefore(currentDate, today)) {
+          const currentDateString = format(currentDate, 'yyyy-MM-dd');
           
-          // 7. Aplicar vida y actualizar petStore
-          if (delta < 0) {
-            await updateHealth(delta);
+          // Obtener los hábitos esperados para el día específico en el bucle
+          const expectedHabits = getHabitsForToday(habits, currentDate);
+          
+          // Consultar los hábitos que no se cumplieron ese día
+          const missedHabits = await logRepo.getMissedHabitsForDate(currentDateString, expectedHabits);
+          
+          if (missedHabits.length > 0) {
+            const delta = calculatePenaltyDelta(missedHabits);
+            totalDelta += delta;
           }
+          
+          // Avanzar al siguiente día
+          currentDate = addDays(currentDate, 1);
         }
 
-        // 8. Registrar lastPenaltyAppliedDate = today en userStore y base de datos
+        // Aplicar la penalización total a la salud si hubo faltas
+        if (totalDelta < 0 && pet.vida > 0) {
+          await updateHealth(totalDelta);
+        }
+
+        // Registrar lastPenaltyAppliedDate = today en userStore y base de datos
         await updateUser({ lastPenaltyAppliedDate: todayString });
         lastRunDateRef.current = todayString;
       } catch (error) {

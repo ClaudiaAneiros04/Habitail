@@ -104,6 +104,28 @@ describe('useHabitCheckIn', () => {
 
       expect(mockUpdateHealth).toHaveBeenCalledWith(5);
     });
+
+    test('should prevent duplicate check-ins from adding more health', async () => {
+      // Setup: the log already exists (habit is completed)
+      (useLogStore as any).mockReturnValue({
+        logs: [
+          {
+            id: 'h-essential_2026-05-22',
+            habitId: 'h-essential',
+            completado: true,
+            fecha: '2026-05-22',
+          },
+        ],
+        addLog: mockAddLog,
+        deleteLog: mockDeleteLog,
+      });
+
+      const { result } = renderHook(() => useHabitCheckIn());
+      await result.current.markComplete('h-essential', new Date('2026-05-22'));
+
+      // Health update should NOT be called
+      expect(mockUpdateHealth).not.toHaveBeenCalled();
+    });
   });
 
   describe('markIncomplete', () => {

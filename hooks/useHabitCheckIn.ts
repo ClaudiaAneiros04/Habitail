@@ -135,7 +135,7 @@ export const useHabitCheckIn = () => {
     await addLog(newLog);
 
     // 4. Actualizamos la gamificación según la prioridad
-    const healthDelta = getHealthDeltaForPriority(habit?.nivelPrioridad, 10);
+    const healthDelta = getHealthDeltaForPriority(habit?.nivelPrioridad, 0);
     await updateHealth(healthDelta);
 
     // 5. Asignación de puntos y evaluación de insignias
@@ -215,7 +215,7 @@ export const useHabitCheckIn = () => {
     }
 
     // 4. Actualizamos la gamificación a modo de penalización según la prioridad
-    const healthDelta = -getHealthDeltaForPriority(habit?.nivelPrioridad, 5);
+    const healthDelta = -getHealthDeltaForPriority(habit?.nivelPrioridad, 0);
     await updateHealth(healthDelta);
 
     // 5. Descontar puntos por deshacer el check-in
