@@ -23,7 +23,8 @@ describe('badgeEngine', () => {
     diasSemana: [0, 1, 2, 3, 4, 5, 6],
     tipoVerificacion: 'BOOLEAN',
     nivelPrioridad: Priority.NORMAL,
-    fechaInicio: new Date().toISOString(),
+    // Set fechaInicio in the past so streaks can be calculated correctly
+    fechaInicio: subDays(new Date(), 10).toISOString(),
     activo,
   });
 
@@ -75,6 +76,10 @@ describe('badgeEngine', () => {
     const user = getMockUser();
     const h1 = getMockHabit('h1');
     const h2 = getMockHabit('h2');
+    
+    // Set fechaInicio to before the test week
+    h1.fechaInicio = new Date('2023-09-01T00:00:00Z').toISOString();
+    h2.fechaInicio = new Date('2023-09-01T00:00:00Z').toISOString();
     
     // Create logs for 7 consecutive days starting from last Monday
     // Since this is relative, we'll just generate logs for a specific known week.
@@ -144,5 +149,66 @@ describe('badgeEngine', () => {
     expect(() => {
       evaluateBadges(user, [h1], logs);
     }).not.toThrow();
+  });
+
+  describe('Historical and Idempotency tests', () => {
+    it('should not invalidate an old perfect week because a new habit was created later', () => {
+      const user = getMockUser();
+      
+      // h1 was created a long time ago
+      const h1 = getMockHabit('h1');
+      h1.fechaInicio = new Date('2023-09-01T00:00:00Z').toISOString();
+      
+      // h2 was created AFTER the perfect week
+      const h2 = getMockHabit('h2');
+      h2.fechaInicio = new Date('2023-11-01T00:00:00Z').toISOString();
+      
+      // Perfect week logs for h1 in Oct 2023
+      const lastMonday = new Date('2023-10-02T00:00:00Z');
+      const logs: HabitLog[] = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(lastMonday.getTime() + i * 86400000);
+        logs.push({
+          id: `l1_${i}`, habitId: 'h1', userId: 'u1', fecha: d.toISOString(), completado: true, timestampRegistro: d.toISOString()
+        });
+      }
+
+      // Even though h2 exists and has no logs in this week, the week is still perfect for h1!
+      const badges = evaluateBadges(user, [h1, h2], logs);
+      expect(badges).toContainEqual({ id: 'perfect_week', name: '100% semanal' });
+    });
+
+    it('should maintain idempotency (no recalculations) and preserve granted badges if logs are deleted', () => {
+      // User ALREADY has perfect_week badge
+      const user = getMockUser(['perfect_week']);
+      const h1 = getMockHabit('h1');
+      
+      // Now imagine the logs for that perfect week were DELETED (logs array is empty)
+      const logs: HabitLog[] = [];
+      
+      const badges = evaluateBadges(user, [h1], logs);
+      
+      // evaluateBadges should return an empty array (no NEW badges unlocked)
+      expect(badges).toEqual([]);
+      
+      // The user's existing badges should still be there (it shouldn't revoke it)
+      expect(user.badges).toContain('perfect_week');
+    });
+
+    it('should not re-grant the same badge on repeated execution', () => {
+      const user = getMockUser([], subDays(new Date(), 8).toISOString());
+      const logs = [createLog('h1', 1)]; // sufficient for first_week
+
+      // First execution unlocks it
+      const newBadges1 = evaluateBadges(user, [], logs);
+      expect(newBadges1).toContainEqual({ id: 'first_week', name: 'Primera semana' });
+
+      // Simulate applying the badge to the user
+      user.badges = [...(user.badges || []), ...newBadges1.map(b => b.id)];
+
+      // Second execution does not unlock it again
+      const newBadges2 = evaluateBadges(user, [], logs);
+      expect(newBadges2).toEqual([]);
+    });
   });
 });

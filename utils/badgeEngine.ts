@@ -93,9 +93,21 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
 
       for (const weekStr of uniqueWeeks) {
         const weekStart = new Date(weekStr);
+        // Calculate the end of the natural week
+        const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+
+        const habitsForThisWeek = activeHabits.filter(h => {
+          if (!h.fechaInicio) return true;
+          const fechaInicio = parseISO(h.fechaInicio);
+          return isValid(fechaInicio) && fechaInicio <= weekEnd;
+        });
+
+        // Si no había hábitos en esa semana, no hay semana perfecta
+        if (habitsForThisWeek.length === 0) continue;
+
         let perfect = true;
 
-        for (const habit of activeHabits) {
+        for (const habit of habitsForThisWeek) {
           const hLogs = logsByHabit.get(habit.id) || [];
           const daysCompletedInWeek = new Set<string>();
 
@@ -112,6 +124,8 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
           });
 
           // Si un hábito no tiene 7 días completados en esta semana, no es una semana perfecta
+          // (Se asume que la definición estricta de "semana perfecta" exige uso de los 7 días
+          // de los hábitos que existían en ese momento)
           if (daysCompletedInWeek.size < 7) {
             perfect = false;
             break;
