@@ -6,9 +6,11 @@ import * as SQLite from 'expo-sqlite';
  * Esto previene que se abran múltiples conexiones al mismo archivo habitail.db,
  * lo cual lanzaría el error "Access Handles cannot be created..." en Web (OPFS).
  */
-const globalDb = globalThis as any;
+const globalDb = globalThis as typeof globalThis & {
+  _dbPromise?: Promise<SQLite.SQLiteDatabase>;
+};
 
-import { CREATE_TABLES_SQL } from '../db/schema';
+import { runMigrations } from '../db/migrator';
 
 export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
   if (!globalDb._dbPromise) {
@@ -19,8 +21,8 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
       await db.execAsync('PRAGMA journal_mode = WAL;');
       await db.execAsync('PRAGMA foreign_keys = ON;'); // Habilitar explícitamente FK
 
-      // Ejecutar la creación del esquema unificado
-      await db.execAsync(CREATE_TABLES_SQL);
+      // Ejecutar el sistema de migraciones versionado
+      await runMigrations(db);
 
       return db;
     })();
