@@ -12,6 +12,7 @@ export const TABLE_NAMES = {
   SUGGESTED_HABITS: 'suggested_habits',
   USER_INTERESTS: 'user_interests',
   USER_BADGES: 'user_badges',
+  HABIT_SCHEDULE_HISTORY: 'habit_schedule_history',
 } as const;
 
 export const CREATE_TABLES_SQL = `
@@ -99,6 +100,17 @@ export const CREATE_TABLES_SQL = `
   CREATE INDEX IF NOT EXISTS idx_habit_logs_user_fecha ON ${TABLE_NAMES.HABIT_LOGS} (userId, fecha);
   CREATE INDEX IF NOT EXISTS idx_habit_logs_habit_completado_fecha ON ${TABLE_NAMES.HABIT_LOGS} (habitId, completado, fecha);
   CREATE INDEX IF NOT EXISTS idx_habit_logs_user_completado_fecha ON ${TABLE_NAMES.HABIT_LOGS} (userId, completado, fecha);
+
+  CREATE TABLE IF NOT EXISTS ${TABLE_NAMES.HABIT_SCHEDULE_HISTORY} (
+    id TEXT PRIMARY KEY NOT NULL,
+    habitId TEXT NOT NULL,
+    frecuencia TEXT NOT NULL,
+    diasSemana TEXT NOT NULL,
+    validFrom TEXT NOT NULL,
+    validUntil TEXT,
+    FOREIGN KEY (habitId) REFERENCES ${TABLE_NAMES.HABITS} (id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_habit_schedule_history_habitId ON ${TABLE_NAMES.HABIT_SCHEDULE_HISTORY} (habitId);
 `;
 
 export interface UserRow {
@@ -152,4 +164,13 @@ export interface HabitLogRow {
   valor: number | null;
   nota: string | null;
   timestampRegistro: string;
+}
+
+export interface HabitScheduleHistoryRow {
+  id: string;
+  habitId: string;
+  frecuencia: string;
+  diasSemana: string;
+  validFrom: string;
+  validUntil: string | null;
 }

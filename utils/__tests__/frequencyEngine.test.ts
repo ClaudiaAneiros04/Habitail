@@ -273,6 +273,46 @@ describe('frequencyEngine', () => {
     });
   });
 
+  describe('getExpectedCompletions - con historial de programación (scheduleHistory)', () => {
+    it('debe calcular los completados esperados combinando múltiples configuraciones históricas', () => {
+      const habitWithHistory: Habit = {
+        ...baseHabit,
+        frecuencia: Frequency.DAILY,
+        fechaInicio: '2026-09-01',
+        scheduleHistory: [
+          {
+            id: 'h1',
+            habitId: '1',
+            frecuencia: Frequency.WEEKLY,
+            diasSemana: [1, 3, 5],
+            validFrom: '2026-09-01T00:00:00Z',
+            validUntil: '2026-09-08T00:00:00Z',
+          },
+          {
+            id: 'h2',
+            habitId: '1',
+            frecuencia: Frequency.DAILY,
+            diasSemana: [],
+            validFrom: '2026-09-08T00:00:00Z',
+            validUntil: null,
+          }
+        ]
+      };
+
+      // 1 al 7 sept 2026 (config WEEKLY: 1, 3, 5). Días que coinciden: Mié 2, Vie 4, Lun 7 -> Total 3
+      const expectedWeek1 = getExpectedCompletions(habitWithHistory, '2026-09-01', '2026-09-07');
+      expect(expectedWeek1).toBe(3);
+
+      // 8 al 10 sept 2026 (config DAILY) -> Total 3
+      const expectedDaily = getExpectedCompletions(habitWithHistory, '2026-09-08', '2026-09-10');
+      expect(expectedDaily).toBe(3);
+
+      // Rango completo 1 al 10 sept -> Total 6
+      const expectedTotal = getExpectedCompletions(habitWithHistory, '2026-09-01', '2026-09-10');
+      expect(expectedTotal).toBe(6);
+    });
+  });
+
   describe('getExpectedCompletionsForHabits (agregación global)', () => {
     it('debe sumar correctamente los esperados de múltiples hábitos con distintas frecuencias', () => {
       const habitDaily: Habit = {

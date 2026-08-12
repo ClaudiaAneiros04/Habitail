@@ -1,6 +1,6 @@
 import { parseISO, isValid } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
-import { getExpectedCompletions } from './frequencyEngine';
+import { getExpectedCompletions, getActiveScheduleForDate } from './frequencyEngine';
 
 /**
  * Parsea una fecha (formato YYYY-MM-DD o ISO completo con T)
@@ -86,7 +86,9 @@ export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
     }
   }
 
-  const freq = String(habit.frecuencia);
+  const activeSchedule = getActiveScheduleForDate(habit, date);
+  const freq = String(activeSchedule.frecuencia);
+  
   if (freq === Frequency.DAILY || freq === 'DAILY') {
     return true;
   }
@@ -94,7 +96,7 @@ export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
     const day = date.getUTCDay(); // 0 es Domingo, 1 es Lunes...
     // Mapeamos domingo de 0 a 0. Algunos sistemas usan 7 para domingo, pero JS usa 0.
     // Para ser robustos, si diasSemana incluye 7, mapeamos 7 a 0 o viceversa.
-    const normalizedDays = habit.diasSemana?.map(d => d === 7 ? 0 : d) || [];
+    const normalizedDays = activeSchedule.diasSemana?.map((d: number) => d === 7 ? 0 : d) || [];
     return normalizedDays.includes(day);
   }
   if (freq === Frequency.MONTHLY || freq === 'MONTHLY') {

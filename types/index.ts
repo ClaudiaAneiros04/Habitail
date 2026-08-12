@@ -82,6 +82,18 @@ export interface Habit {
   name?: string;
   reminderTime?: string;
   completedDays?: string[];
+  
+  // Historical schedule configuration
+  scheduleHistory?: HabitScheduleHistory[];
+}
+
+export interface HabitScheduleHistory {
+  id: string;
+  habitId: string;
+  frecuencia: Frequency | string;
+  diasSemana: number[];
+  validFrom: string;
+  validUntil: string | null;
 }
 
 export interface HabitLog {

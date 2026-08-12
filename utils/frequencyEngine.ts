@@ -17,14 +17,41 @@ export const normalizeToStartOfDay = (date: Date | string): Date => {
 };
 
 /**
+ * Obtiene la configuración de programación activa para una fecha dada utilizando el historial,
+ * o la configuración actual si no hay historial disponible.
+ */
+export const getActiveScheduleForDate = (habit: Habit, date: Date | string): { frecuencia: string; diasSemana: number[] } => {
+  if (!habit.scheduleHistory || habit.scheduleHistory.length === 0) {
+    return { frecuencia: habit.frecuencia, diasSemana: habit.diasSemana };
+  }
+
+  const targetDate = normalizeToStartOfDay(date);
+
+  for (let i = habit.scheduleHistory.length - 1; i >= 0; i--) {
+    const history = habit.scheduleHistory[i];
+    const validFrom = normalizeToStartOfDay(history.validFrom);
+    const validUntil = history.validUntil ? normalizeToStartOfDay(history.validUntil) : null;
+
+    // is targetDate >= validFrom AND (targetDate < validUntil OR validUntil is null)
+    if ((targetDate.getTime() >= validFrom.getTime()) && 
+        (!validUntil || targetDate.getTime() < validUntil.getTime())) {
+      return { frecuencia: history.frecuencia, diasSemana: history.diasSemana };
+    }
+  }
+
+  // Fallback
+  return { frecuencia: habit.frecuencia, diasSemana: habit.diasSemana };
+};
+
+/**
  * Determina si un hábito está programado para una fecha concreta.
  *
  * Reglas aplicadas:
  * 1. Si targetDate es anterior a habit.fechaInicio -> false (el hábito no había sido creado).
  * 2. Si habit.fechaFin existe y targetDate es posterior a habit.fechaFin -> false (hábito desactivado/finalizado).
- * 3. Según frecuencia:
+ * 3. Según frecuencia activa en esa fecha (history o actual):
  *    - DAILY: siempre true.
- *    - WEEKLY: true si el día de la semana coincide con habit.diasSemana (normalizando 7 a 0 para Domingo).
+ *    - WEEKLY: true si el día de la semana coincide con diasSemana (normalizando 7 a 0 para Domingo).
  *    - MONTHLY: true si el día del mes coincide con el día de creación del hábito.
  *      En meses con menos días que el día de creación (ej. día 31 en mes de 28/30 días),
  *      se programa para el último día del mes.
@@ -48,7 +75,8 @@ export const isHabitScheduledForDate = (habit: Habit, date: Date | string): bool
     }
   }
 
-  const freq = habit.frecuencia as Frequency;
+  const activeSchedule = getActiveScheduleForDate(habit, targetDate);
+  const freq = activeSchedule.frecuencia as Frequency;
 
   switch (freq) {
     case Frequency.DAILY:
@@ -57,12 +85,12 @@ export const isHabitScheduledForDate = (habit: Habit, date: Date | string): bool
 
     case Frequency.WEEKLY:
     case 'WEEKLY': {
-      if (!Array.isArray(habit.diasSemana) || habit.diasSemana.length === 0) {
+      if (!Array.isArray(activeSchedule.diasSemana) || activeSchedule.diasSemana.length === 0) {
         return false;
       }
       // Convención JS: 0=Domingo, 1=Lunes, ..., 6=Sábado.
       // Normalizamos 7 a 0 por si se ingresó con la convención ISO (1-7).
-      const normalizedDays = habit.diasSemana.map((d) => (d === 7 ? 0 : d));
+      const normalizedDays = activeSchedule.diasSemana.map((d) => (d === 7 ? 0 : d));
       return normalizedDays.includes(targetDate.getDay());
     }
 
