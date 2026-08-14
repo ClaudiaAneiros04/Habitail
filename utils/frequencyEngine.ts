@@ -1,19 +1,12 @@
 import { Habit, Frequency } from '../types';
 import { startOfDay, parseISO, isBefore, isAfter } from 'date-fns';
+import { parseLogicalDateUTC } from './dateUtils';
 
 /**
  * Normaliza una fecha (Date o string ISO / YYYY-MM-DD) al inicio del día local (00:00:00).
  */
 export const normalizeToStartOfDay = (date: Date | string): Date => {
-  if (date instanceof Date) {
-    return startOfDay(date);
-  }
-  if (!date) {
-    return startOfDay(new Date());
-  }
-  // Si es un string YYYY-MM-DD sin T, parseISO o new Date puede asumir UTC o local según entorno.
-  // parseISO maneja ambos de forma consistente.
-  return startOfDay(parseISO(date));
+  return parseLogicalDateUTC(date);
 };
 
 /**
@@ -64,13 +57,13 @@ export const isHabitScheduledForDate = (habit: Habit, date: Date | string): bool
   const targetDate = normalizeToStartOfDay(date);
   const habitStart = normalizeToStartOfDay(habit.fechaInicio);
 
-  if (isBefore(targetDate, habitStart)) {
+  if (targetDate.getTime() < habitStart.getTime()) {
     return false;
   }
 
   if (habit.fechaFin) {
     const habitEnd = normalizeToStartOfDay(habit.fechaFin);
-    if (isAfter(targetDate, habitEnd)) {
+    if (targetDate.getTime() > habitEnd.getTime()) {
       return false;
     }
   }
@@ -91,20 +84,20 @@ export const isHabitScheduledForDate = (habit: Habit, date: Date | string): bool
       // Convención JS: 0=Domingo, 1=Lunes, ..., 6=Sábado.
       // Normalizamos 7 a 0 por si se ingresó con la convención ISO (1-7).
       const normalizedDays = activeSchedule.diasSemana.map((d) => (d === 7 ? 0 : d));
-      return normalizedDays.includes(targetDate.getDay());
+      return normalizedDays.includes(targetDate.getUTCDay());
     }
 
     case Frequency.MONTHLY:
     case 'MONTHLY': {
-      const creationDay = habitStart.getDate();
-      // Obtenemos el número de días del mes de targetDate (año, mes+1, día 0)
-      const maxDaysInMonth = new Date(
-        targetDate.getFullYear(),
-        targetDate.getMonth() + 1,
+      const creationDay = habitStart.getUTCDate();
+      // Obtenemos el número de días del mes de targetDate (año, mes+1, día 0) en UTC
+      const maxDaysInMonth = new Date(Date.UTC(
+        targetDate.getUTCFullYear(),
+        targetDate.getUTCMonth() + 1,
         0
-      ).getDate();
+      )).getUTCDate();
       const targetDay = Math.min(creationDay, maxDaysInMonth);
-      return targetDate.getDate() === targetDay;
+      return targetDate.getUTCDate() === targetDay;
     }
 
     default:
@@ -135,22 +128,22 @@ export const getExpectedCompletions = (
   const rangeStart = normalizeToStartOfDay(fromDate);
   const rangeEnd = normalizeToStartOfDay(toDate);
 
-  if (isAfter(rangeStart, rangeEnd)) {
+  if (rangeStart.getTime() > rangeEnd.getTime()) {
     return 0;
   }
 
   const habitStart = normalizeToStartOfDay(habit.fechaInicio);
-  const effectiveStart = isBefore(rangeStart, habitStart) ? habitStart : rangeStart;
+  const effectiveStart = rangeStart.getTime() < habitStart.getTime() ? habitStart : rangeStart;
 
   let effectiveEnd = rangeEnd;
   if (habit.fechaFin) {
     const habitEnd = normalizeToStartOfDay(habit.fechaFin);
-    if (isAfter(effectiveEnd, habitEnd)) {
+    if (effectiveEnd.getTime() > habitEnd.getTime()) {
       effectiveEnd = habitEnd;
     }
   }
 
-  if (isAfter(effectiveStart, effectiveEnd)) {
+  if (effectiveStart.getTime() > effectiveEnd.getTime()) {
     return 0;
   }
 
@@ -161,7 +154,7 @@ export const getExpectedCompletions = (
     if (isHabitScheduledForDate(habit, current)) {
       count++;
     }
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return count;

@@ -1,32 +1,10 @@
-import { parseISO, isValid } from 'date-fns';
+import { isValid } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
 import { getExpectedCompletions, getActiveScheduleForDate } from './frequencyEngine';
+import { parseLogicalDateUTC, formatLogicalDate } from './dateUtils';
 
-/**
- * Parsea una fecha (formato YYYY-MM-DD o ISO completo con T)
- * de forma que devuelva un objeto Date que represente la medianoche (00:00:00) en UTC.
- * Esto asegura consistencia total sin importar la zona horaria del dispositivo.
- */
-export const parseAsUTC = (dateStr: string): Date => {
-  if (!dateStr) return new Date(NaN);
-  
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const parts = cleanStr.split('-');
-  if (parts.length === 3) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // 0-indexed en JS
-    const day = parseInt(parts[2], 10);
-    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-      return new Date(Date.UTC(year, month, day));
-    }
-  }
-  
-  // Fallback si por alguna razón no coincide con YYYY-MM-DD
-  const parsed = parseISO(dateStr);
-  if (isValid(parsed)) {
-    return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
-  }
-  return new Date(NaN); // Fecha inválida
+export const parseAsUTC = (dateStr: string | Date): Date => {
+  return parseLogicalDateUTC(dateStr);
 };
 
 /**
@@ -57,14 +35,8 @@ export const startOfWeekUTC = (date: Date, weekStartsOn = 1): Date => {
   return d;
 };
 
-/**
- * Convierte un objeto Date a formato YYYY-MM-DD en UTC.
- */
 export const formatDateUTC = (date: Date): string => {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(date.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return formatLogicalDate(date);
 };
 
 /**
