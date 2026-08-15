@@ -55,7 +55,7 @@ export default function HabitsScreen() {
   };
 
   const handleStart = async () => {
-    await completeOnboarding(selectedHabits, petName);
+    await completeOnboarding(selectedHabits as unknown as PredefinedHabit[], petName);
     /**
      * Se usa router.replace en lugar de router.push para que el stack de
      * onboarding no sea alcanzable con el botón atrás del sistema.
@@ -155,7 +155,7 @@ export default function HabitsScreen() {
 
       <FlatList
         data={suggestedHabits}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.nombre}
         renderItem={renderHabit}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

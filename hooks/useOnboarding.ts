@@ -4,6 +4,7 @@ import { PredefinedHabit } from '../data/habitLibrary';
 import { Habit, VerificationType } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setOnboardingStatus } from '../services/onboardingService';
+import { useOnboardingStore } from '../store/useOnboardingStore';
 
 export function useOnboarding() {
   const user = useUserStore((state) => state.user);
@@ -58,6 +59,10 @@ export function useOnboarding() {
       // 3. Establecer el estado del onboarding como completado (persiste en AsyncStorage y UserStore)
       await setOnboardingStatus(true);
       console.log('[useOnboarding] Onboarding completado y sincronizado con éxito.');
+
+      // 4. Limpiar el estado temporal del onboarding
+      await useOnboardingStore.getState().reset();
+
     } catch (error) {
       console.error('[useOnboarding] Error durante la finalización del onboarding:', error);
       throw new Error('No se pudo finalizar el flujo de onboarding.');
