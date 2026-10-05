@@ -41,7 +41,7 @@ export function ToastConfirmation({ message, visible }: ToastConfirmationProps) 
     }
   }, [visible, opacity, translateY]);
 
-  if (!visible && opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) === 0) {
+  if (!visible) {
     // Avoid rendering completely when invisible, but animation handles fade out
   }
 

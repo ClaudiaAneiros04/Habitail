@@ -117,4 +117,70 @@ describe('useHabitStats Hook', () => {
     expect(result.current.currentStreak).toBe(2);
     expect(result.current.totalCompleted).toBe(15);
   });
+
+  test('Periodo "total" no debe usar 1970-01-01 y debe iniciar en fechaInicio del hábito', async () => {
+    const habitWithStart: Habit = {
+      ...mockHabit,
+      fechaInicio: '2026-06-15',
+    };
+    mockHabitRepo.getById.mockResolvedValueOnce(habitWithStart);
+    mockLogRepo.getByHabit.mockResolvedValueOnce([]);
+    mockLogRepo.getStatsByPeriod.mockResolvedValueOnce({ totalCompleted: 10, totalDays: 30 });
+
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useHabitStats({
+        habitId: 'habit-123',
+        period: 'total',
+        _habitRepo: mockHabitRepo,
+        _logRepo: mockLogRepo,
+      })
+    );
+
+    await waitForNextUpdate();
+
+    // Comprobamos que getStatsByPeriod se llamó con fechaInicio '2026-06-15' y NO con '1970-01-01'
+    expect(mockLogRepo.getStatsByPeriod).toHaveBeenCalledWith(
+      'habit-123',
+      '2026-06-15',
+      todayStr
+    );
+    expect(result.current.totalCompleted).toBe(10);
+  });
+
+  test('Periodo "total" global no debe usar 1970-01-01 y debe calcular inicio lógico de los hábitos del usuario', async () => {
+    const habitA: Habit = {
+      ...mockHabit,
+      id: 'habit-a',
+      fechaInicio: '2026-07-01',
+    };
+    const habitB: Habit = {
+      ...mockHabit,
+      id: 'habit-b',
+      fechaInicio: '2026-08-01',
+    };
+
+    mockHabitRepo.get.mockResolvedValueOnce([habitA, habitB]);
+    mockLogRepo.getGlobalActiveDates.mockResolvedValueOnce(['2026-08-10', '2026-07-05']);
+    mockLogRepo.getGlobalStatsByPeriod.mockResolvedValueOnce({ totalCompleted: 20, totalDays: 50 });
+
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useHabitStats({
+        habitId: undefined, // Global
+        userId: 'user-456',
+        period: 'total',
+        _habitRepo: mockHabitRepo,
+        _logRepo: mockLogRepo,
+      })
+    );
+
+    await waitForNextUpdate();
+
+    // Debe comenzar en la fecha más antigua de sus hábitos ('2026-07-01'), NUNCA '1970-01-01'
+    expect(mockLogRepo.getGlobalStatsByPeriod).toHaveBeenCalledWith(
+      'user-456',
+      '2026-07-01',
+      todayStr
+    );
+    expect(result.current.totalCompleted).toBe(20);
+  });
 });

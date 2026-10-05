@@ -72,6 +72,7 @@ export interface ILogRepository {
    * Identifica qué hábitos de la lista proporcionada no tienen log completado en la fecha indicada.
    * Evita cargar todos los logs en memoria iterando en JavaScript.
    */
+  getMissedHabitsForDate(date: string, habits: import('../types').Habit[]): Promise<import('../types').Habit[]>;
   /**
    * Obtiene una lista de fechas únicas (YYYY-MM-DD) en las que el usuario
    * completó al menos un hábito. Ordenadas de más reciente a más antigua.

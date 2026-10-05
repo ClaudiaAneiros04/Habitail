@@ -1,6 +1,6 @@
 import { isValid } from 'date-fns';
 import { Habit, HabitLog, Frequency } from '../types';
-import { getExpectedCompletions, getActiveScheduleForDate } from './frequencyEngine';
+import { getExpectedCompletions, getActiveScheduleForDate, isHabitScheduledForDate } from './frequencyEngine';
 import { parseLogicalDateUTC, formatLogicalDate } from './dateUtils';
 
 export const parseAsUTC = (dateStr: string | Date): Date => {
@@ -41,43 +41,10 @@ export const formatDateUTC = (date: Date): string => {
 
 /**
  * Determina si el hábito está programado/activo en un día específico en UTC.
+ * Reutiliza la lógica central de frecuencia (frequencyEngine).
  */
 export const isHabitActiveOnUTCDate = (habit: Habit, date: Date): boolean => {
-  const targetDateUTC = date.getTime();
-  const habitStart = parseAsUTC(habit.fechaInicio);
-  const habitStartUTC = habitStart.getTime();
-
-  if (targetDateUTC < habitStartUTC) {
-    return false;
-  }
-
-  if (habit.fechaFin) {
-    const habitEndUTC = parseAsUTC(habit.fechaFin).getTime();
-    if (targetDateUTC > habitEndUTC) {
-      return false;
-    }
-  }
-
-  const activeSchedule = getActiveScheduleForDate(habit, date);
-  const freq = String(activeSchedule.frecuencia);
-  
-  if (freq === Frequency.DAILY || freq === 'DAILY') {
-    return true;
-  }
-  if (freq === Frequency.WEEKLY || freq === 'WEEKLY') {
-    const day = date.getUTCDay(); // 0 es Domingo, 1 es Lunes...
-    // Mapeamos domingo de 0 a 0. Algunos sistemas usan 7 para domingo, pero JS usa 0.
-    // Para ser robustos, si diasSemana incluye 7, mapeamos 7 a 0 o viceversa.
-    const normalizedDays = activeSchedule.diasSemana?.map((d: number) => d === 7 ? 0 : d) || [];
-    return normalizedDays.includes(day);
-  }
-  if (freq === Frequency.MONTHLY || freq === 'MONTHLY') {
-    const creationDay = habitStart.getUTCDate();
-    const maxDaysInMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-    const targetDay = Math.min(creationDay, maxDaysInMonth);
-    return date.getUTCDate() === targetDay;
-  }
-  return false;
+  return isHabitScheduledForDate(habit, date);
 };
 
 /**
@@ -105,7 +72,7 @@ const prepareLogs = (logs: HabitLog[]): Date[] => {
 };
 
 /**
- * Calcula la racha actual considerando la frecuencia del hábito (diario/semanal).
+ * Calcula la racha actual considerando la frecuencia del hábito (diario/semanal/mensual).
  * Se puede pasar una fecha de referencia (para tests).
  * 
  * @param logs Lista de registros del hábito
@@ -116,6 +83,9 @@ const prepareLogs = (logs: HabitLog[]): Date[] => {
 export const calculateCurrentStreak = (logs: HabitLog[], habit: Habit, referenceDate: Date = new Date()): number => {
   if (!logs || logs.length === 0) return 0;
 
+  // Un hábito inactivo o archivado no tiene racha en curso
+  if (habit.activo === false) return 0;
+
   const sortedDates = prepareLogs(logs);
   if (sortedDates.length === 0) return 0;
 
@@ -125,6 +95,14 @@ export const calculateCurrentStreak = (logs: HabitLog[], habit: Habit, reference
     referenceDate.getMonth(),
     referenceDate.getDate()
   ));
+
+  // Si el hábito ya finalizó antes de la fecha de referencia, no tiene racha activa hoy
+  if (habit.fechaFin) {
+    const habitEndUTC = parseAsUTC(habit.fechaFin).getTime();
+    if (habitEndUTC < refDayUTC.getTime()) {
+      return 0;
+    }
+  }
 
   // Frecuencia diaria, semanal o mensual basándose en las ocurrencias esperadas:
   const completedDatesSet = new Set(sortedDates.map(d => d.toISOString()));
