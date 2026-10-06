@@ -143,6 +143,9 @@ export const subDaysFromLogicalDate = (date: LogicalDate | string | Date, days: 
   return addDaysToLogicalDate(date, -days);
 };
 
+export const addLogicalDays = addDaysToLogicalDate;
+export const subLogicalDays = subDaysFromLogicalDate;
+
 /**
  * Calcula la diferencia en días entre dateA y dateB (dateA - dateB).
  */
@@ -267,10 +270,8 @@ export const formatShortDate = (date: Date | string): string => {
 /**
  * Verifica si la fecha es estrictamente posterior a hoy.
  */
-export const isFutureDate = (date: Date | string): boolean => {
-  const today = getLogicalToday();
-  const target = toLogicalDate(date);
-  return target > today;
+export const isFutureDate = (date: LogicalDate | string | Date): boolean => {
+  return compareLogicalDates(date, getLogicalToday()) > 0;
 };
 
 /**

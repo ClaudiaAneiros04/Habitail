@@ -45,6 +45,8 @@ describe('useHabitCheckIn', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-05-22T12:00:00Z'));
 
     mockAddLog = jest.fn().mockResolvedValue(undefined);
     mockDeleteLog = jest.fn().mockResolvedValue(undefined);
@@ -177,5 +179,38 @@ describe('useHabitCheckIn', () => {
 
       expect(mockUpdateHealth).toHaveBeenCalledWith(-5);
     });
+
+    test('should NOT update health when desmarcando a historical date', async () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      // 2026-05-20 es histórico respecto a 2026-05-22
+      await result.current.markIncomplete('h-essential', new Date('2026-05-20'));
+
+      expect(mockUpdateHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('historical and future constraints', () => {
+    test('should NOT modify health for historical check-in (before today)', async () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      // Hoy es 2026-05-22, completamos día anterior 2026-05-21
+      await result.current.markComplete('h-essential', '2026-05-21');
+
+      expect(mockAddLog).toHaveBeenCalled();
+      expect(mockUpdateHealth).not.toHaveBeenCalled();
+    });
+
+    test('should reject completing future date (after today)', async () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      // Mañana es 2026-05-23
+      const res = await result.current.markComplete('h-essential', '2026-05-23');
+
+      expect(res.shouldLaunchConfetti).toBe(false);
+      expect(mockAddLog).not.toHaveBeenCalled();
+      expect(mockUpdateHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
   });
 });

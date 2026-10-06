@@ -1,10 +1,12 @@
-import { Habit, Frequency, LogicalDate } from '../types';
+import { Habit, HabitLog, Frequency, LogicalDate } from '../types';
 import {
   toLogicalDate,
   addDaysToLogicalDate,
   getDayOfWeek,
   getDaysInMonth,
   parseLogicalDateUTC,
+  getLogicalToday,
+  compareLogicalDates,
 } from './dateUtils';
 
 /**
@@ -229,6 +231,100 @@ export const countExpectedOccurrences = (
   return count;
 };
 
+/**
+ * Estado canónico de un hábito en una fecha concreta según las reglas definitivas.
+ * - 'COMPLETED': Estaba programado y existe log con completado = true.
+ * - 'PENDING': Estaba programado, la fecha es HOY y aún no tiene log completado.
+ * - 'FAILED': Estaba programado, la fecha es ANTERIOR a hoy y no existe log completado.
+ * - 'FUTURE': Fecha posterior a hoy (no juzgado como incumplido ni completable).
+ * - 'NOT_SCHEDULED': El hábito NO correspondía en esa fecha (por frecuencia, antes de nacer o inactivo).
+ */
+export type HabitDayStatus = 'COMPLETED' | 'FAILED' | 'PENDING' | 'FUTURE' | 'NOT_SCHEDULED';
+
+export interface EvaluatedHabitHistoryItem {
+  habit: Habit;
+  status: HabitDayStatus;
+  log?: HabitLog;
+}
+
+/**
+ * Evalúa el estado de cumplimiento de un hábito para una fecha específica según las
+ * 5 reglas definitivas de dominio:
+ *
+ * 1. Si el hábito NO estaba programado en esa fecha -> 'NOT_SCHEDULED'.
+ * 2. Si estaba programado y existe log completado -> 'COMPLETED'.
+ * 3. Si estaba programado, la fecha es ANTERIOR a hoy y no existe log -> 'FAILED'.
+ * 4. Si estaba programado, la fecha es HOY y no existe log -> 'PENDING'.
+ * 5. Si la fecha es FUTURA -> 'FUTURE' (no completable ni fallido).
+ */
+export const getHabitStatusForDate = (
+  habit: Habit,
+  date: LogicalDate | string | Date,
+  log?: HabitLog | null,
+  today: LogicalDate | string | Date = getLogicalToday()
+): HabitDayStatus => {
+  const targetDate = toLogicalDate(date);
+  const currentToday = toLogicalDate(today);
+
+  // 1. Si no correspondía programado en esa fecha
+  if (!isHabitExpectedOnDate(habit, targetDate)) {
+    return 'NOT_SCHEDULED';
+  }
+
+  // 2. Si estaba programado y existe log completado
+  if (log && log.completado) {
+    return 'COMPLETED';
+  }
+
+  // 5. Fecha futura: no debe juzgarse como incumplido ni completado
+  if (compareLogicalDates(targetDate, currentToday) > 0) {
+    return 'FUTURE';
+  }
+
+  // 4. Si estaba programado, la fecha es HOY y no existe log: PENDING
+  if (compareLogicalDates(targetDate, currentToday) === 0) {
+    return 'PENDING';
+  }
+
+  // 3. Si estaba programado, la fecha es ANTERIOR a hoy y no existe log: FAILED
+  return 'FAILED';
+};
+
+/**
+ * Consulta de dominio para componentes de Historial y Calendario:
+ * Filtra los hábitos que correspondían en esa fecha y los combina con sus logs para
+ * devolver los ítems evaluados con su estado canónico ('COMPLETED', 'PENDING', 'FAILED', 'FUTURE').
+ *
+ * Los hábitos que no estaban programados quedan excluidos automáticamente de la lista
+ * histórica conforme a la regla 1 ("puede no aparecer directamente en la lista histórica").
+ */
+export const getHabitHistoryForDate = (
+  habits: Habit[],
+  date: LogicalDate | string | Date,
+  logs: HabitLog[] | Record<string, HabitLog>,
+  today: LogicalDate | string | Date = getLogicalToday()
+): EvaluatedHabitHistoryItem[] => {
+  const targetDate = toLogicalDate(date);
+  const currentToday = toLogicalDate(today);
+
+  const logsMap: Record<string, HabitLog> = Array.isArray(logs)
+    ? logs.reduce((acc, l) => {
+        if (toLogicalDate(l.fecha) === targetDate) {
+          acc[l.habitId] = l;
+        }
+        return acc;
+      }, {} as Record<string, HabitLog>)
+    : logs;
+
+  const expectedHabits = getHabitsExpectedOnDate(habits, targetDate);
+
+  return expectedHabits.map((habit) => ({
+    habit,
+    status: getHabitStatusForDate(habit, targetDate, logsMap[habit.id], currentToday),
+    log: logsMap[habit.id],
+  }));
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Wrappers temporales de retrocompatibilidad
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,6 +375,9 @@ export const getExpectedCompletionsForHabits = (
 /**
  * Wrapper de retrocompatibilidad para getHabitsForToday.
  */
-export const getHabitsForToday = (habits: Habit[], date: Date | string = new Date()): Habit[] => {
+export const getHabitsForToday = (
+  habits: Habit[],
+  date: LogicalDate | string | Date = getLogicalToday()
+): Habit[] => {
   return getHabitsExpectedOnDate(habits, date);
 };

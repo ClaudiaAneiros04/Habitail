@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AccessibilityInfo } from 'react-native';
-import { formatDateDB } from '../utils/dateUtils';
+import { toLogicalDate, getLogicalToday, LogicalDate } from '../utils/dateUtils';
 
 /**
  * Parámetros que el hook necesita del contexto de HomeScreen.
@@ -11,7 +11,7 @@ import { formatDateDB } from '../utils/dateUtils';
 interface CompletionCelebrationParams {
   completedCount: number;
   totalCount: number;
-  selectedDate: Date;
+  selectedDate: Date | LogicalDate | string;
 }
 
 /**
@@ -81,8 +81,8 @@ export function useCompletionCelebration({
 
   // ── Lógica de disparo ──
   useEffect(() => {
-    const todayStr = formatDateDB(new Date());
-    const selectedStr = formatDateDB(selectedDate);
+    const todayStr = getLogicalToday();
+    const selectedStr = toLogicalDate(selectedDate);
 
     // Solo evaluar para el día de hoy (no días pasados ni futuros).
     if (selectedStr !== todayStr) return;

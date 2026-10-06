@@ -10,6 +10,7 @@ import i18n from '../../i18n';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Colors } from '../../constants/colors';
 import { useHabitStats } from '../../hooks/useHabitStats';
+import { parseLogicalDateUTC } from '../../utils/dateUtils';
 
 const locales: Record<string, any> = {
   es,
@@ -124,7 +125,7 @@ export default function HabitDetailScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t('habitDetails.createdLabel', { defaultValue: 'Creado:' })}</Text>
             <Text style={styles.infoValue}>
-              {format(new Date(habit.fechaInicio), 'dd MMM yyyy', { locale: getLocale() })}
+              {format(parseLogicalDateUTC(habit.fechaInicio), 'dd MMM yyyy', { locale: getLocale() })}
             </Text>
           </View>
         </View>

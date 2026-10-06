@@ -5,38 +5,42 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHabitStore } from '../../store/useHabitStore';
 import { useLogStore } from '../../store/useLogStore';
 import { Colors } from '../../constants/colors';
-import { HabitLog } from '../../types';
-import { getHabitsForToday } from '../../utils/frequencyEngine';
-import { isFutureDate, startOfDayDate, formatDateDB, formatDateLocally } from '../../utils/dateUtils';
+import { HabitLog, LogicalDate } from '../../types';
+import { getHabitHistoryForDate, EvaluatedHabitHistoryItem } from '../../utils/frequencyEngine';
+import { 
+  getLogicalToday, 
+  addLogicalDays, 
+  compareLogicalDates, 
+  formatDateLocally 
+} from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/empty-states/EmptyState';
 
 /**
  * Pantalla del Historial (HistoryScreen) para revisar retrospectivamente los registros.
  * 
- * Interfaz de Solo Lectura (Read Only) que evalúa si un hábito fue 'Completado', 'Incumplido'
- * o simplemente marcado como 'Sin registro' en una fecha anterior determinada.
- * Se alimenta de data real consumiendo store/useHabitStore y store/useLogStore.
+ * Interfaz de Consulta / Solo Lectura (Read Only) que evalúa el estado canónico de cada
+ * hábito programado para la fecha seleccionada ('COMPLETED', 'FAILED', 'PENDING').
+ * Consume useHabitStore y useLogStore preguntando exclusivamente al motor de dominio.
  * 
- * @returns {JSX.Element} Screen principal del historial, listando cada hábito para un día en específico.
+ * @returns {JSX.Element} Screen principal del historial.
  */
 export default function HistoryScreen() {
   const { t } = useTranslation();
-  const [selectedDate, setSelectedDate] = useState<Date>(startOfDayDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState<LogicalDate>(getLogicalToday());
   const [logsObj, setLogsObj] = useState<Record<string, HabitLog>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const allHabits = useHabitStore((state) => state.habits);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
 
-  // Cada que cambia la fecha recuperamos los logs históricos
+  // Cada vez que cambia la fecha recuperamos los logs históricos de ese día
   useEffect(() => {
     let isMounted = true;
     const fetchHistory = async () => {
       setIsLoading(true);
       try {
-        const dateStr = formatDateDB(selectedDate);
-        const logs = await getLogsForDay(dateStr);
+        const logs = await getLogsForDay(selectedDate);
         if (!isMounted) return;
         
         const map: Record<string, HabitLog> = {};
@@ -55,30 +59,20 @@ export default function HistoryScreen() {
     return () => { isMounted = false; };
   }, [selectedDate, getLogsForDay]);
 
-  // Hábitos que aplican para ese histórico en base a la fecha solicitada
-  const habitsForDate = useMemo(() => {
-    return getHabitsForToday(allHabits, selectedDate);
-  }, [allHabits, selectedDate]);
+  // Consulta canónica de dominio: evalúa qué hábitos correspondían y su estado exacto
+  const historyItems = useMemo(() => {
+    return getHabitHistoryForDate(allHabits, selectedDate, logsObj);
+  }, [allHabits, selectedDate, logsObj]);
 
-  // Cambiar entre días
-  /**
-   * Avanza o retrocede la fecha seleccionada interactuando con el calendario superior.
-   * Modifica el estado global de componente disparando un re-fetech asíncrono.
-   * Evita el desbordamiento si se trata de viajar al día de "mañana" o subsecuentes.
-   * @param {number} offset - Cantidad de días (+1 adelante, -1 atrás).
-   */
+  // Navegación pura con LogicalDate: no permite avanzar más allá de hoy
   const changeDateBy = (offset: number) => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + offset);
-    if (!isFutureDate(newDate)) {
-      setSelectedDate(startOfDayDate(newDate));
+    const newDate = addLogicalDays(selectedDate, offset);
+    if (compareLogicalDates(newDate, getLogicalToday()) <= 0) {
+      setSelectedDate(newDate);
     }
   };
 
-  const isToday = selectedDate.getTime() === startOfDayDate(new Date()).getTime();
-  // Una fecha es "pasada o hoy" si NO es futura. En ese caso, los hábitos
-  // no completados deben mostrarse como incumplidos (X roja suave).
-  const isPastOrToday = !isFutureDate(selectedDate);
+  const isToday = compareLogicalDates(selectedDate, getLogicalToday()) === 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -116,57 +110,50 @@ export default function HistoryScreen() {
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
         ) : (
           <FlatList
-            data={habitsForDate}
-            keyExtractor={item => item.id}
+            data={historyItems}
+            keyExtractor={({ habit }) => habit.id}
             contentContainerStyle={styles.flatListContent}
-            renderItem={({ item }) => {
-              const log = logsObj[item.id];
-              // Resolución del estado de cada hábito en la fecha seleccionada:
-              // - Día futuro          → NONE (el hábito aún no tiene fecha de expiración)
-              // - Día pasado/hoy + log completado=true → COMPLETED (✓ verde)
-              // - Día pasado/hoy + sin log o log no completado → FAILED (✗ roja suave)
-              let statusType: 'COMPLETED' | 'FAILED' | 'NONE' = 'NONE';
-
-              if (!isPastOrToday) {
-                statusType = 'NONE';              // fecha futura: sin juzgar
-              } else if (log && log.completado) {
-                statusType = 'COMPLETED';         // completado explícitamente
-              } else {
-                statusType = 'FAILED';            // pasado o hoy sin completar
-              }
+            renderItem={({ item }: { item: EvaluatedHabitHistoryItem }) => {
+              const { habit, status } = item;
+              const isFailed = status === 'FAILED';
 
               return (
                 <View style={[
-                   styles.historyItem,
-                   statusType === 'FAILED' && styles.historyItemFailed,
+                  styles.historyItem,
+                  isFailed && styles.historyItemFailed,
                 ]}>
                   <View style={styles.leftPill}>
-                    <View style={[styles.iconBox, { backgroundColor: item.colorHex || Colors.primary }]}>
-                      <Ionicons name={(item.icono as any) || 'star'} size={20} color="#FFF" />
+                    <View style={[styles.iconBox, { backgroundColor: habit.colorHex || Colors.primary }]}>
+                      <Ionicons name={(habit.icono as any) || 'star'} size={20} color="#FFF" />
                     </View>
                     <View>
                       <Text style={[
                         styles.itemName,
-                        statusType === 'FAILED' && styles.itemNameFailed,
-                      ]}>{item.nombre}</Text>
-                      {item.horaRecordatorio && (
-                        <Text style={styles.itemTime}>{item.horaRecordatorio}</Text>
+                        isFailed && styles.itemNameFailed,
+                      ]}>{habit.nombre}</Text>
+                      {habit.horaRecordatorio && (
+                        <Text style={styles.itemTime}>{habit.horaRecordatorio}</Text>
                       )}
                     </View>
                   </View>
 
                   <View style={styles.statusBox}>
-                    {statusType === 'COMPLETED' && (
+                    {status === 'COMPLETED' && (
                       <View style={[styles.statusIcon, styles.completedIcon]}>
                         <Ionicons name="checkmark-sharp" size={18} color="#FFF" />
                       </View>
                     )}
-                    {statusType === 'FAILED' && (
+                    {status === 'FAILED' && (
                       <View style={[styles.statusIcon, styles.failedIcon]}>
                         <Ionicons name="close-sharp" size={18} color="#FFF" />
                       </View>
                     )}
-                    {statusType === 'NONE' && (
+                    {status === 'PENDING' && (
+                      <View style={[styles.statusIcon, styles.pendingIcon]}>
+                        <Ionicons name="time-outline" size={18} color="#FFF" />
+                      </View>
+                    )}
+                    {status === 'FUTURE' && (
                       <View style={styles.statusNone} />
                     )}
                   </View>
@@ -241,17 +228,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 1,
   },
-  // Tinte rojizo sutil para ítems incumplidos: no punitivo, solo informativo.
+  // Tinte rojizo sutil para ítems incumplidos: solo informativo
   historyItemFailed: {
-    backgroundColor: '#FFF1F2', // Un rojo muy claro y sólido (Rose 50)
+    backgroundColor: '#FFF1F2', // Rose 50
     borderWidth: 1,
-    borderColor: '#FFE4E6',     // Un borde ligeramente más oscuro (Rose 100)
-    shadowOpacity: 0.02,        // Reducimos la sombra para que no parezca que flota doblemente
+    borderColor: '#FFE4E6',     // Rose 100
+    shadowOpacity: 0.02,
   },
   leftPill: { flexDirection: 'row', alignItems: 'center' },
   iconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   itemName: { fontSize: 16, fontWeight: '600', color: Colors.text },
-  // Nombre ligeramente atenuado para hábitos incumplidos.
+  // Nombre atenuado solo para hábitos incumplidos
   itemNameFailed: { opacity: 0.6 },
   itemTime: { fontSize: 12, color: Colors.text, opacity: 0.5, marginTop: 2 },
   
@@ -259,5 +246,6 @@ const styles = StyleSheet.create({
   statusIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   completedIcon: { backgroundColor: '#10B981' }, // Verde esmeralda exitoso
   failedIcon: { backgroundColor: '#FB7185' },     // Rojo rosa pastel (no punitivo)
+  pendingIcon: { backgroundColor: '#F59E0B' },    // Ámbar indicador de pendiente hoy
   statusNone: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: Colors.inactive, opacity: 0.3, borderStyle: 'dashed' },
 });

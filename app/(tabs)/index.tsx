@@ -6,8 +6,8 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { useHabitStore } from '../../store/useHabitStore';
 import { useLogStore } from '../../store/useLogStore';
-import { Habit, HabitLog, Priority } from '../../types';
-import { getHabitsForToday } from '../../utils/frequencyEngine';
+import { Habit, HabitLog, Priority, LogicalDate } from '../../types';
+import { getHabitsExpectedOnDate } from '../../utils/frequencyEngine';
 
 import HabitItem from '../../components/HabitItem';
 import ProgressBar from '../../components/ProgressBar';
@@ -15,7 +15,15 @@ import { MiniPet } from '../../components/Pet/MiniPet';
 import { PermissionBanner } from '../../components/PermissionBanner';
 import { usePetStore } from '../../store/usePetStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
-import { formatDateDB, generateLogId, formatDateLocally, formatShortDate } from '../../utils/dateUtils';
+import { 
+  getLogicalToday, 
+  addLogicalDays, 
+  compareLogicalDates, 
+  generateLogId, 
+  getCurrentInstant, 
+  formatDateLocally, 
+  formatShortDate 
+} from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { ToastConfirmation } from '../../components/ToastConfirmation';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
@@ -26,49 +34,17 @@ import ConfettiOverlay from '../../components/ConfettiOverlay';
 import { HabitItemSkeleton } from '../../components/skeletons/HabitItemSkeleton';
 import { SkeletonItem } from '../../components/skeletons/SkeletonItem';
 
-// Native Date Helpers (Moved to utils/dateUtils.ts)
-
-/**
- * Compara dos fechas verificando que el año, mes y día coincidan, 
- * sin importar horas/minutos/segundos.
- */
-const isSameDayDate = (d1: Date, d2: Date) => 
-  d1.getFullYear() === d2.getFullYear() &&
-  d1.getMonth() === d2.getMonth() &&
-  d1.getDate() === d2.getDate();
-
-/**
- * Verifica si la fecha proporcionada representa un día estrictamente
- * posterior al día de hoy. Considera solo la fecha (día exacto).
- */
-const isFutureDate = (date: Date) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const check = new Date(date);
-  check.setHours(0, 0, 0, 0);
-  return check.getTime() > today.getTime();
-};
-
-/**
- * Devuelve un clon de la fecha configurada a medianoche (00:00:00).
- */
-const startOfDayDate = (date: Date) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
 /**
  * Pantalla principal (Home Screen) que enseña los hábitos del día.
  * Actúa como orquestador entre el store de hábitos (`useHabitStore`) 
  * y el histórico interacciones (`useLogStore`).
  * 
  * Permite moverse entre días anteriores (no futuros) para auditar 
- * completados, y mutar el estatus 'completado' de de cada hábito.
+ * completados, y mutar el estatus 'completado' de cada hábito.
  */
 export default function HomeScreen() {
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(startOfDayDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState<LogicalDate>(getLogicalToday());
   const [completedHabitsObj, setCompletedHabitsObj] = useState<Record<string, HabitLog>>({});
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [snoozedHabits, setSnoozedHabits] = useState<Record<string, Date>>({});
@@ -83,10 +59,7 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const allHabits = useHabitStore((state) => state.habits);
-  const addLog = useLogStore((state) => state.addLog);
-  const deleteLog = useLogStore((state) => state.deleteLog);
   const getLogsForDay = useLogStore((state) => state.getLogsForDay);
-  const pet = usePetStore((state) => state.pet);
   const { markComplete, markIncomplete } = useHabitCheckIn();
 
   // Inicialización de la app
@@ -115,9 +88,8 @@ export default function HomeScreen() {
     setRefreshTrigger(prev => prev + 1);
   });
   useMidnightRefresh(() => {
-    // Si la fecha cambia, actualizamos el trigger y aseguramos que selectedDate vuelva a "hoy"
-    const hoy = startOfDayDate(new Date());
-    setSelectedDate(hoy);
+    // Si la fecha cambia, aseguramos que selectedDate vuelva al día actual
+    setSelectedDate(getLogicalToday());
     setRefreshTrigger(prev => prev + 1);
   });
 
@@ -127,7 +99,7 @@ export default function HomeScreen() {
     const fetchLogs = async () => {
       setIsLoadingLogs(true);
       try {
-        const dateStr = formatDateDB(selectedDate);
+        const dateStr = selectedDate;
         const logs = await getLogsForDay(dateStr);
         if (!isMounted) return;
         
@@ -161,9 +133,9 @@ export default function HomeScreen() {
     return () => { isMounted = false; };
   }, [selectedDate, getLogsForDay, refreshTrigger, showToast, t]);
 
-  // Selección de hábitos correspondientes al día seleccionado
+  // Selección de hábitos correspondientes al día seleccionado según motor canónico
   const habitsForDate = React.useMemo(() => {
-    return getHabitsForToday(allHabits, selectedDate);
+    return getHabitsExpectedOnDate(allHabits, selectedDate);
   }, [allHabits, selectedDate]);
 
   // Ordenar los hábitos
@@ -194,7 +166,6 @@ export default function HomeScreen() {
       }
 
       // 3. Hora recordatorio (ej '09:00' vs '14:30') ASCendente
-      // String compare sirve dado que el ISO es HH:mm (0-padded) 
       const timeA = a.horaRecordatorio || '23:59';
       const timeB = b.horaRecordatorio || '23:59';
       return timeA.localeCompare(timeB);
@@ -221,9 +192,14 @@ export default function HomeScreen() {
    * @param {Habit} habit - El hábito seleccionado a reconfigurar.
    */
   const handleToggleHabit = useCallback(async (habit: Habit) => {
+    // Regla de dominio: nunca se puede completar una fecha futura
+    if (compareLogicalDates(selectedDate, getLogicalToday()) > 0) {
+      return;
+    }
+
     const currentLog = completedHabitsObj[habit.id];
     const isCurrentlyCompleted = currentLog?.completado === true;
-    const dateStr = formatDateDB(selectedDate);
+    const dateStr = selectedDate;
     const logId = generateLogId(habit.id, selectedDate);
 
     if (isCurrentlyCompleted) {
@@ -249,7 +225,7 @@ export default function HomeScreen() {
         userId: habit.userId || 'default-user',
         fecha: dateStr,
         completado: true,
-        timestampRegistro: new Date().toISOString(),
+        timestampRegistro: getCurrentInstant(),
       };
       setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: newLog }));
       try {
@@ -281,18 +257,16 @@ export default function HomeScreen() {
   };
 
   /**
-   * Cambia el estado visual de la fecha y carga (mediante useEffect)
-   * todos los logs correspondientes a ese nuevo día seleccionado.
+   * Cambia el estado visual de la fecha navegando exclusivamente con LogicalDate.
    * Evita intencionalmente avanzar hacia el futuro según las restricciones funcionales.
    * 
    * @param {number} offset - Incremento (+1 para día sig., -1 para día anter.)
    */
   const changeDateBy = (offset: number) => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + offset);
+    const newDate = addLogicalDays(selectedDate, offset);
     // No permitir navegar hacia el futuro
-    if (!isFutureDate(newDate)) {
-      setSelectedDate(startOfDayDate(newDate));
+    if (compareLogicalDates(newDate, getLogicalToday()) <= 0) {
+      setSelectedDate(newDate);
     }
   };
 
@@ -318,7 +292,7 @@ export default function HomeScreen() {
     );
   }
 
-  const isToday = isSameDayDate(selectedDate, new Date());
+  const isToday = compareLogicalDates(selectedDate, getLogicalToday()) === 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -389,7 +363,7 @@ export default function HomeScreen() {
               <HabitItem 
                 habit={item}
                 completed={completedHabitsObj[item.id]?.completado || false}
-                onToggle={(habitId) => handleToggleHabit(item)}
+                onToggle={() => handleToggleHabit(item)}
                 // TODO: Logic/Data debe exponer snoozedUntil en el store.
                 // Provisionalmente usamos un estado local (se documenta en LEARNING.md)
                 snoozedUntil={snoozedHabits[item.id]}
