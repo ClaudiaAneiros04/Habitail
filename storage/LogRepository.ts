@@ -18,10 +18,10 @@ export interface PeriodStats {
 }
 
 export interface ILogRepository {
-  save(log: HabitLog): Promise<void>;
+  upsert(log: HabitLog): Promise<void>;
   deleteById(id: string): Promise<void>;
   getByHabit(habitId: string): Promise<HabitLog[]>;
-  getByDate(fecha: string): Promise<HabitLog[]>;
+  getByDate(fecha: string, userId?: string): Promise<HabitLog[]>;
   getLogsForRange(habitId: string, fromDate: string, toDate: string): Promise<HabitLog[]>;
   /**
    * Obtiene logs de un hábito dentro de un rango de fechas de forma paginada.
@@ -120,12 +120,17 @@ export class LogRepository implements ILogRepository {
     };
   }
 
-  async save(log: HabitLog): Promise<void> {
+  async upsert(log: HabitLog): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO habit_logs 
+      `INSERT INTO habit_logs 
       (id, habitId, userId, fecha, completado, valor, nota, timestampRegistro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        completado = excluded.completado,
+        valor = excluded.valor,
+        nota = excluded.nota,
+        timestampRegistro = excluded.timestampRegistro`,
       [
         log.id,
         log.habitId,
@@ -156,8 +161,12 @@ export class LogRepository implements ILogRepository {
     await db.runAsync('DELETE FROM habit_logs WHERE id = ?', [id]);
   }
 
-  async getByDate(fecha: string): Promise<HabitLog[]> {
+  async getByDate(fecha: string, userId?: string): Promise<HabitLog[]> {
     const db = await getDb();
+    if (userId) {
+      const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs WHERE fecha = ? AND userId = ?', [fecha, userId]);
+      return rows.map(row => this.mapRowToLog(row));
+    }
     const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs WHERE fecha = ?', [fecha]);
     return rows.map(row => this.mapRowToLog(row));
   }

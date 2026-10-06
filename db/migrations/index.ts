@@ -3,12 +3,14 @@ import { migrationV1 } from './v1_initial_schema';
 import { migrationV2 } from './v2_user_penalty_and_inventory';
 import { migrationV3 } from './v3_habit_logs_indices';
 import { migrationV4 } from './v4_habit_schedule_history';
+import { migrationV5 } from './v5_habit_logs_unique';
 
 export * from './types';
 export * from './v1_initial_schema';
 export * from './v2_user_penalty_and_inventory';
 export * from './v3_habit_logs_indices';
 export * from './v4_habit_schedule_history';
+export * from './v5_habit_logs_unique';
 
 /**
  * Registro ordenado de todas las migraciones del sistema.
@@ -19,6 +21,7 @@ export const migrations: readonly Migration[] = [
   migrationV2,
   migrationV3,
   migrationV4,
+  migrationV5,
 ];
 
 /**

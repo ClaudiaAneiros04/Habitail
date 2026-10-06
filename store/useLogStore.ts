@@ -10,7 +10,7 @@ interface LogStore {
   addLog: (log: HabitLog) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
   loadLogs: () => Promise<void>;
-  getLogsForDay: (date: string) => Promise<HabitLog[]>;
+  getLogsForDay: (date: string, userId?: string) => Promise<HabitLog[]>;
 }
 
 const logRepo = new LogRepository();
@@ -19,7 +19,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   logs: [],
   lastUpdate: 0,
   addLog: async (log) => {
-    await logRepo.save(log);
+    await logRepo.upsert(log);
     set((state) => ({ 
       logs: [...state.logs.filter((l) => l.id !== log.id), log],
       lastUpdate: Date.now()
@@ -44,8 +44,8 @@ export const useLogStore = create<LogStore>((set, get) => ({
   loadLogs: async () => {
     // Carga diferida: dependemos de getLogsForDay para consultas por día.
   },
-  getLogsForDay: async (date: string) => {
-    const dayLogs = await logRepo.getByDate(date);
+  getLogsForDay: async (date: string, userId?: string) => {
+    const dayLogs = await logRepo.getByDate(date, userId);
     set((state) => {
       const dayLogIds = new Set(dayLogs.map((l) => l.id));
       const otherLogs = state.logs.filter((l) => !dayLogIds.has(l.id));

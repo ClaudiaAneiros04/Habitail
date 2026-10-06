@@ -4,7 +4,10 @@ import { PetRow } from '../db/schema';
 
 export interface IPetRepository {
   get(): Promise<Pet | null>;
-  save(pet: Pet): Promise<void>;
+  get(): Promise<Pet | null>;
+  getByUserId(userId: string): Promise<Pet | null>;
+  create(pet: Pet): Promise<void>;
+  update(id: string, updates: Partial<Pet>): Promise<void>;
 }
 
 export class PetRepository implements IPetRepository {
@@ -28,10 +31,16 @@ export class PetRepository implements IPetRepository {
     return row ? this.mapRowToPet(row) : null;
   }
 
-  async save(pet: Pet): Promise<void> {
+  async getByUserId(userId: string): Promise<Pet | null> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<PetRow>('SELECT * FROM pets WHERE userId = ? LIMIT 1', [userId]);
+    return row ? this.mapRowToPet(row) : null;
+  }
+
+  async create(pet: Pet): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT OR REPLACE INTO pets (id, userId, vida, nivel, xp, xpParaSiguienteNivel, estadoActual, skinEquipada, accesorios) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO pets (id, userId, vida, nivel, xp, xpParaSiguienteNivel, estadoActual, skinEquipada, accesorios) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         pet.id,
         pet.userId,
@@ -42,6 +51,29 @@ export class PetRepository implements IPetRepository {
         pet.estadoActual,
         pet.skinEquipada,
         JSON.stringify(pet.accesorios || [])
+      ]
+    );
+  }
+
+  async update(id: string, updates: Partial<Pet>): Promise<void> {
+    const db = await getDb();
+    const currentRow = await db.getFirstAsync<PetRow>('SELECT * FROM pets WHERE id = ?', [id]);
+    if (!currentRow) return;
+    
+    const current = this.mapRowToPet(currentRow);
+    const updated = { ...current, ...updates };
+    
+    await db.runAsync(
+      `UPDATE pets SET vida = ?, nivel = ?, xp = ?, xpParaSiguienteNivel = ?, estadoActual = ?, skinEquipada = ?, accesorios = ? WHERE id = ?`,
+      [
+        updated.vida,
+        updated.nivel,
+        updated.xp,
+        updated.xpParaSiguienteNivel,
+        updated.estadoActual,
+        updated.skinEquipada,
+        JSON.stringify(updated.accesorios || []),
+        id
       ]
     );
   }

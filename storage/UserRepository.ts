@@ -1,10 +1,13 @@
 import { getDb } from './database';
 import { User } from '../types';
 import { UserRow } from '../db/schema';
+import * as SQLite from 'expo-sqlite';
 
 export interface IUserRepository {
   get(): Promise<User | null>;
-  save(user: User): Promise<void>;
+  getByUserId(id: string): Promise<User | null>;
+  create(user: User): Promise<void>;
+  update(id: string, updates: Partial<User>): Promise<void>;
   updatePoints(userId: string, newBalance: number): Promise<void>;
   addBadges(userId: string, badgeIds: string[]): Promise<void>;
 }
@@ -14,9 +17,20 @@ export class UserRepository implements IUserRepository {
     const db = await getDb();
     const row = await db.getFirstAsync<UserRow>('SELECT * FROM users LIMIT 1');
     if (!row) return null;
+    return this.mapRowToUser(row, db);
+  }
+
+  async getByUserId(id: string): Promise<User | null> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
+    if (!row) return null;
+    return this.mapRowToUser(row, db);
+  }
+
+  private async mapRowToUser(row: UserRow, db: SQLite.SQLiteDatabase): Promise<User> {
     // Fetch badges
     const badgesRows = await db.getAllAsync<{badgeId: string}>('SELECT badgeId FROM user_badges WHERE userId = ?', [row.id]);
-    const badges = badgesRows.map(r => r.badgeId);
+    const badges = badgesRows.map((r: any) => r.badgeId);
 
     let inventario: string[] = [];
     try {
@@ -38,11 +52,10 @@ export class UserRepository implements IUserRepository {
     } as User;
   }
 
-  async save(user: User): Promise<void> {
+  async create(user: User): Promise<void> {
     const db = await getDb();
-    // Verify if table has inventario column, if not, it should be added in database initialization
     await db.runAsync(
-      `INSERT OR REPLACE INTO users (id, username, email, avatar, fechaRegistro, puntos, onboardingCompleted, lastPenaltyAppliedDate, inventario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, username, email, avatar, fechaRegistro, puntos, onboardingCompleted, lastPenaltyAppliedDate, inventario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
         user.username,
@@ -53,6 +66,32 @@ export class UserRepository implements IUserRepository {
         user.onboardingCompleted ? 1 : 0,
         user.lastPenaltyAppliedDate || null,
         JSON.stringify(user.inventario || []),
+      ]
+    );
+  }
+
+  async update(id: string, updates: Partial<User>): Promise<void> {
+    const db = await getDb();
+    const current = await this.getByUserId(id);
+    if (!current) return;
+    
+    const updated = { ...current, ...updates };
+    
+    await db.runAsync(
+      `UPDATE users SET 
+        username = ?, email = ?, avatar = ?, fechaRegistro = ?, puntos = ?, 
+        onboardingCompleted = ?, lastPenaltyAppliedDate = ?, inventario = ?
+       WHERE id = ?`,
+      [
+        updated.username,
+        updated.email || null,
+        updated.avatar || null,
+        updated.fechaRegistro,
+        updated.puntos,
+        updated.onboardingCompleted ? 1 : 0,
+        updated.lastPenaltyAppliedDate || null,
+        JSON.stringify(updated.inventario || []),
+        id
       ]
     );
   }

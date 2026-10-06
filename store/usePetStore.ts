@@ -31,7 +31,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
       vida: nuevaVida,
       estadoActual: getPetState(nuevaVida),
     };
-    await petRepo.save(updatedPet);
+    await petRepo.update(pet.id, { vida: nuevaVida, estadoActual: getPetState(nuevaVida) });
     set({ pet: updatedPet });
   },
   levelUp: async () => {
@@ -43,7 +43,11 @@ export const usePetStore = create<PetStore>((set, get) => ({
       xp: 0,
       xpParaSiguienteNivel: Math.floor(pet.xpParaSiguienteNivel * 1.5) // Ejemplo: incremento de dificultad
     };
-    await petRepo.save(updatedPet);
+    await petRepo.update(pet.id, {
+      nivel: pet.nivel + 1,
+      xp: 0,
+      xpParaSiguienteNivel: Math.floor(pet.xpParaSiguienteNivel * 1.5)
+    });
     set({ pet: updatedPet });
   },
   loadPet: async () => {
@@ -63,7 +67,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
         skinEquipada: 'default-cat',
         accesorios: []
       };
-      await petRepo.save(defaultPet);
+      await petRepo.create(defaultPet);
       set({ pet: defaultPet });
     }
   },
@@ -71,7 +75,7 @@ export const usePetStore = create<PetStore>((set, get) => ({
     const { pet } = get();
     if (!pet) return;
     const updatedPet = { ...pet, ...updates };
-    await petRepo.save(updatedPet);
+    await petRepo.update(pet.id, updates);
     set({ pet: updatedPet });
   },
 }));

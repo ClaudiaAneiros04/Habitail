@@ -12,7 +12,7 @@ describe('useLogStore', () => {
     useLogStore.setState({ logs: [] });
 
     // Spy on prototype methods to intercept calls correctly regardless of construction timing
-    saveSpy = jest.spyOn(LogRepository.prototype, 'save').mockResolvedValue(undefined);
+    saveSpy = jest.spyOn(LogRepository.prototype, 'upsert').mockResolvedValue(undefined);
     deleteByIdSpy = jest.spyOn(LogRepository.prototype, 'deleteById').mockResolvedValue(undefined);
     getByDateSpy = jest.spyOn(LogRepository.prototype, 'getByDate').mockResolvedValue([]);
   });
@@ -83,7 +83,7 @@ describe('useLogStore', () => {
 
     const result = await useLogStore.getState().getLogsForDay(date);
 
-    expect(getByDateSpy).toHaveBeenCalledWith(date);
+    expect(getByDateSpy).toHaveBeenCalledWith(date, undefined);
     expect(result).toEqual(dbLogs);
     
     // Verify that the Zustand store logs array is synchronized with the loaded logs

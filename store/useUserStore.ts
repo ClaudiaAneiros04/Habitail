@@ -26,7 +26,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
     const { user } = get();
     if (!user) return;
     const updatedUser = { ...user, ...updates };
-    await userRepo.save(updatedUser);
+    await userRepo.update(user.id, updates);
     set({ user: updatedUser });
   },
   loadUser: async () => {
@@ -50,7 +50,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
         puntos: 0,
         onboardingCompleted,
       };
-      await userRepo.save(user);
+      await userRepo.create(user);
     } else {
       // Mantener sincronizado el flag con AsyncStorage
       user.onboardingCompleted = onboardingCompleted;

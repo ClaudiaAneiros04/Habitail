@@ -35,14 +35,15 @@ describe('useHabitStats Hook', () => {
     mockHabitRepo = {
       get: jest.fn(),
       getById: jest.fn().mockResolvedValue(mockHabit),
-      save: jest.fn(),
+      create: jest.fn(),
+      upsert: jest.fn(),
       update: jest.fn(),
       archive: jest.fn(),
       delete: jest.fn(),
     };
 
     mockLogRepo = {
-      save: jest.fn(),
+      upsert: jest.fn(),
       deleteById: jest.fn(),
       getByHabit: jest.fn().mockResolvedValue([]),
       getByDate: jest.fn(),

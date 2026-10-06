@@ -37,7 +37,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       id: newId,
     };
 
-    await habitRepo.save(newHabit);
+    await habitRepo.create(newHabit);
     set((state) => ({
       habits: [...state.habits, newHabit],
     }));
@@ -155,7 +155,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
             // Guardar en SQLite de forma segura con try-catch individual por hábito
             for (const h of sanitizedHabits) {
               try {
-                await habitRepo.save(h);
+                await habitRepo.upsert(h);
               } catch (dbError) {
                 console.error(`[HabitStore] Error al guardar hábito migrado ${h.id} en SQLite:`, dbError);
               }
