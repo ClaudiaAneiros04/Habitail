@@ -134,3 +134,17 @@ export interface UserInterest {
   userId: string;
   categoria: Category | string;
 }
+
+export interface GamificationEvent {
+  eventKey: string;
+  userId: string;
+  petId: string;
+  habitId: string | null;
+  logicalDate: LogicalDate;
+  eventType: string;
+  healthDelta: number;
+  pointsDelta: number;
+  createdAt: Instant;
+  isReverted: boolean;
+  revertedAt?: Instant | null;
+}

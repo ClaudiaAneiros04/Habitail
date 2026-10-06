@@ -1,18 +1,13 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLogStore } from '../store/useLogStore';
-import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { useUserStore } from '../store/useUserStore';
-import { useStatsStore } from '../store/useStatsStore';
-import { calcPointsDelta } from '../utils/pointsEngine';
-import { evaluateBadges } from '../utils/badgeEngine';
-import { generateLogId, formatDateDB } from '../utils/dateUtils';
-import { getHealthDeltaForPriority } from '../utils/petLogic';
-import { HabitLog, Habit } from '../types';
+import { useLogStore } from '../store/useLogStore';
+import { formatDateDB, getLogicalToday } from '../utils/dateUtils';
+import { Habit } from '../types';
 import { initDb } from '../storage/database';
-import { LogRepository } from '../storage/LogRepository';
+import { habitCompletionService } from '../services/HabitCompletionService';
 
 // ============================================================================
 // Constants
@@ -100,75 +95,27 @@ export async function registerNotificationCategories(): Promise<void> {
  * @param habitId ID del hábito a completar.
  */
 async function handleDoneAction(habitId: string): Promise<void> {
-  console.log(`[NotificationService] Marcando hábito ${habitId} como completado...`);
+  console.log(`[NotificationService] Marcando hábito ${habitId} como completado a través de HabitCompletionService...`);
   
   try {
-    const today = new Date();
-    const dateStr = formatDateDB(today);
-    
     // Asegurar que la base de datos está inicializada
     await initDb();
     
     // Cargar y sincronizar stores en background (Zustand context limpio en Headless JS)
     await useUserStore.getState().loadUser();
-    await usePetStore.getState().loadPet();
-    await useHabitStore.getState().loadHabits();
     
-    // 1. Obtener estado actual hidratado
     const user = useUserStore.getState().user;
-    const habits = useHabitStore.getState().habits;
-    const { addLog, getLogsForDay } = useLogStore.getState();
-    const { updateHealth } = usePetStore.getState();
-    const { updatePoints, addBadges } = useUserStore.getState();
-    
-    const logId = generateLogId(habitId, today);
-    
-    // Consultar logs del día directamente de la base de datos
-    const dayLogs = await getLogsForDay(dateStr);
-    const existingLog = dayLogs.find(l => l.habitId === habitId && l.completado);
-    if (existingLog) {
-      console.log(`[NotificationService] El hábito ${habitId} ya estaba completado hoy.`);
-      return;
-    }
+    const userId = user?.id || 'default-user';
+    const todayStr = getLogicalToday();
 
-    // 2. Crear log
-    const newLog: HabitLog = {
-      id: logId,
+    await habitCompletionService.completeHabit({
+      userId,
       habitId,
-      userId: user?.id || 'default-user',
-      fecha: dateStr,
-      completado: true,
-      timestampRegistro: new Date().toISOString()
-    };
+      logicalDate: todayStr,
+      source: 'NOTIFICATION',
+    });
 
-    // 3. Persistir y aplicar gamificación
-    await addLog(newLog);
-    
-    const habit = habits.find(h => h.id === habitId);
-    const healthDelta = getHealthDeltaForPriority(habit?.nivelPrioridad, 10);
-    await updateHealth(healthDelta);
-    
-    if (habit) {
-      const points = calcPointsDelta(habit);
-      await updatePoints(points);
-      
-      const updatedUser = useUserStore.getState().user;
-      if (updatedUser) {
-        // Cargar todo el historial para la evaluación de insignias
-        const allLogs = await new LogRepository().getAll();
-        // Asegurarse de incluir el log que acabamos de guardar (en caso de desfase en la lectura)
-        if (!allLogs.some(l => l.id === newLog.id)) {
-          allLogs.push(newLog);
-        }
-        const newEarnedBadges = evaluateBadges(updatedUser as any, habits, allLogs);
-        if (newEarnedBadges.length > 0) {
-          await addBadges(newEarnedBadges);
-        }
-      }
-    }
-    
-    useStatsStore.getState().clearAll();
-    console.log(`[NotificationService] Hábito ${habitId} marcado con éxito.`);
+    console.log(`[NotificationService] Hábito ${habitId} completado con éxito.`);
   } catch (error) {
     console.error(`[NotificationService] Error al completar hábito ${habitId}:`, error);
   }

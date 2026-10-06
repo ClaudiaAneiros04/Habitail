@@ -13,6 +13,7 @@ export const TABLE_NAMES = {
   USER_INTERESTS: 'user_interests',
   USER_BADGES: 'user_badges',
   HABIT_SCHEDULE_HISTORY: 'habit_schedule_history',
+  GAMIFICATION_EVENTS: 'gamification_events',
 } as const;
 
 export const CREATE_TABLES_SQL = `
@@ -112,6 +113,25 @@ export const CREATE_TABLES_SQL = `
     FOREIGN KEY (habitId) REFERENCES ${TABLE_NAMES.HABITS} (id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_habit_schedule_history_habitId ON ${TABLE_NAMES.HABIT_SCHEDULE_HISTORY} (habitId);
+
+  CREATE TABLE IF NOT EXISTS ${TABLE_NAMES.GAMIFICATION_EVENTS} (
+    eventKey TEXT PRIMARY KEY NOT NULL,
+    userId TEXT NOT NULL,
+    petId TEXT NOT NULL,
+    habitId TEXT,
+    logicalDate TEXT NOT NULL,
+    eventType TEXT NOT NULL,
+    healthDelta INTEGER NOT NULL,
+    pointsDelta INTEGER NOT NULL,
+    createdAt TEXT NOT NULL,
+    isReverted INTEGER NOT NULL DEFAULT 0,
+    revertedAt TEXT,
+    FOREIGN KEY (userId) REFERENCES ${TABLE_NAMES.USERS} (id) ON DELETE CASCADE,
+    FOREIGN KEY (petId) REFERENCES ${TABLE_NAMES.PETS} (id) ON DELETE CASCADE,
+    FOREIGN KEY (habitId) REFERENCES ${TABLE_NAMES.HABITS} (id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_gamification_events_user ON ${TABLE_NAMES.GAMIFICATION_EVENTS} (userId);
+  CREATE INDEX IF NOT EXISTS idx_gamification_events_habit_date ON ${TABLE_NAMES.GAMIFICATION_EVENTS} (habitId, logicalDate);
 `;
 
 export interface UserRow {
@@ -175,4 +195,18 @@ export interface HabitScheduleHistoryRow {
   validFrom: string;
   validUntil: string | null;
   activo: number;
+}
+
+export interface GamificationEventRow {
+  eventKey: string;
+  userId: string;
+  petId: string;
+  habitId: string | null;
+  logicalDate: string;
+  eventType: string;
+  healthDelta: number;
+  pointsDelta: number;
+  createdAt: string;
+  isReverted: number;
+  revertedAt: string | null;
 }

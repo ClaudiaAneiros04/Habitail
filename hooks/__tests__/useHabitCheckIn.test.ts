@@ -1,33 +1,23 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-hooks';
 import { useHabitCheckIn } from '../useHabitCheckIn';
 import { useLogStore } from '../../store/useLogStore';
-import { usePetStore } from '../../store/usePetStore';
 import { useHabitStore } from '../../store/useHabitStore';
 import { useUserStore } from '../../store/useUserStore';
-import { useStatsStore } from '../../store/useStatsStore';
+import { habitCompletionService } from '../../services/HabitCompletionService';
 import { Priority, Category, Frequency, VerificationType } from '../../types';
 
 // Mocks
 jest.mock('../../store/useLogStore');
-jest.mock('../../store/usePetStore');
 jest.mock('../../store/useHabitStore');
 jest.mock('../../store/useUserStore');
-jest.mock('../../store/useStatsStore', () => ({
-  useStatsStore: {
-    getState: jest.fn().mockReturnValue({
-      clearAll: jest.fn(),
-    }),
+jest.mock('../../services/HabitCompletionService', () => ({
+  habitCompletionService: {
+    completeHabit: jest.fn(),
+    uncompleteHabit: jest.fn(),
   },
 }));
 
-describe('useHabitCheckIn', () => {
-  let mockAddLog: jest.Mock;
-  let mockDeleteLog: jest.Mock;
-  let mockUpdateHealth: jest.Mock;
-  let mockUpdatePoints: jest.Mock;
-  let mockAddBadges: jest.Mock;
-  let mockClearAll: jest.Mock;
-
+describe('useHabitCheckIn (UI Wrapper)', () => {
   const mockHabit = (id: string, priority: Priority) => ({
     id,
     userId: 'u1',
@@ -48,26 +38,8 @@ describe('useHabitCheckIn', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-05-22T12:00:00Z'));
 
-    mockAddLog = jest.fn().mockResolvedValue(undefined);
-    mockDeleteLog = jest.fn().mockResolvedValue(undefined);
-    mockUpdateHealth = jest.fn().mockResolvedValue(undefined);
-    mockUpdatePoints = jest.fn().mockResolvedValue(undefined);
-    mockAddBadges = jest.fn().mockResolvedValue(undefined);
-    mockClearAll = jest.fn();
-
-    // Reset store state
-    (useStatsStore.getState as jest.Mock).mockReturnValue({
-      clearAll: mockClearAll,
-    });
-
     (useLogStore as any).mockReturnValue({
       logs: [],
-      addLog: mockAddLog,
-      deleteLog: mockDeleteLog,
-    });
-
-    (usePetStore as any).mockReturnValue({
-      updateHealth: mockUpdateHealth,
     });
 
     (useHabitStore as any).mockReturnValue({
@@ -80,133 +52,148 @@ describe('useHabitCheckIn', () => {
 
     (useUserStore as any).mockReturnValue({
       user: { id: 'u1', puntos: 100 },
-      updatePoints: mockUpdatePoints,
-      addBadges: mockAddBadges,
+    });
+
+    (habitCompletionService.completeHabit as jest.Mock).mockResolvedValue({
+      success: true,
+      logId: 'log-1',
+      eventKey: 'event-1',
+      alreadyCompleted: false,
+      healthDelta: 20,
+      pointsDelta: 20,
+      isHistorical: false,
+    });
+
+    (habitCompletionService.uncompleteHabit as jest.Mock).mockResolvedValue({
+      success: true,
+      logId: 'log-1',
+      eventKey: 'event-1',
+      alreadyUncompleted: false,
+      healthDeltaReverted: 20,
+      pointsDeltaReverted: 20,
     });
   });
 
-  describe('markComplete', () => {
-    test('should add 20 health for ESSENTIAL habit', async () => {
+  describe('markComplete delegation', () => {
+    test('should delegate to habitCompletionService with UI source', async () => {
       const { result } = renderHook(() => useHabitCheckIn());
       await result.current.markComplete('h-essential', new Date('2026-05-22'));
 
-      expect(mockUpdateHealth).toHaveBeenCalledWith(20);
-    });
-
-    test('should add 10 health for NORMAL habit', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markComplete('h-normal', new Date('2026-05-22'));
-
-      expect(mockUpdateHealth).toHaveBeenCalledWith(10);
-    });
-
-    test('should add 5 health for FLEXIBLE habit', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markComplete('h-flexible', new Date('2026-05-22'));
-
-      expect(mockUpdateHealth).toHaveBeenCalledWith(5);
-    });
-
-    test('should prevent duplicate check-ins from adding more health', async () => {
-      // Setup: the log already exists (habit is completed)
-      (useLogStore as any).mockReturnValue({
-        logs: [
-          {
-            id: 'h-essential_2026-05-22',
-            habitId: 'h-essential',
-            completado: true,
-            fecha: '2026-05-22',
-          },
-        ],
-        addLog: mockAddLog,
-        deleteLog: mockDeleteLog,
-      });
-
-      const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markComplete('h-essential', new Date('2026-05-22'));
-
-      // Health update should NOT be called
-      expect(mockUpdateHealth).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('markIncomplete', () => {
-    beforeEach(() => {
-      // Mock existing log to allow markIncomplete to run
-      (useLogStore as any).mockReturnValue({
-        logs: [
-          {
-            id: 'h-essential_2026-05-22',
-            habitId: 'h-essential',
-            completado: true,
-            fecha: '2026-05-22',
-          },
-          {
-            id: 'h-normal_2026-05-22',
-            habitId: 'h-normal',
-            completado: true,
-            fecha: '2026-05-22',
-          },
-          {
-            id: 'h-flexible_2026-05-22',
-            habitId: 'h-flexible',
-            completado: true,
-            fecha: '2026-05-22',
-          },
-        ],
-        addLog: mockAddLog,
-        deleteLog: mockDeleteLog,
+      expect(habitCompletionService.completeHabit).toHaveBeenCalledWith({
+        userId: 'u1',
+        habitId: 'h-essential',
+        logicalDate: '2026-05-22',
+        source: 'UI',
       });
     });
 
-    test('should subtract 20 health for ESSENTIAL habit', async () => {
+    test('should reject completing future date early without calling service', async () => {
       const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markIncomplete('h-essential', new Date('2026-05-22'));
-
-      expect(mockUpdateHealth).toHaveBeenCalledWith(-20);
-    });
-
-    test('should subtract 10 health for NORMAL habit', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markIncomplete('h-normal', new Date('2026-05-22'));
-
-      expect(mockUpdateHealth).toHaveBeenCalledWith(-10);
-    });
-
-    test('should subtract 5 health for FLEXIBLE habit', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      await result.current.markIncomplete('h-flexible', new Date('2026-05-22'));
-
-      expect(mockUpdateHealth).toHaveBeenCalledWith(-5);
-    });
-
-    test('should NOT update health when desmarcando a historical date', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      // 2026-05-20 es histórico respecto a 2026-05-22
-      await result.current.markIncomplete('h-essential', new Date('2026-05-20'));
-
-      expect(mockUpdateHealth).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('historical and future constraints', () => {
-    test('should NOT modify health for historical check-in (before today)', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      // Hoy es 2026-05-22, completamos día anterior 2026-05-21
-      await result.current.markComplete('h-essential', '2026-05-21');
-
-      expect(mockAddLog).toHaveBeenCalled();
-      expect(mockUpdateHealth).not.toHaveBeenCalled();
-    });
-
-    test('should reject completing future date (after today)', async () => {
-      const { result } = renderHook(() => useHabitCheckIn());
-      // Mañana es 2026-05-23
       const res = await result.current.markComplete('h-essential', '2026-05-23');
 
       expect(res.shouldLaunchConfetti).toBe(false);
-      expect(mockAddLog).not.toHaveBeenCalled();
-      expect(mockUpdateHealth).not.toHaveBeenCalled();
+      expect(habitCompletionService.completeHabit).not.toHaveBeenCalled();
+    });
+
+    test('should calculate shouldLaunchConfetti when all daily tasks are done', async () => {
+      // Setup: 2 habits, 1 already completed
+      (useHabitStore as any).mockReturnValue({
+        habits: [
+          mockHabit('h-1', Priority.NORMAL),
+          mockHabit('h-2', Priority.NORMAL),
+        ],
+      });
+
+      (useLogStore as any).mockReturnValue({
+        logs: [
+          { habitId: 'h-1', fecha: '2026-05-22', completado: true },
+        ],
+      });
+
+      const { result } = renderHook(() => useHabitCheckIn());
+      const res = await result.current.markComplete('h-2', '2026-05-22');
+
+      expect(res.shouldLaunchConfetti).toBe(true);
+    });
+
+    test('should NOT launch confetti if service returns alreadyCompleted', async () => {
+      (habitCompletionService.completeHabit as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        logId: 'log-1',
+        eventKey: 'event-1',
+        alreadyCompleted: true,
+        healthDelta: 0,
+        pointsDelta: 0,
+        isHistorical: false,
+      });
+
+      const { result } = renderHook(() => useHabitCheckIn());
+      const res = await result.current.markComplete('h-essential', '2026-05-22');
+
+      expect(res.shouldLaunchConfetti).toBe(false);
+    });
+  });
+
+  describe('markIncomplete delegation', () => {
+    test('should delegate to habitCompletionService with UI source', async () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      await result.current.markIncomplete('h-essential', new Date('2026-05-22'));
+
+      expect(habitCompletionService.uncompleteHabit).toHaveBeenCalledWith({
+        userId: 'u1',
+        habitId: 'h-essential',
+        logicalDate: '2026-05-22',
+        source: 'UI',
+      });
+    });
+
+    test('should reject uncompleting future date early without calling service', async () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      await result.current.markIncomplete('h-essential', '2026-05-23');
+
+      expect(habitCompletionService.uncompleteHabit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('UI helpers', () => {
+    test('getStatusForDay reflects store logs', () => {
+      (useLogStore as any).mockReturnValue({
+        logs: [
+          { habitId: 'h-essential', fecha: '2026-05-22', completado: true },
+        ],
+      });
+
+      const { result } = renderHook(() => useHabitCheckIn());
+      expect(result.current.getStatusForDay('h-essential', '2026-05-22')).toBe(true);
+      expect(result.current.getStatusForDay('h-essential', '2026-05-21')).toBe(false);
+      expect(result.current.getStatusForDay('h-normal', '2026-05-22')).toBe(false);
+    });
+
+    test('getDailyProgress calculates ratio of completed habits', () => {
+      (useHabitStore as any).mockReturnValue({
+        habits: [
+          mockHabit('h-1', Priority.NORMAL),
+          mockHabit('h-2', Priority.NORMAL),
+        ],
+      });
+
+      (useLogStore as any).mockReturnValue({
+        logs: [
+          { habitId: 'h-1', fecha: '2026-05-22', completado: true },
+        ],
+      });
+
+      const { result } = renderHook(() => useHabitCheckIn());
+      expect(result.current.getDailyProgress('2026-05-22')).toBe(0.5);
+    });
+
+    test('triggerBounce triggers spring animation sequence', () => {
+      const { result } = renderHook(() => useHabitCheckIn());
+      expect(() => {
+        act(() => {
+          result.current.triggerBounce();
+        });
+      }).not.toThrow();
     });
   });
 

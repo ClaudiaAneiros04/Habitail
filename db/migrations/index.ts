@@ -5,6 +5,7 @@ import { migrationV3 } from './v3_habit_logs_indices';
 import { migrationV4 } from './v4_habit_schedule_history';
 import { migrationV5 } from './v5_habit_logs_unique';
 import { migrationV6 } from './v6_historical_schedule_and_logical_dates';
+import { migrationV7 } from './v7_gamification_events';
 
 export * from './types';
 export * from './v1_initial_schema';
@@ -13,6 +14,7 @@ export * from './v3_habit_logs_indices';
 export * from './v4_habit_schedule_history';
 export * from './v5_habit_logs_unique';
 export * from './v6_historical_schedule_and_logical_dates';
+export * from './v7_gamification_events';
 
 /**
  * Registro ordenado de todas las migraciones del sistema.
@@ -25,6 +27,7 @@ export const migrations: readonly Migration[] = [
   migrationV4,
   migrationV5,
   migrationV6,
+  migrationV7,
 ];
 
 /**
