@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../types';
 import { HabitRepository } from '../storage/HabitRepository';
 import { scheduleHabitReminder, cancelHabitReminder } from '../notifications/notificationService';
+import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
 
 const habitRepo = new HabitRepository();
 
@@ -35,11 +36,14 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     const newHabit: Habit = {
       ...habitData,
       id: newId,
+      fechaInicio: toLogicalDate(habitData.fechaInicio || getLogicalToday()),
+      fechaFin: habitData.fechaFin ? toLogicalDate(habitData.fechaFin) : undefined,
     };
 
     await habitRepo.create(newHabit);
+    const persistedHabit = await habitRepo.getById(newId);
     set((state) => ({
-      habits: [...state.habits, newHabit],
+      habits: [...state.habits, persistedHabit || newHabit],
     }));
     saveToStorage(get().habits);
 
@@ -52,9 +56,10 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
 
   updateHabit: async (id: string, updates: Partial<Habit>) => {
     await habitRepo.update(id, updates);
+    const updatedFromDb = await habitRepo.getById(id);
     set((state) => ({
       habits: state.habits.map((h) =>
-        h.id === id ? { ...h, ...updates } : h
+        h.id === id ? (updatedFromDb || { ...h, ...updates }) : h
       ),
     }));
     saveToStorage(get().habits);
@@ -73,9 +78,10 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
 
   archiveHabit: async (id: string) => {
     await habitRepo.archive(id);
+    const archivedFromDb = await habitRepo.getById(id);
     set((state) => ({
       habits: state.habits.map((h) =>
-        h.id === id ? { ...h, activo: false } : h
+        h.id === id ? (archivedFromDb || { ...h, activo: false }) : h
       ),
     }));
     saveToStorage(get().habits);
@@ -145,8 +151,8 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
               horaRecordatorio: h.horaRecordatorio || null,
               tipoVerificacion: h.tipoVerificacion || 'BOOLEAN',
               nivelPrioridad: h.nivelPrioridad || 'NORMAL',
-              fechaInicio: h.fechaInicio || new Date().toISOString(),
-              fechaFin: h.fechaFin || null,
+              fechaInicio: toLogicalDate(h.fechaInicio || getLogicalToday()),
+              fechaFin: h.fechaFin ? toLogicalDate(h.fechaFin) : null,
               activo: h.activo !== undefined ? Boolean(h.activo) : true,
             }));
 

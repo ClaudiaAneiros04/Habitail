@@ -1,5 +1,6 @@
 import { Habit, SuggestedHabit, VerificationType, Priority, Frequency } from '../types';
 import { useHabitStore } from '../store/useHabitStore';
+import { getLogicalToday } from '../utils/dateUtils';
 
 /**
  * Preferencias del usuario requeridas para instanciar un hábito de la biblioteca.
@@ -79,7 +80,7 @@ export const createHabitFromLibrary = (
         horaRecordatorio: preferences.horaRecordatorio,
         tipoVerificacion: tipoVerif,
         nivelPrioridad: preferences.nivelPrioridad,
-        fechaInicio: new Date().toISOString(), // Empieza en el momento exacto de la creación
+        fechaInicio: getLogicalToday(),
         activo: true, // El hábito nace activo por defecto
       };
 

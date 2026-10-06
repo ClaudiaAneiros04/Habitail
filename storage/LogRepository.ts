@@ -1,6 +1,7 @@
 import { HabitLog } from '../types';
 import { getDb } from './database';
 import { HabitLogRow } from '../db/schema';
+import { toLogicalDate, toInstant } from '../utils/dateUtils';
 
 /**
  * Resultado compacto que devuelven las queries de estadísticas.
@@ -114,6 +115,7 @@ export class LogRepository implements ILogRepository {
   private mapRowToLog(row: HabitLogRow): HabitLog {
     return {
       ...row,
+      fecha: toLogicalDate(row.fecha),
       valor: row.valor !== null ? row.valor : undefined,
       nota: row.nota !== null ? row.nota : undefined,
       completado: Number(row.completado) === 1,
@@ -135,11 +137,11 @@ export class LogRepository implements ILogRepository {
         log.id,
         log.habitId,
         log.userId,
-        log.fecha,
+        toLogicalDate(log.fecha),
         log.completado === true ? 1 : 0, // Cast explícito: evita que valores truthy no-boolean se guarden como 1
         log.valor !== undefined ? log.valor : null,
         log.nota || null,
-        log.timestampRegistro
+        toInstant(log.timestampRegistro)
       ]
     );
   }

@@ -90,7 +90,6 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
 
       const version = await getDatabaseVersion(db);
       expect(version).toBe(LATEST_SCHEMA_VERSION);
-      expect(version).toBe(3);
 
       // Verificar que todas las tablas existen
       const tables = await db.getAllAsync<{ name: string }>(
@@ -220,8 +219,8 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
       // Ejecutar migraciones
       await runMigrations(db);
 
-      // Comprobar que la versión avanzó a 3
-      expect(await getDatabaseVersion(db)).toBe(3);
+      // Comprobar que la versión avanzó a LATEST_SCHEMA_VERSION
+      expect(await getDatabaseVersion(db)).toBe(LATEST_SCHEMA_VERSION);
 
       // Comprobar que todos los datos existentes siguen intactos
       const user = await db.getFirstAsync<{ username: string; puntos: number; inventario: string }>(

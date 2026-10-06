@@ -196,6 +196,7 @@ describe('statsCalculator - computeStats y completionRate centralizado', () => {
             diasSemana: [1, 3, 5],
             validFrom: '2026-09-01T00:00:00Z',
             validUntil: '2026-09-04T00:00:00Z', // Mié 2 -> 1 esperado
+            activo: true,
           },
           {
             id: 'sh-2',
@@ -204,6 +205,7 @@ describe('statsCalculator - computeStats y completionRate centralizado', () => {
             diasSemana: [],
             validFrom: '2026-09-04T00:00:00Z',
             validUntil: null, // Vie 4, Sáb 5, Dom 6, Lun 7 -> 4 esperados
+            activo: true,
           },
         ],
       };

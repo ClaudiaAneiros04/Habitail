@@ -3,6 +3,7 @@ import { Category, Habit, Frequency, Priority, VerificationType } from '../types
 import { useHabitStore } from '../store/useHabitStore';
 import { useUserStore } from '../store/useUserStore';
 import { habitLibrary, PredefinedHabit } from '../data/habitLibrary';
+import { getLogicalToday } from '../utils/dateUtils';
 
 /**
  * Clave utilizada en AsyncStorage para almacenar el estado de finalización del onboarding.
@@ -147,7 +148,7 @@ export const completeOnboarding = async (
           horaRecordatorio: '09:00',
           tipoVerificacion: VerificationType.BOOLEAN,
           nivelPrioridad: libraryHabit.nivelPrioridad,
-          fechaInicio: new Date().toISOString(),
+          fechaInicio: getLogicalToday(),
           activo: true,
         };
 

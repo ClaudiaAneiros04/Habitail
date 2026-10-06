@@ -52,6 +52,7 @@ import {
   calculateCurrentStreak,
   calculateMaxStreak,
 } from '../utils/streakCalculator';
+import { toLogicalDate } from '../utils/dateUtils';
 import { format } from 'date-fns';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -162,12 +163,12 @@ export const useHabitStats = ({
           // 1. habit.fechaInicio
           // 2. Si existen logs completados anteriores a fechaInicio, usamos la fecha más antigua
           // 3. Fallback a hoy si no hay fechas disponibles (nunca 1970-01-01)
-          let earliestDate = habit.fechaInicio ? habit.fechaInicio.split('T')[0] : null;
+          let earliestDate = habit.fechaInicio ? toLogicalDate(habit.fechaInicio) : null;
 
           if (logs.length > 0) {
             for (const log of logs) {
               if (log.fecha) {
-                const logDate = log.fecha.split('T')[0];
+                const logDate = toLogicalDate(log.fecha);
                 if (!earliestDate || logDate < earliestDate) {
                   earliestDate = logDate;
                 }
@@ -179,7 +180,7 @@ export const useHabitStats = ({
 
           // Si el hábito tiene fechaFin y es anterior a hoy, acotamos el fin
           if (habit.fechaFin) {
-            const habitEnd = habit.fechaFin.split('T')[0];
+            const habitEnd = toLogicalDate(habit.fechaFin);
             if (habitEnd < effectiveTo) {
               effectiveTo = habitEnd;
             }
@@ -192,7 +193,7 @@ export const useHabitStats = ({
           // Si el hábito se creó después de fromDate (ej. a mitad de semana/mes),
           // acotamos el inicio para no consultar periodos previos a su existencia
           if (habit.fechaInicio) {
-            const habitStart = habit.fechaInicio.split('T')[0];
+            const habitStart = toLogicalDate(habit.fechaInicio);
             if (habitStart > effectiveFrom) {
               effectiveFrom = habitStart;
             }
@@ -200,7 +201,7 @@ export const useHabitStats = ({
 
           // Si el hábito tiene fechaFin anterior a toDate, acotamos el fin
           if (habit.fechaFin) {
-            const habitEnd = habit.fechaFin.split('T')[0];
+            const habitEnd = toLogicalDate(habit.fechaFin);
             if (habitEnd < effectiveTo) {
               effectiveTo = habitEnd;
             }
@@ -255,7 +256,7 @@ export const useHabitStats = ({
           // El mínimo entre la fechaInicio más antigua de los hábitos del usuario
           // y el primer registro válido en activeDates.
           const habitStarts = userHabits
-            .map(h => h.fechaInicio ? h.fechaInicio.split('T')[0] : null)
+            .map(h => h.fechaInicio ? toLogicalDate(h.fechaInicio) : null)
             .filter((d): d is string => Boolean(d));
 
           let earliestDate: string | null = null;
@@ -266,7 +267,7 @@ export const useHabitStats = ({
 
           if (activeDates.length > 0) {
             for (let i = activeDates.length - 1; i >= 0; i--) {
-              const d = activeDates[i].split('T')[0];
+              const d = toLogicalDate(activeDates[i]);
               if (!earliestDate || d < earliestDate) {
                 earliestDate = d;
               }

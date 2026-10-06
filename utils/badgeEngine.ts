@@ -1,6 +1,7 @@
 import { startOfWeek, subDays, isSameWeek, parseISO, isValid } from 'date-fns';
 import { Habit, HabitLog, User } from '../types';
 import { calculateCurrentStreak } from './streakCalculator';
+import { toLogicalDate } from './dateUtils';
 
 export interface Badge {
   id: string;
@@ -117,7 +118,7 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
               if (isValid(d)) {
                 if (isSameWeek(d, weekStart, { weekStartsOn: 1 })) {
                   // guardamos la fecha truncada a dia para evitar dobles checkins
-                  daysCompletedInWeek.add(d.toISOString().split('T')[0]);
+                  daysCompletedInWeek.add(toLogicalDate(l.fecha));
                 }
               }
             }
@@ -152,7 +153,7 @@ export function evaluateBadges(user: UserWithBadges, habits: Habit[], logs: Habi
       const d = parseISO(l.fecha);
       if (isValid(d)) {
         if (d >= startDate) {
-          activeDays.add(d.toISOString().split('T')[0]);
+          activeDays.add(toLogicalDate(l.fecha));
         }
       }
     });

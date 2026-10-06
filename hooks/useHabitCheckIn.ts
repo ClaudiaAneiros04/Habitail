@@ -7,11 +7,11 @@ import { useStatsStore } from '../store/useStatsStore';
 import { useHeatmapStore } from '../store/useHeatmapStore';
 import { HabitLog } from '../types';
 import { formatISO, startOfDay, parseISO } from 'date-fns';
-import { getHabitsForToday } from '../utils/frequencyEngine';
+import { getHabitsForToday, getHabitsExpectedOnDate } from '../utils/frequencyEngine';
 import { useUserStore } from '../store/useUserStore';
 import { calcPointsDelta } from '../utils/pointsEngine';
 import { evaluateBadges } from '../utils/badgeEngine';
-import { formatDateDB, generateLogId } from '../utils/dateUtils';
+import { formatDateDB, generateLogId, toLogicalDate, getCurrentInstant } from '../utils/dateUtils';
 import { getHealthDeltaForPriority } from '../utils/petLogic';
 
 /**
@@ -59,8 +59,7 @@ export const useHabitCheckIn = () => {
     // Busca en el estado global el log que concuerde en fecha y ID de hábito
     const log = logs.find(l => {
       if (l.habitId !== habitId) return false;
-      // Normalizamos la fecha del log a YYYY-MM-DD para la comparación de forma agnóstica a timezone
-      const logDateStr = l.fecha.split('T')[0];
+      const logDateStr = toLogicalDate(l.fecha);
       return logDateStr === targetDateStr;
     });
 
@@ -128,7 +127,7 @@ export const useHabitCheckIn = () => {
       userId: user?.id || 'default-user',
       fecha: formatDateDB(fecha),
       completado: true,
-      timestampRegistro: formatISO(new Date())
+      timestampRegistro: getCurrentInstant()
     };
 
     // 3. Persistimos el registro de éxito

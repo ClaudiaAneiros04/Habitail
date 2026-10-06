@@ -4,8 +4,9 @@ import { useUserStore } from '../store/useUserStore';
 import { useHabitStore } from '../store/useHabitStore';
 import { usePetStore } from '../store/usePetStore';
 import { LogRepository } from '../storage/LogRepository';
-import { getHabitsForToday } from '../utils/frequencyEngine';
+import { getHabitsExpectedOnDate, getHabitsForToday } from '../utils/frequencyEngine';
 import { calculatePenaltyDelta } from '../utils/petLogic';
+import { getLogicalToday, toLogicalDate } from '../utils/dateUtils';
 
 const logRepo = new LogRepository();
 
@@ -23,7 +24,7 @@ export const useDailyPenaltyJob = () => {
     if (!user || !pet || !habits) return;
 
     const runJob = async () => {
-      const todayString = format(new Date(), 'yyyy-MM-dd');
+      const todayString = getLogicalToday();
       
       // 1. Si ya se ejecutó hoy en esta instancia o está corriendo -> no hacer nada
       if (lastRunDateRef.current === todayString || isRunningRef.current) {
@@ -57,10 +58,10 @@ export const useDailyPenaltyJob = () => {
 
         // Bucle para procesar cada día desde lastProcessedDate + 1 hasta ayer (inclusive)
         while (isBefore(currentDate, today)) {
-          const currentDateString = format(currentDate, 'yyyy-MM-dd');
+          const currentDateString = toLogicalDate(currentDate);
           
           // Obtener los hábitos esperados para el día específico en el bucle
-          const expectedHabits = getHabitsForToday(habits, currentDate);
+          const expectedHabits = getHabitsExpectedOnDate(habits, currentDateString);
           
           // Consultar los hábitos que no se cumplieron ese día
           const missedHabits = await logRepo.getMissedHabitsForDate(currentDateString, expectedHabits);

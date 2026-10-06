@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Frequency, VerificationType, Priority } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { getLogicalToday } from '../../utils/dateUtils';
 
 const DAYS_OF_WEEK = [
   { id: 1, key: 'lun' },
@@ -82,7 +83,7 @@ export default function SettingsScreen() {
           horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
           tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
           nivelPrioridad: priority,
-          fechaInicio: new Date().toISOString(),
+          fechaInicio: getLogicalToday(),
           activo: true,
         });
       }

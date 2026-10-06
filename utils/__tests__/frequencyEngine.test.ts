@@ -287,6 +287,7 @@ describe('frequencyEngine', () => {
             diasSemana: [1, 3, 5],
             validFrom: '2026-09-01T00:00:00Z',
             validUntil: '2026-09-08T00:00:00Z',
+            activo: true,
           },
           {
             id: 'h2',
@@ -295,6 +296,7 @@ describe('frequencyEngine', () => {
             diasSemana: [],
             validFrom: '2026-09-08T00:00:00Z',
             validUntil: null,
+            activo: true,
           }
         ]
       };

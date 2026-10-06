@@ -5,6 +5,7 @@ import { Habit, VerificationType } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setOnboardingStatus } from '../services/onboardingService';
 import { useOnboardingStore } from '../store/useOnboardingStore';
+import { getLogicalToday } from '../utils/dateUtils';
 
 export function useOnboarding() {
   const user = useUserStore((state) => state.user);
@@ -47,7 +48,7 @@ export function useOnboarding() {
             horaRecordatorio: '09:00',
             tipoVerificacion: VerificationType.BOOLEAN,
             nivelPrioridad: habit.nivelPrioridad,
-            fechaInicio: new Date().toISOString(),
+            fechaInicio: getLogicalToday(),
             activo: true,
           };
           

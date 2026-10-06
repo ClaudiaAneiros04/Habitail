@@ -193,13 +193,17 @@ describe('Caso 3 – Hábito semanal y día no activo', () => {
      * medio de dos semanas con log no rompe nada: lo importante es que
      * cada semana tuvo al menos 1 completado.
      */
+    const habitSoloLunes = makeHabit({
+      frecuencia: Frequency.WEEKLY,
+      diasSemana: [1], // Solo Lunes
+    });
     // Completó el lunes de esta semana (20 Apr) y el lunes de la semana pasada (13 Apr)
     const logs: HabitLog[] = [
       { id: 'l1', habitId: 'h1', userId: 'u1', fecha: '2026-04-20', completado: true, timestampRegistro: '' },
       { id: 'l2', habitId: 'h1', userId: 'u1', fecha: '2026-04-13', completado: true, timestampRegistro: '' },
     ];
     // Ref = martes 21 (día inactivo, pero dentro de la misma semana que el log del 20)
-    const streak = calculateCurrentStreak(logs, habitSoloLMV, martes);
+    const streak = calculateCurrentStreak(logs, habitSoloLunes, martes);
     expect(streak).toBe(2); // 2 semanas consecutivas con completado
   });
 

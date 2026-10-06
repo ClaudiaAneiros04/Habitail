@@ -35,15 +35,27 @@ export enum VerificationType {
   TIMER = 'TIMER'
 }
 
+/**
+ * LogicalDate: Día calendario del usuario en formato exacto YYYY-MM-DD.
+ * Inmune a desfases horarios y zonas horarias.
+ */
+export type LogicalDate = string;
+
+/**
+ * Instant: Timestamp real ISO 8601 con fecha, hora y zona horaria (UTC o con offset)
+ * para eventos técnicos y registros que requieren precisión temporal.
+ */
+export type Instant = string;
+
 export interface User {
   id: string;
   username: string; // From ER
   email?: string; // From ER
   avatar?: string; // From ER
-  fechaRegistro: string; // From ER
+  fechaRegistro: Instant; // From ER
   puntos: number; // From ER
   onboardingCompleted: boolean; // From Frontend
-  lastPenaltyAppliedDate?: string; // App Init Job
+  lastPenaltyAppliedDate?: LogicalDate; // App Init Job
   inventario?: string[]; // IDs de items comprados
   badges?: string[]; // IDs de insignias desbloqueadas
   lastOpenedAt?: number; // Timestamp de la última vez que abrió la app (Fase 6)
@@ -74,8 +86,8 @@ export interface Habit {
   horaRecordatorio?: string;
   tipoVerificacion: VerificationType | string;
   nivelPrioridad: Priority | string;
-  fechaInicio: string;
-  fechaFin?: string;
+  fechaInicio: LogicalDate;
+  fechaFin?: LogicalDate;
   activo: boolean;
 
   // English aliases / Gamification properties (Phase 6 Notifications requirement)
@@ -92,19 +104,20 @@ export interface HabitScheduleHistory {
   habitId: string;
   frecuencia: Frequency | string;
   diasSemana: number[];
-  validFrom: string;
-  validUntil: string | null;
+  validFrom: LogicalDate;
+  validUntil: LogicalDate | null;
+  activo: boolean;
 }
 
 export interface HabitLog {
   id: string;
   habitId: string;
   userId: string;
-  fecha: string;
+  fecha: LogicalDate;
   completado: boolean;
   valor?: number;
   nota?: string;
-  timestampRegistro: string;
+  timestampRegistro: Instant;
 }
 
 export interface SuggestedHabit {

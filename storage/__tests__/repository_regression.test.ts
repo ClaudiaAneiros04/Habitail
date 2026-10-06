@@ -5,6 +5,59 @@ import { HabitRepository } from '../HabitRepository';
 import { LogRepository } from '../LogRepository';
 import { runMigrations } from '../../db/migrator';
 import { User, Pet, Habit, HabitLog, PetState } from '../../types';
+import { DatabaseSync } from 'node:sqlite';
+
+class RealSqliteTestAdapter {
+  private rawDb: DatabaseSync;
+
+  constructor() {
+    this.rawDb = new DatabaseSync(':memory:');
+  }
+
+  async execAsync(source: string): Promise<void> {
+    this.rawDb.exec(source);
+  }
+
+  async runAsync(source: string, params: unknown[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
+    const stmt = this.rawDb.prepare(source);
+    const result = stmt.run(...(params as any[]));
+    return {
+      lastInsertRowId: Number(result.lastInsertRowid ?? 0),
+      changes: Number(result.changes ?? 0),
+    };
+  }
+
+  async getFirstAsync<T>(source: string, params: unknown[] = []): Promise<T | null> {
+    const stmt = this.rawDb.prepare(source);
+    const row = stmt.get(...(params as any[]));
+    return (row as T) ?? null;
+  }
+
+  async getAllAsync<T>(source: string, params: unknown[] = []): Promise<T[]> {
+    const stmt = this.rawDb.prepare(source);
+    const rows = stmt.all(...(params as any[]));
+    return rows as T[];
+  }
+
+  async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+    this.rawDb.exec('BEGIN TRANSACTION;');
+    try {
+      await task();
+      this.rawDb.exec('COMMIT;');
+    } catch (error) {
+      this.rawDb.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
+  asExpoDb(): any {
+    return this;
+  }
+
+  close(): void {
+    this.rawDb.close();
+  }
+}
 
 describe('Repository Regression Tests', () => {
   let userRepo: UserRepository;
@@ -12,23 +65,14 @@ describe('Repository Regression Tests', () => {
   let habitRepo: HabitRepository;
   let logRepo: LogRepository;
   let db: any;
+  let testAdapter: RealSqliteTestAdapter;
 
   beforeEach(async () => {
-    // 1. Limpiar e inicializar la BD
-    db = await getDb();
-    // Simulate drop tables to ensure clean state
-    await db.execAsync(`
-      PRAGMA foreign_keys = OFF;
-      DROP TABLE IF EXISTS habit_logs;
-      DROP TABLE IF EXISTS habit_schedule_history;
-      DROP TABLE IF EXISTS habits;
-      DROP TABLE IF EXISTS pets;
-      DROP TABLE IF EXISTS user_badges;
-      DROP TABLE IF EXISTS user_interests;
-      DROP TABLE IF EXISTS users;
-      PRAGMA foreign_keys = ON;
-    `);
-    await initDb(); // Corre las migraciones v1 a v5
+    testAdapter = new RealSqliteTestAdapter();
+    db = testAdapter.asExpoDb();
+    (globalThis as any)._dbPromise = Promise.resolve(db);
+
+    await runMigrations(db); // Corre las migraciones v1 a v6
 
     userRepo = new UserRepository();
     petRepo = new PetRepository();
@@ -37,7 +81,8 @@ describe('Repository Regression Tests', () => {
   });
 
   afterEach(async () => {
-    // clean up or close if needed
+    testAdapter.close();
+    delete (globalThis as any)._dbPromise;
   });
 
   it('Modificar el nombre del usuario conserva todos los hijos', async () => {

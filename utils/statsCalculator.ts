@@ -18,7 +18,7 @@ import { HabitLog, Habit } from '../types';
 import { PeriodStats } from '../storage/LogRepository';
 import { calculateCurrentStreak, calculateMaxStreak } from './streakCalculator';
 import { getExpectedCompletions, getExpectedCompletionsForHabits } from './frequencyEngine';
-import { parseLogicalDateUTC } from './dateUtils';
+import { parseLogicalDateUTC, toLogicalDate } from './dateUtils';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -93,11 +93,7 @@ export const buildPeriodRange = (
     default: {
       let fromDate: string;
       if (customStartDate) {
-        if (typeof customStartDate === 'string') {
-          fromDate = customStartDate.includes('T') ? customStartDate.split('T')[0] : customStartDate;
-        } else {
-          fromDate = fmt(customStartDate);
-        }
+        fromDate = toLogicalDate(customStartDate);
       } else {
         // En ausencia de fecha explícita, se usa el día de hoy como fecha base lógica,
         // evitando fechas arbitrarias como 1970-01-01.
@@ -221,10 +217,10 @@ export const calculateGlobalStreaks = (
   // Normalizamos a array de strings 'YYYY-MM-DD', extrayendo si son objetos HabitLog
   const rawDates: string[] = activeDates.map((item: any) => {
     if (typeof item === 'string') {
-      return item.includes('T') ? item.split('T')[0] : item;
+      return toLogicalDate(item);
     }
     if (item && typeof item === 'object' && typeof item.fecha === 'string') {
-      return item.fecha.includes('T') ? item.fecha.split('T')[0] : item.fecha;
+      return toLogicalDate(item.fecha);
     }
     return '';
   }).filter(Boolean);

@@ -108,6 +108,7 @@ export const CREATE_TABLES_SQL = `
     diasSemana TEXT NOT NULL,
     validFrom TEXT NOT NULL,
     validUntil TEXT,
+    activo INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (habitId) REFERENCES ${TABLE_NAMES.HABITS} (id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_habit_schedule_history_habitId ON ${TABLE_NAMES.HABIT_SCHEDULE_HISTORY} (habitId);
@@ -173,4 +174,5 @@ export interface HabitScheduleHistoryRow {
   diasSemana: string;
   validFrom: string;
   validUntil: string | null;
+  activo: number;
 }
