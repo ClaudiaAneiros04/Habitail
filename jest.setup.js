@@ -15,3 +15,11 @@ jest.mock('expo-sqlite', () => {
     }),
   };
 });
+
+// Mock global de expo-crypto para generación de UUIDs RFC4122 en tests
+jest.mock('expo-crypto', () => ({
+  randomUUID: () => {
+    const crypto = require('crypto');
+    return crypto.randomUUID();
+  },
+}));

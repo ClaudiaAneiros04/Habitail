@@ -3,8 +3,7 @@ import { getDb } from './database';
 import { PetRow } from '../db/schema';
 
 export interface IPetRepository {
-  get(): Promise<Pet | null>;
-  get(): Promise<Pet | null>;
+  get(userId?: string): Promise<Pet | null>;
   getByUserId(userId: string): Promise<Pet | null>;
   create(pet: Pet): Promise<void>;
   update(id: string, updates: Partial<Pet>): Promise<void>;
@@ -25,7 +24,10 @@ export class PetRepository implements IPetRepository {
     };
   }
 
-  async get(): Promise<Pet | null> {
+  async get(userId?: string): Promise<Pet | null> {
+    if (userId) {
+      return this.getByUserId(userId);
+    }
     const db = await getDb();
     const row = await db.getFirstAsync<PetRow>('SELECT * FROM pets LIMIT 1');
     return row ? this.mapRowToPet(row) : null;

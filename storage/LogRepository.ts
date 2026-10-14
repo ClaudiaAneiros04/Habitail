@@ -68,7 +68,7 @@ export interface ILogRepository {
     limit: number,
     offset: number
   ): Promise<HabitLog[]>;
-  getAll(): Promise<HabitLog[]>;
+  getAll(userId?: string): Promise<HabitLog[]>;
   /**
    * Identifica qué hábitos de la lista proporcionada no tienen log completado en la fecha indicada.
    * Evita cargar todos los logs en memoria iterando en JavaScript.
@@ -416,9 +416,11 @@ export class LogRepository implements ILogRepository {
     return rows.map(row => this.mapRowToLog(row));
   }
 
-  async getAll(): Promise<HabitLog[]> {
+  async getAll(userId?: string): Promise<HabitLog[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs');
+    const rows = userId
+      ? await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs WHERE userId = ?', [userId])
+      : await db.getAllAsync<HabitLogRow>('SELECT * FROM habit_logs');
     return rows.map(row => this.mapRowToLog(row));
   }
 

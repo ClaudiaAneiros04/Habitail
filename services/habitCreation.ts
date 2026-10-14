@@ -15,17 +15,7 @@ export interface UserHabitPreferences {
   tipoVerificacion?: VerificationType | string;
 }
 
-/**
- * Función auxiliar que genera un identificador UUID v4.
- * Funciona como un polyfill simple compatible de forma segura con React Native.
- */
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
+import { generateUUID } from '../utils/uuid';
 
 /**
  * Genera un nuevo hábito a partir de un hábito sugerido (SuggestedHabit) de la biblioteca,

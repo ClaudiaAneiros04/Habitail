@@ -26,19 +26,7 @@ export const DEFAULT_ROUTES: OnboardingRoutes = {
   mainApp: '/(tabs)',
 };
 
-/**
- * Genera un identificador único con formato UUID v4.
- * Implementación limpia y segura compatible con entornos React Native.
- * 
- * @returns {string} Un string UUID v4 autogenerado.
- */
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
+import { generateUUID } from '../utils/uuid';
 
 /**
  * Recupera el estado actual del onboarding desde AsyncStorage.

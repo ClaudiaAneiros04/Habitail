@@ -4,7 +4,7 @@ import { UserRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
 
 export interface IUserRepository {
-  get(): Promise<User | null>;
+  get(userId?: string): Promise<User | null>;
   getByUserId(id: string): Promise<User | null>;
   create(user: User): Promise<void>;
   update(id: string, updates: Partial<User>): Promise<void>;
@@ -13,9 +13,13 @@ export interface IUserRepository {
 }
 
 export class UserRepository implements IUserRepository {
-  async get(): Promise<User | null> {
+  async get(userId?: string): Promise<User | null> {
+    if (userId) {
+      return this.getByUserId(userId);
+    }
     const db = await getDb();
-    const row = await db.getFirstAsync<UserRow>('SELECT * FROM users LIMIT 1');
+    const row = await db.getFirstAsync<UserRow>('SELECT * FROM users WHERE id = ?', ['default-user'])
+      || await db.getFirstAsync<UserRow>('SELECT * FROM users LIMIT 1');
     if (!row) return null;
     return this.mapRowToUser(row, db);
   }
@@ -102,12 +106,14 @@ export class UserRepository implements IUserRepository {
 
   async updatePoints(userId: string, newBalance: number): Promise<void> {
     const db = await getDb();
-    await db.runAsync(`UPDATE users SET puntos = ? WHERE id = ?`, [newBalance, userId]);
+    const safeBalance = Math.max(0, newBalance);
+    await db.runAsync(`UPDATE users SET puntos = ? WHERE id = ?`, [safeBalance, userId]);
   }
 
   async addBadges(userId: string, badgeIds: string[]): Promise<void> {
     const db = await getDb();
-    for (const badgeId of badgeIds) {
+    const uniqueBadges = Array.from(new Set(badgeIds));
+    for (const badgeId of uniqueBadges) {
       await db.runAsync('INSERT OR IGNORE INTO user_badges (userId, badgeId) VALUES (?, ?)', [userId, badgeId]);
     }
   }

@@ -3,9 +3,10 @@ import { getDb } from './database';
 import { HabitRow, HabitScheduleHistoryRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
 import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
+import { generateUUID } from '../utils/uuid';
 
 export interface IHabitRepository {
-  get(): Promise<Habit[]>;
+  get(userId?: string): Promise<Habit[]>;
   getById(id: string): Promise<Habit | null>;
   create(habit: Habit): Promise<void>;
   update(id: string, changes: Partial<Habit>): Promise<void>;
@@ -25,14 +26,6 @@ export class HabitRepository implements IHabitRepository {
       diasSemana: JSON.parse(row.diasSemana),
       activo: Boolean(row.activo),
     } as Habit;
-  }
-
-  private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
   }
 
   /**
@@ -60,7 +53,7 @@ export class HabitRepository implements IHabitRepository {
       await db.runAsync(
         'INSERT INTO habit_schedule_history (id, habitId, frecuencia, diasSemana, validFrom, validUntil, activo) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
-          this.generateUUID(),
+          generateUUID(),
           habit.id,
           targetFreq,
           targetDays,
@@ -100,7 +93,7 @@ export class HabitRepository implements IHabitRepository {
       await db.runAsync(
         'INSERT INTO habit_schedule_history (id, habitId, frecuencia, diasSemana, validFrom, validUntil, activo) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
-          this.generateUUID(),
+          generateUUID(),
           habit.id,
           targetFreq,
           targetDays,
@@ -112,9 +105,11 @@ export class HabitRepository implements IHabitRepository {
     }
   }
 
-  async get(): Promise<Habit[]> {
+  async get(userId?: string): Promise<Habit[]> {
     const db = await getDb();
-    const rows = await db.getAllAsync<HabitRow>('SELECT * FROM habits');
+    const rows = userId
+      ? await db.getAllAsync<HabitRow>('SELECT * FROM habits WHERE userId = ?', [userId])
+      : await db.getAllAsync<HabitRow>('SELECT * FROM habits');
     const historyRows = await db.getAllAsync<HabitScheduleHistoryRow>(
       'SELECT * FROM habit_schedule_history ORDER BY validFrom ASC'
     );

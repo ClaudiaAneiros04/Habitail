@@ -1,15 +1,20 @@
 import { create } from 'zustand';
 import { HabitLog } from '../types';
 import { LogRepository } from '../storage/LogRepository';
-import { useStatsStore } from './useStatsStore';
-import { useHeatmapStore } from './useHeatmapStore';
+import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
+import { CacheInvalidationService } from '../services/cacheInvalidationService';
 
 interface LogStore {
+  /** Caché reactivo de logs de días consultados recientemente. No representa todo el historial histórico. */
   logs: HabitLog[];
   lastUpdate: number;
   addLog: (log: HabitLog) => Promise<void>;
   deleteLog: (logId: string) => Promise<void>;
-  loadLogs: () => Promise<void>;
+  /**
+   * Refresca los logs del día en el caché reactivo (por defecto, la fecha de hoy).
+   * Garantiza que loadLogs realice una carga real y no sea un no-op ficticio.
+   */
+  loadLogs: (date?: string, userId?: string) => Promise<void>;
   getLogsForDay: (date: string, userId?: string) => Promise<HabitLog[]>;
 }
 
@@ -18,42 +23,52 @@ const logRepo = new LogRepository();
 export const useLogStore = create<LogStore>((set, get) => ({
   logs: [],
   lastUpdate: 0,
+
   addLog: async (log) => {
     await logRepo.upsert(log);
-    set((state) => ({ 
+    set((state) => ({
       logs: [...state.logs.filter((l) => l.id !== log.id), log],
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
     }));
-    useStatsStore.getState().clearAll();
-    useHeatmapStore.getState().clearAll();
+    CacheInvalidationService.invalidateHabitCaches(log.habitId);
   },
+
   /**
    * Elimina un log de la DB y del estado local.
    * Llamar cuando el usuario desmarca un hábito para que
    * el historial muestre NONE en lugar de FAILED (X roja).
    */
   deleteLog: async (logId) => {
+    const existingLog = get().logs.find((l) => l.id === logId);
     await logRepo.deleteById(logId);
-    set((state) => ({ 
+    set((state) => ({
       logs: state.logs.filter((l) => l.id !== logId),
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
     }));
-    useStatsStore.getState().clearAll();
-    useHeatmapStore.getState().clearAll();
+    CacheInvalidationService.invalidateHabitCaches(existingLog?.habitId);
   },
-  loadLogs: async () => {
-    // Carga diferida: dependemos de getLogsForDay para consultas por día.
+
+  loadLogs: async (date?: string, userId?: string) => {
+    const targetDate = date ? toLogicalDate(date) : getLogicalToday();
+    await get().getLogsForDay(targetDate, userId);
   },
+
   getLogsForDay: async (date: string, userId?: string) => {
-    const dayLogs = await logRepo.getByDate(date, userId);
+    const targetDate = toLogicalDate(date);
+    const dayLogs = await logRepo.getByDate(targetDate, userId);
+
     set((state) => {
-      const dayLogIds = new Set(dayLogs.map((l) => l.id));
-      const otherLogs = state.logs.filter((l) => !dayLogIds.has(l.id));
-      return { logs: [...otherLogs, ...dayLogs] };
+      // Elimina del caché TODOS los registros previamente cacheados de esa fecha (y usuario si aplica)
+      // para evitar que sobrevivan en memoria logs eliminados externamente de la DB.
+      const otherLogs = state.logs.filter(
+        (l) => !(l.fecha === targetDate && (!userId || l.userId === userId))
+      );
+      return {
+        logs: [...otherLogs, ...dayLogs],
+        lastUpdate: Date.now(),
+      };
     });
+
     return dayLogs;
   },
 }));
-
-// Hydration al iniciar
-useLogStore.getState().loadLogs();

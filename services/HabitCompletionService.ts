@@ -20,8 +20,7 @@ import { evaluateBadges } from '../utils/badgeEngine';
 import { useLogStore } from '../store/useLogStore';
 import { usePetStore } from '../store/usePetStore';
 import { useUserStore } from '../store/useUserStore';
-import { useStatsStore } from '../store/useStatsStore';
-import { useHeatmapStore } from '../store/useHeatmapStore';
+import { CacheInvalidationService } from './cacheInvalidationService';
 
 export interface CompleteHabitParams {
   userId: string;
@@ -338,8 +337,7 @@ export class HabitCompletionService {
     } catch (e) {}
 
     try {
-      useStatsStore.getState().clearAll();
-      useHeatmapStore.getState().clearAll();
+      CacheInvalidationService.invalidateHabitCaches(params.habitId);
     } catch (e) {}
 
     // Evaluación de insignias con el historial persistido completo
@@ -499,8 +497,7 @@ export class HabitCompletionService {
     } catch (e) {}
 
     try {
-      useStatsStore.getState().clearAll();
-      useHeatmapStore.getState().clearAll();
+      CacheInvalidationService.invalidateHabitCaches(params.habitId);
     } catch (e) {}
 
     return {

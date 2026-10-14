@@ -12,6 +12,7 @@ import {
   getCurrentInstant 
 } from '../utils/dateUtils';
 import { getDb } from '../storage/database';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { PetRow, UserRow, GamificationEventRow } from '../db/schema';
 import { PetState } from '../types';
 
@@ -108,7 +109,7 @@ export const useDailyPenaltyJob = () => {
         const missedHabits = await logRepo.getMissedHabitsForDate(targetDate, expectedHabits);
         const delta = missedHabits.length > 0 ? calculatePenaltyDelta(missedHabits) : 0;
 
-        let db: any;
+        let db: SQLiteDatabase;
         try {
           db = await getDb();
         } catch (dbError) {
