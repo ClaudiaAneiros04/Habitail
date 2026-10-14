@@ -13,7 +13,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Renderizamos el componente principal de la mascota */}
+        {/* Renderizamos el componente principal de la mascota con el sprite animado */}
         <PetDisplay pet={pet} />
         
         {/* Espacio para futuras interacciones (Tienda, Inventario, etc.) */}

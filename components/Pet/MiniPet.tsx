@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { PetState } from '../../types';
 import { usePetStore } from '../../store/usePetStore';
+import { PetSprite } from './PetSprite';
 
 /**
  * MiniPet Component (Widget)
@@ -80,8 +81,8 @@ export const MiniPet = () => {
       {/* Contenedor de la cara con "Efecto Zoom" */}
       <View style={styles.faceWrapper}>
         <Animated.View style={[styles.faceContainer, { opacity: fadeAnim }]}>
-          {/* Usamos un fontSize grande y posicionamiento para centrar la cara del emoji */}
-          <Text style={styles.emojiFace}>{getPetAvatar(displayedState)}</Text>
+          {/* Sprite animado de la mascota en miniatura */}
+          <PetSprite mood={displayedState} size={48} />
         </Animated.View>
         
         {/* Badge de salud baja (Punto rojo) */}

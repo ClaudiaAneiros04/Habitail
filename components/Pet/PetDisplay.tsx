@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native
 import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/colors';
 import { Pet, PetState } from '../../types';
-import { PetBubble } from './PetBubble';
+import { PetSprite } from './PetSprite';
 import { usePetStore } from '../../store/usePetStore';
 
 interface PetDisplayProps {
@@ -203,11 +203,8 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
             transform: [{ translateY: bounceAnim }]
           }
         ]}>
-          {/* Burbuja flotante con mensaje aleatorio según estado */}
-          <PetBubble state={displayedState} />
-
-          {/* El propio Avatar/Emoji */}
-          <Text style={styles.emojiAvatar}>{getPetAvatar(displayedState)}</Text>
+          {/* El Sprite Animado de la Mascota con el spritesheet correspondiente */}
+          <PetSprite mood={displayedState} size={130} />
 
           {/* Textos de recompensa flotantes (ej. +10 XP) */}
           {floatingTexts.map(item => (
@@ -327,24 +324,22 @@ const styles = StyleSheet.create({
     marginVertical: 15,
   },
   avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
     borderColor: Colors.primary + '20',
     zIndex: 2,
-  },
-  emojiAvatar: {
-    fontSize: 70,
+    overflow: 'hidden',
   },
   flashEffect: {
     position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     backgroundColor: 'rgba(255, 215, 0, 0.5)', // Destello dorado
     zIndex: 1,
   },
