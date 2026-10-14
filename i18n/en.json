@@ -100,6 +100,14 @@
     "banner": {
       "denied": "Notifications are disabled. You can enable them in Settings",
       "goToSettings": "Go to Settings"
+    },
+    "reminder": {
+      "title": "Time for your habit!",
+      "body": "It's time to do your habit: {{name}}",
+      "snoozeTitle": "Postponed reminder",
+      "snoozeBody": "It's time to complete your habit: {{name}}",
+      "actionDone": "Done",
+      "actionSnooze": "Snooze"
     }
   },
   "onboarding": {

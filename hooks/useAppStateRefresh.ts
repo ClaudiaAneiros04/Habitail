@@ -5,6 +5,7 @@ import { useLogStore } from '../store/useLogStore';
 import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { handleAppForeground } from '../notifications/inactivityService';
+import { rescheduleAllHabitNotifications } from '../notifications/notificationService';
 
 /**
  * Hook para detectar cuando la app vuelve a primer plano (active)
@@ -32,6 +33,7 @@ export function useAppStateRefresh(onRefresh: () => void) {
         await useUserStore.getState().loadUser();
         await usePetStore.getState().loadPet();
         await handleAppForeground();
+        await rescheduleAllHabitNotifications(useHabitStore.getState().habits);
         onRefresh();
       }
       appState.current = nextAppState;

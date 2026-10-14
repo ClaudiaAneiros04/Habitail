@@ -4,10 +4,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useHabitStore } from '../store/useHabitStore';
 import { useUserStore } from '../store/useUserStore';
 import { useLogStore } from '../store/useLogStore';
-import { formatDateDB, getLogicalToday } from '../utils/dateUtils';
-import { Habit } from '../types';
-import { initDb } from '../storage/database';
+import { 
+  toLogicalDate, 
+  getLogicalToday, 
+  getDayOfWeek, 
+  getDaysInMonth, 
+  addDaysToLogicalDate, 
+  formatDateDB 
+} from '../utils/dateUtils';
+import { isHabitExpectedOnDate } from '../utils/frequencyEngine';
+import { Habit, Frequency } from '../types';
+import { getDb, initDb } from '../storage/database';
 import { habitCompletionService } from '../services/HabitCompletionService';
+import i18n from '../i18n';
 
 // ============================================================================
 // Constants
@@ -15,34 +24,200 @@ import { habitCompletionService } from '../services/HabitCompletionService';
 export const HABIT_REMINDER_CATEGORY = 'HABIT_REMINDER';
 export const ACTION_DONE = 'DONE';
 export const ACTION_SNOOZE = 'SNOOZE';
+export const SNOOZE_STORAGE_PREFIX = 'habit_snooze_count_';
 
 // ============================================================================
 // Types
 // ============================================================================
 export interface HabitNotificationData {
   habitId: string;
+  habitName?: string;
   snoozeCount?: number;
+  snoozeDate?: string;
+  weekday?: number;
+  day?: number;
+  targetDate?: string;
+  frequency?: string;
   [key: string]: unknown;
 }
 
 // ============================================================================
-// Notification Handler Setup
+// Validation Helpers
 // ============================================================================
 
 /**
- * Configura cómo se comportan las notificaciones cuando la aplicación
- * está en primer plano (foreground).
+ * Valida un string de hora en formato HH:mm (hora 0..23, minuto 0..59).
  */
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+export function isValidReminderTime(timeStr?: string | null): boolean {
+  if (!timeStr || typeof timeStr !== 'string') return false;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return false;
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+}
+
+/**
+ * Parsea un string HH:mm y extrae horas y minutos numéricos validados.
+ */
+export function parseReminderTime(timeStr: string): { hours: number; minutes: number } {
+  if (!isValidReminderTime(timeStr)) {
+    throw new Error(`Formato de hora de recordatorio inválido: "${timeStr}". Debe ser HH:mm con hora 0..23 y minuto 0..59.`);
+  }
+  const [hStr, mStr] = timeStr.trim().split(':');
+  return {
+    hours: parseInt(hStr, 10),
+    minutes: parseInt(mStr, 10),
+  };
+}
+
+/**
+ * Conversión explícita entre la convención interna de Habitail (0=Domingo...6=Sábado, con 7=Domingo soportado)
+ * y la convención nativa de Expo Notifications (1=Domingo...7=Sábado).
+ */
+export function habitWeekdayToExpoWeekday(habitWeekday: number): number {
+  const normalized = habitWeekday === 7 ? 0 : habitWeekday;
+  if (normalized < 0 || normalized > 6) {
+    throw new Error(`Día de la semana de Habitail inválido: ${habitWeekday}. Debe estar entre 0 y 6.`);
+  }
+  return normalized + 1; // 0 (Dom) -> 1, 1 (Lun) -> 2, ..., 6 (Sáb) -> 7
+}
+
+/**
+ * Conversión explícita de Expo Notifications (1=Domingo...7=Sábado) a Habitail (0=Domingo...6=Sábado).
+ */
+export function expoWeekdayToHabitWeekday(expoWeekday: number): number {
+  if (expoWeekday < 1 || expoWeekday > 7) {
+    throw new Error(`Expo weekday inválido: ${expoWeekday}. Debe estar entre 1 y 7.`);
+  }
+  return expoWeekday - 1; // 1 (Dom) -> 0, ..., 7 (Sáb) -> 6
+}
+
+// ============================================================================
+// Domain Completion Check
+// ============================================================================
+
+/**
+ * Comprueba de forma segura si un hábito ya fue completado en una fecha lógica determinada.
+ * Consulta prioritariamente SQLite como fuente canónica de verdad.
+ */
+export async function isHabitCompletedOnDate(
+  habitId: string,
+  dateStr: string = getLogicalToday()
+): Promise<boolean> {
+  if (Platform.OS !== 'web') {
+    try {
+      const db = await getDb();
+      const row = await db.getFirstAsync<{ completado: number | boolean }>(
+        'SELECT completado FROM habit_logs WHERE habitId = ? AND fecha = ?',
+        [habitId, dateStr]
+      );
+      if (row !== null && row !== undefined) {
+        return Number(row.completado) === 1 || row.completado === true;
+      }
+    } catch (error) {
+      // Si SQLite no está disponible de inmediato, continuar con fallback
+    }
+  }
+
+  try {
+    const logs = useLogStore.getState().logs;
+    if (Array.isArray(logs) && logs.length > 0) {
+      return logs.some(
+        (l) => l.habitId === habitId && toLogicalDate(l.fecha) === dateStr && Boolean(l.completado)
+      );
+    }
+  } catch (storeError) {}
+
+  return false;
+}
+
+// ============================================================================
+// Snooze State Persistence
+// ============================================================================
+
+/**
+ * Obtiene el número persistido de posposiciones realizadas para un hábito en una fecha lógica.
+ */
+export async function getHabitSnoozeCount(habitId: string, dateStr: string = getLogicalToday()): Promise<number> {
+  try {
+    const key = `${SNOOZE_STORAGE_PREFIX}${habitId}_${dateStr}`;
+    const value = await AsyncStorage.getItem(key);
+    return value ? parseInt(value, 10) : 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
+ * Incrementa y persiste el número de posposiciones para un hábito en una fecha lógica.
+ */
+export async function incrementHabitSnoozeCount(habitId: string, dateStr: string = getLogicalToday()): Promise<number> {
+  try {
+    const current = await getHabitSnoozeCount(habitId, dateStr);
+    const next = current + 1;
+    const key = `${SNOOZE_STORAGE_PREFIX}${habitId}_${dateStr}`;
+    await AsyncStorage.setItem(key, String(next));
+    return next;
+  } catch (error) {
+    return 1;
+  }
+}
+
+/**
+ * Cancela cualquier recordatorio pospuesto (snooze) programado para un hábito.
+ */
+export async function cancelHabitSnooze(habitId: string, dateStr?: string): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const prefix = dateStr 
+      ? `habit:${habitId}:snooze:${dateStr}` 
+      : `habit:${habitId}:snooze:`;
+    const toCancel = scheduled.filter((n) => n.identifier.startsWith(prefix));
+    await Promise.all(toCancel.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+  } catch (error) {
+    console.warn(`[NotificationService] Error al cancelar snooze para el hábito ${habitId}:`, error);
+  }
+}
+
+// ============================================================================
+// Canonical Horizon Calculation
+// ============================================================================
+
+/**
+ * Genera las próximas N ocurrencias para un hábito mensual aplicando la regla canónica de Habitail
+ * (si el hábito inició el 29/30/31 y el mes no tiene ese día, corresponde el último día del mes).
+ */
+export function getUpcomingMonthlyOccurrences(
+  habit: Habit,
+  fromDateStr: string = getLogicalToday(),
+  horizonMonths: number = 6
+): string[] {
+  const habitStart = toLogicalDate(habit.fechaInicio);
+  const creationDay = parseInt(habitStart.split('-')[2], 10);
+  const [startYear, startMonth] = fromDateStr.split('-').map(Number);
+
+  const occurrences: string[] = [];
+  let currentYear = startYear;
+  let currentMonth = startMonth; // 1-indexed
+
+  for (let i = 0; i < horizonMonths + 3 && occurrences.length < horizonMonths; i++) {
+    const maxDays = getDaysInMonth(currentYear, currentMonth);
+    const expectedDay = Math.min(creationDay, maxDays);
+    const occStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(expectedDay).padStart(2, '0')}`;
+
+    if (occStr >= fromDateStr && isHabitExpectedOnDate(habit, occStr)) {
+      occurrences.push(occStr);
+    }
+
+    currentMonth++;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear++;
+    }
+  }
+
+  return occurrences;
 }
 
 // ============================================================================
@@ -50,8 +225,7 @@ if (Platform.OS !== 'web') {
 // ============================================================================
 
 /**
- * Registra las categorías de notificaciones interactivas.
- * Debe llamarse tempranamente en el ciclo de vida de la app (ej: App.tsx).
+ * Registra las categorías de notificaciones interactivas usando traducciones i18n.
  */
 export async function registerNotificationCategories(): Promise<void> {
   if (Platform.OS === 'web') {
@@ -59,29 +233,30 @@ export async function registerNotificationCategories(): Promise<void> {
     return;
   }
 
+  const doneTitle = i18n.t('notifications.reminder.actionDone', { defaultValue: 'Hecho' });
+  const snoozeTitle = i18n.t('notifications.reminder.actionSnooze', { defaultValue: 'Posponer' });
+
   await Notifications.setNotificationCategoryAsync(HABIT_REMINDER_CATEGORY, [
     {
       identifier: ACTION_DONE,
-      buttonTitle: 'Hecho',
+      buttonTitle: doneTitle,
       options: {
         isDestructive: false,
         isAuthenticationRequired: false,
-        // Permite que la acción se ejecute en segundo plano sin abrir la app
         opensAppToForeground: false, 
       },
     },
     {
       identifier: ACTION_SNOOZE,
-      buttonTitle: 'Posponer',
+      buttonTitle: snoozeTitle,
       options: {
         isDestructive: false,
         isAuthenticationRequired: false,
-        // Permite que la acción se ejecute en segundo plano sin abrir la app
         opensAppToForeground: false, 
       },
     },
   ]);
-  console.log('[NotificationService] Categorías registradas correctamente.');
+  console.log('[NotificationService] Categorías registradas correctamente con i18n.');
 }
 
 // ============================================================================
@@ -90,20 +265,16 @@ export async function registerNotificationCategories(): Promise<void> {
 
 /**
  * Maneja la acción "DONE" (Hecho).
- * Se encarga de marcar el hábito como completado.
- * 
- * @param habitId ID del hábito a completar.
+ * Delega íntegramente en HabitCompletionService.completeHabit para asegurar idempotencia,
+ * ledger inmutable y consistencia con la UI.
  */
-async function handleDoneAction(habitId: string): Promise<void> {
+export async function handleDoneAction(habitId: string): Promise<void> {
   console.log(`[NotificationService] Marcando hábito ${habitId} como completado a través de HabitCompletionService...`);
-  
+
   try {
-    // Asegurar que la base de datos está inicializada
     await initDb();
-    
-    // Cargar y sincronizar stores en background (Zustand context limpio en Headless JS)
     await useUserStore.getState().loadUser();
-    
+
     const user = useUserStore.getState().user;
     const userId = user?.id || 'default-user';
     const todayStr = getLogicalToday();
@@ -115,7 +286,10 @@ async function handleDoneAction(habitId: string): Promise<void> {
       source: 'NOTIFICATION',
     });
 
-    console.log(`[NotificationService] Hábito ${habitId} completado con éxito.`);
+    // Cancelar cualquier recordatorio de snooze pendiente para hoy
+    await cancelHabitSnooze(habitId, todayStr);
+
+    console.log(`[NotificationService] Hábito ${habitId} completado con éxito vía HabitCompletionService.`);
   } catch (error) {
     console.error(`[NotificationService] Error al completar hábito ${habitId}:`, error);
   }
@@ -123,51 +297,67 @@ async function handleDoneAction(habitId: string): Promise<void> {
 
 /**
  * Maneja la acción "SNOOZE" (Posponer).
- * Reprograma la notificación para 30 minutos después, limitado a 1 vez por día.
- * 
- * @param habitId ID del hábito a posponer.
- * @param currentSnoozeCount Número de veces que ya se ha pospuesto hoy.
- * @param originalContent El contenido original de la notificación.
+ * Reprograma la notificación para 30 minutos después, limitado a 1 vez por hábito y LogicalDate.
  */
-async function handleSnoozeAction(
+export async function handleSnoozeAction(
   habitId: string, 
   currentSnoozeCount: number,
   originalContent: Notifications.NotificationContent
 ): Promise<void> {
-  console.log(`[NotificationService] Pospiniendo hábito ${habitId}. Contador actual: ${currentSnoozeCount}`);
+  const todayStr = getLogicalToday();
+  console.log(`[NotificationService] Pospiniendo hábito ${habitId} en fecha ${todayStr}. Contador payload: ${currentSnoozeCount}`);
 
-  // Limitar a 1 'snooze' por día
-  if (currentSnoozeCount >= 1) {
-    console.log(`[NotificationService] El hábito ${habitId} ya fue pospuesto hoy. Se ignora la acción.`);
+  // 1. Si el hábito ya fue completado hoy, ignoramos el snooze
+  const isAlreadyDone = await isHabitCompletedOnDate(habitId, todayStr);
+  if (isAlreadyDone) {
+    console.log(`[NotificationService] El hábito ${habitId} ya fue completado hoy. Se ignora la acción de posponer.`);
+    return;
+  }
+
+  // 2. Comprobar tanto el contador del payload como el persistido en AsyncStorage
+  const persistedCount = await getHabitSnoozeCount(habitId, todayStr);
+  if (persistedCount >= 1 || currentSnoozeCount >= 1) {
+    console.log(`[NotificationService] El hábito ${habitId} ya alcanzó el máximo de 1 posposición hoy (persistido: ${persistedCount}, payload: ${currentSnoozeCount}). Se ignora.`);
     return;
   }
 
   try {
-    const nextSnoozeCount = currentSnoozeCount + 1;
-    
-    // Configurar el disparador para dentro de 30 minutos (1800 segundos)
+    const nextSnoozeCount = await incrementHabitSnoozeCount(habitId, todayStr);
+
     const trigger: Notifications.TimeIntervalTriggerInput = {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: 30 * 60,
       repeats: false,
     };
 
-    // Reprogramamos la notificación reutilizando el título y cuerpo originales
+    const habitName = (originalContent.data as HabitNotificationData)?.habitName as string || 
+                      originalContent.body || 
+                      '';
+    const snoozeTitle = i18n.t('notifications.reminder.snoozeTitle', { defaultValue: 'Recordatorio Pospuesto' });
+    const snoozeBody = i18n.t('notifications.reminder.snoozeBody', { 
+      name: habitName, 
+      defaultValue: originalContent.body || 'Es hora de completar tu hábito.' 
+    });
+
+    const snoozeIdentifier = `habit:${habitId}:snooze:${todayStr}`;
+
     await Notifications.scheduleNotificationAsync({
+      identifier: snoozeIdentifier,
       content: {
-        title: originalContent.title || 'Recordatorio Pospuesto',
-        body: originalContent.body || 'Es hora de completar tu hábito.',
+        title: snoozeTitle,
+        body: snoozeBody,
         categoryIdentifier: HABIT_REMINDER_CATEGORY,
         data: {
           ...originalContent.data,
-          habitId: habitId,
+          habitId,
           snoozeCount: nextSnoozeCount,
+          snoozeDate: todayStr,
         } as HabitNotificationData,
       },
       trigger,
     });
 
-    console.log(`[NotificationService] Hábito ${habitId} pospuesto exitosamente por 30 minutos.`);
+    console.log(`[NotificationService] Hábito ${habitId} pospuesto exitosamente por 30 minutos (ID: ${snoozeIdentifier}).`);
   } catch (error) {
     console.error(`[NotificationService] Error al posponer hábito ${habitId}:`, error);
   }
@@ -178,17 +368,41 @@ async function handleSnoozeAction(
 // ============================================================================
 
 /**
- * Configura los listeners para detectar las respuestas y recepción de las notificaciones.
- * Esto captura cuando el usuario recibe una notificación en primer plano o interactúa con ella.
- * 
- * @returns Una función de limpieza para remover los listeners cuando el componente se desmonte.
+ * Configura los listeners para detectar las respuestas e interacciones con las notificaciones.
  */
 export function setupNotificationListeners(): () => void {
   if (Platform.OS === 'web') {
-    return () => {}; // No-op en web
+    return () => {};
   }
 
-  // Listener para capturar interacciones (cuando el usuario presiona botones o la notificación principal)
+  // Configuración de visualización en foreground con verificación de hábitos completados
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const data = notification.request.content.data as unknown as HabitNotificationData;
+      if (data?.habitId) {
+        const todayStr = getLogicalToday();
+        const completed = await isHabitCompletedOnDate(data.habitId, todayStr);
+        if (completed) {
+          console.log(`[NotificationService] Notificación suprimida en primer plano: hábito ${data.habitId} ya completado hoy.`);
+          return {
+            shouldShowAlert: false,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+            shouldShowBanner: false,
+            shouldShowList: false,
+          };
+        }
+      }
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      };
+    },
+  });
+
   const responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
     const actionIdentifier = response.actionIdentifier;
     const notificationData = response.notification.request.content.data as unknown as HabitNotificationData;
@@ -199,11 +413,9 @@ export function setupNotificationListeners(): () => void {
       return;
     }
 
-    // Registramos que se mostró/interactuó con la notificación hoy para cumplir la Regla de Oro
     const todayStr = formatDateDB(new Date());
     await AsyncStorage.setItem(`notification_last_sent_${habitId}`, todayStr);
 
-    // Delegamos la lógica dependiendo de la acción presionada
     if (actionIdentifier === ACTION_DONE) {
       await handleDoneAction(habitId);
     } 
@@ -212,24 +424,20 @@ export function setupNotificationListeners(): () => void {
       await handleSnoozeAction(habitId, snoozeCount, response.notification.request.content);
     } 
     else if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-      // El usuario tocó la notificación directamente en lugar de los botones
-      // TODO: Manejar la navegación a la pantalla de detalle del hábito
       console.log(`[NotificationService] Usuario tocó la notificación del hábito ${habitId}.`);
     }
   });
 
-  // Listener para capturar notificaciones recibidas en primer plano (foreground)
   const receivedListener = Notifications.addNotificationReceivedListener(async (notification) => {
     const notificationData = notification.request.content.data as unknown as HabitNotificationData;
     const habitId = notificationData?.habitId;
     if (habitId) {
       const todayStr = formatDateDB(new Date());
       await AsyncStorage.setItem(`notification_last_sent_${habitId}`, todayStr);
-      console.log(`[NotificationService] Notificación recibida en primer plano para el hábito ${habitId}. Guardada fecha: ${todayStr}`);
+      console.log(`[NotificationService] Notificación recibida para el hábito ${habitId}. Guardada fecha: ${todayStr}`);
     }
   });
 
-  // Retornamos la función de limpieza
   return () => {
     responseListener.remove();
     receivedListener.remove();
@@ -240,12 +448,10 @@ export function setupNotificationListeners(): () => void {
 // Notification Scheduling and Management
 // ============================================================================
 
-// Cola de ejecución serializada para evitar ejecuciones concurrentes en rescheduleAll
 let rescheduleQueue = Promise.resolve();
 
 /**
- * Verifica de forma segura y silenciosa si el usuario ha otorgado permisos de notificación.
- * Si ocurre algún error al consultar al sistema operativo, se asume false para evitar crasheos.
+ * Verifica de forma silenciosa si el usuario ha otorgado permisos de notificación.
  */
 export async function hasNotificationPermissionSilently(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
@@ -259,13 +465,7 @@ export async function hasNotificationPermissionSilently(): Promise<boolean> {
 }
 
 /**
- * Wrapper de seguridad para ejecutar operaciones de notificaciones de forma segura.
- * Captura excepciones no controladas de la API nativa de Expo y verifica permisos,
- * actualizando el estado de los permisos en el store de hábitos de manera silenciosa.
- * Evita lanzar excepciones no controladas hacia el hilo principal o el store.
- *
- * @param operation Función asíncrona que contiene la operación a realizar.
- * @param fallbackValue Valor de retorno por defecto en caso de fallo o falta de permisos.
+ * Wrapper de seguridad para ejecutar operaciones de notificaciones.
  */
 export async function runSafeNotificationOperation<T>(
   operation: () => Promise<T>,
@@ -277,7 +477,6 @@ export async function runSafeNotificationOperation<T>(
   try {
     const hasPermission = await hasNotificationPermissionSilently();
     
-    // Sincronizar el estado del store de manera silenciosa
     try {
       const habitStore = useHabitStore.getState();
       if (habitStore && typeof habitStore.setNotificationsEnabled === 'function') {
@@ -300,17 +499,36 @@ export async function runSafeNotificationOperation<T>(
 }
 
 /**
- * Programa una notificación diaria para un hábito específico a la hora establecida en su configuración.
- * Aplica la "Regla de Oro": no se envía ni se programa para hoy si el hábito ya fue completado
- * hoy o si ya se envió una notificación para este hábito en el día actual. En esos casos,
- * se programa para iniciar el día de mañana de forma segura.
+ * Cancela exclusivamente los triggers programados pertenecientes a un hábito específico.
+ * Identifica triggers mediante el prefijo namespaced `habit:<habitId>:`, el ID directo o data.habitId.
+ * No afecta a otros hábitos ni a notificaciones del sistema como pet:inactivity.
  * 
- * @param habit Objeto hábito que contiene la configuración del recordatorio.
+ * @param habitId ID del hábito cuyo recordatorio se desea cancelar.
+ */
+export async function cancelHabitReminder(habitId: string): Promise<void> {
+  return runSafeNotificationOperation(async () => {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const habitPrefix = `habit:${habitId}:`;
+    const toCancel = scheduled.filter(
+      (n) => n.identifier.startsWith(habitPrefix) || 
+             n.identifier === habitId ||
+             (n.content?.data as HabitNotificationData)?.habitId === habitId
+    );
+    await Promise.all(toCancel.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+    console.log(`[NotificationService] Recordatorio(s) cancelado(s) para el hábito: ${habitId} (${toCancel.length} triggers)`);
+  }, undefined);
+}
+
+/**
+ * Programa los recordatorios de un hábito según su frecuencia y configuración de recordatorio.
+ * Respeta la fuente canónica del calendario, la validez del formato HH:mm y la Regla de Oro
+ * (no enviar recordatorio hoy si ya se completó antes de la hora).
+ *
+ * @param habit Objeto hábito con la configuración del recordatorio.
  */
 export async function scheduleHabitReminder(habit: Habit): Promise<void> {
   return runSafeNotificationOperation(async () => {
-    // Obtenemos la hora de recordatorio (admite el campo en español o el alias en inglés)
-    const reminderTime = habit.horaRecordatorio || habit.reminderTime;
+    const reminderTime = habit.horaRecordatorio || (habit as any).reminderTime;
 
     if (!habit.activo) {
       console.log(`[NotificationService] El hábito "${habit.nombre || habit.name}" está inactivo. Omitiendo recordatorio.`);
@@ -322,136 +540,266 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
       return;
     }
 
-    const [hourStr, minuteStr] = reminderTime.split(':');
-    const hours = parseInt(hourStr, 10);
-    const minutes = parseInt(minuteStr, 10);
-
-    if (isNaN(hours) || isNaN(minutes)) {
-      console.warn(`[NotificationService] Formato de hora de recordatorio inválido ("${reminderTime}") para el hábito ${habit.id}.`);
+    if (!isValidReminderTime(reminderTime)) {
+      console.warn(`[NotificationService] Formato de hora de recordatorio inválido ("${reminderTime}") para el hábito ${habit.id}. Debe ser HH:mm (hora 0..23, minuto 0..59).`);
       return;
     }
 
-    const todayStr = formatDateDB(new Date());
+    const { hours, minutes } = parseReminderTime(reminderTime);
+    const todayStr = getLogicalToday();
+    const habitName = habit.nombre || habit.name || '';
 
-    // 1. REGLA DE ORO - Validación A: ¿Ya se completó el hábito hoy?
-    const logs = useLogStore.getState().logs;
-    const isCompletedTodayInLogs = logs.some(
-      (log) => log.habitId === habit.id && log.fecha === todayStr && log.completado
-    );
-    const isCompletedTodayInProps = habit.completedDays?.includes(todayStr) || false;
-    const isAlreadyCompletedToday = isCompletedTodayInLogs || isCompletedTodayInProps;
+    // 1. Cancelar triggers previos de este hábito exclusivamente
+    await cancelHabitReminder(habit.id);
 
-    // 2. REGLA DE ORO - Validación B: ¿Ya se envió la notificación hoy?
-    const lastSentKey = `notification_last_sent_${habit.id}`;
-    const lastSentDate = await AsyncStorage.getItem(lastSentKey);
-    const isAlreadySentToday = lastSentDate === todayStr;
+    // 2. Comprobar si ya está completado hoy consultando SQLite
+    const isCompletedToday = await isHabitCompletedOnDate(habit.id, todayStr);
 
-    // Cancelamos cualquier notificación previa para este hábito nativamente
-    // Nota: llamamos directamente a la API nativa de cancelación interna para evitar doble check de permisos redundante o recursiones
-    try {
-      await Notifications.cancelScheduledNotificationAsync(habit.id);
-    } catch (e) {
-      // Ignorar fallos de cancelación individual
+    // 3. Comprobar si la hora del recordatorio de hoy ya pasó
+    const now = new Date();
+    const reminderToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+    const hasReminderPassedToday = now.getTime() >= reminderToday.getTime();
+
+    // Textos con i18n
+    const title = i18n.t('notifications.reminder.title', { defaultValue: '¡Hora de tu hábito!' });
+    const body = i18n.t('notifications.reminder.body', {
+      name: habitName,
+      defaultValue: `Es momento de realizar tu hábito: ${habitName}`,
+    });
+
+    const freq = (habit.frecuencia || 'DAILY').toUpperCase();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FRECUENCIA DAILY
+    // ─────────────────────────────────────────────────────────────────────────
+    if (freq === Frequency.DAILY || freq === 'DAILY') {
+      if (isCompletedToday && !hasReminderPassedToday) {
+        // Completado hoy antes de la hora del recordatorio:
+        // No alertar hoy, pero mantener programadas las próximas ocurrencias en un horizonte de 7 días
+        for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
+          const targetDateStr = addDaysToLogicalDate(todayStr, dayOffset);
+          if (isHabitExpectedOnDate(habit, targetDateStr)) {
+            const [y, m, d] = targetDateStr.split('-').map(Number);
+            const targetDate = new Date(y, m - 1, d, hours, minutes, 0, 0);
+
+            await Notifications.scheduleNotificationAsync({
+              identifier: `habit:${habit.id}:daily:${targetDateStr}`,
+              content: {
+                title,
+                body,
+                categoryIdentifier: HABIT_REMINDER_CATEGORY,
+                data: { habitId: habit.id, habitName, targetDate: targetDateStr } as HabitNotificationData,
+              },
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: targetDate,
+              },
+            });
+          }
+        }
+        console.log(`[NotificationService] Hábito diario ${habit.id} completado hoy antes de hora. Horizonte de 7 días programado.`);
+      } else {
+        // Caso normal o la hora ya pasó hoy: trigger diario nativo recurrente
+        await Notifications.scheduleNotificationAsync({
+          identifier: `habit:${habit.id}:daily`,
+          content: {
+            title,
+            body,
+            categoryIdentifier: HABIT_REMINDER_CATEGORY,
+            data: { habitId: habit.id, habitName } as HabitNotificationData,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+            hour: hours,
+            minute: minutes,
+            repeats: true,
+          },
+        });
+        console.log(`[NotificationService] Recordatorio diario nativo programado a las ${reminderTime} para: ${habit.id}`);
+      }
     }
 
-    if (isAlreadyCompletedToday || isAlreadySentToday) {
-      console.log(
-        `[NotificationService] REGLA DE ORO: Saltando recordatorio de hoy para el hábito "${habit.nombre || habit.name}". ` +
-        `Motivo: Completado hoy = ${isAlreadyCompletedToday}, Notificado hoy = ${isAlreadySentToday}.`
-      );
+    // ─────────────────────────────────────────────────────────────────────────
+    // FRECUENCIA WEEKLY
+    // ─────────────────────────────────────────────────────────────────────────
+    else if (freq === Frequency.WEEKLY || freq === 'WEEKLY') {
+      const configuredDays = Array.isArray(habit.diasSemana) ? habit.diasSemana : [];
+      const currentDayOfWeek = getDayOfWeek(todayStr); // 0=Dom...6=Sáb
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(hours, minutes, 0, 0);
+      for (const habitDay of configuredDays) {
+        const expoWeekday = habitWeekdayToExpoWeekday(habitDay);
+        const isToday = currentDayOfWeek === (habitDay === 7 ? 0 : habitDay);
 
-      await Notifications.scheduleNotificationAsync({
-        identifier: habit.id,
-        content: {
-          title: '¡Hora de tu hábito!',
-          body: `No olvides realizar tu hábito hoy: ${habit.nombre || habit.name}`,
-          categoryIdentifier: HABIT_REMINDER_CATEGORY,
-          data: { habitId: habit.id } as HabitNotificationData,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: tomorrow,
-        },
-      });
+        if (isToday && isCompletedToday && !hasReminderPassedToday) {
+          // Si correspondía hoy y ya fue completado antes del recordatorio:
+          // Saltamos hoy y agendamos el próximo día correspondiente de la semana entrante como DATE trigger
+          const nextDateStr = addDaysToLogicalDate(todayStr, 7);
+          const [y, m, d] = nextDateStr.split('-').map(Number);
+          const nextDate = new Date(y, m - 1, d, hours, minutes, 0, 0);
 
-      console.log(`[NotificationService] Recordatorio programado para mañana (${tomorrow.toLocaleString()}) para el hábito: ${habit.id}`);
-    } else {
-      await Notifications.scheduleNotificationAsync({
-        identifier: habit.id,
-        content: {
-          title: '¡Hora de tu hábito!',
-          body: `Es momento de realizar tu hábito: ${habit.nombre || habit.name}`,
-          categoryIdentifier: HABIT_REMINDER_CATEGORY,
-          data: { habitId: habit.id } as HabitNotificationData,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          hour: hours,
-          minute: minutes,
-          repeats: true,
-        },
-      });
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:weekly:${habitDay}:next`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, weekday: habitDay, targetDate: nextDateStr } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: nextDate,
+            },
+          });
+          console.log(`[NotificationService] Hábito semanal ${habit.id} completado hoy para día ${habitDay}. Próxima ocurrencia programada: ${nextDateStr}`);
+        } else {
+          // Programar trigger nativo WEEKLY recurrente para este día
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:weekly:${habitDay}`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, weekday: habitDay } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              weekday: expoWeekday,
+              hour: hours,
+              minute: minutes,
+              repeats: true,
+            },
+          });
+          console.log(`[NotificationService] Recordatorio semanal nativo programado (día ${habitDay}, expo ${expoWeekday}) para: ${habit.id}`);
+        }
+      }
+    }
 
-      console.log(`[NotificationService] Recordatorio diario programado con éxito a las ${reminderTime} para el hábito: ${habit.id}`);
+    // ─────────────────────────────────────────────────────────────────────────
+    // FRECUENCIA MONTHLY
+    // ─────────────────────────────────────────────────────────────────────────
+    else if (freq === Frequency.MONTHLY || freq === 'MONTHLY') {
+      const habitStart = toLogicalDate(habit.fechaInicio);
+      const creationDay = parseInt(habitStart.split('-')[2], 10);
+
+      if (creationDay <= 28) {
+        // El día cabe siempre en todos los meses (1..28)
+        const todayDay = parseInt(todayStr.split('-')[2], 10);
+        const isTodayMonthly = todayDay === creationDay;
+
+        if (isTodayMonthly && isCompletedToday && !hasReminderPassedToday) {
+          // Si correspondía hoy y ya fue completado antes del recordatorio:
+          // Calculamos la ocurrencia del próximo mes con DATE trigger
+          const upcoming = getUpcomingMonthlyOccurrences(habit, todayStr, 2);
+          const nextOccStr = upcoming.find((d) => d > todayStr);
+          if (nextOccStr) {
+            const [y, m, d] = nextOccStr.split('-').map(Number);
+            const nextDate = new Date(y, m - 1, d, hours, minutes, 0, 0);
+
+            await Notifications.scheduleNotificationAsync({
+              identifier: `habit:${habit.id}:monthly:${nextOccStr}`,
+              content: {
+                title,
+                body,
+                categoryIdentifier: HABIT_REMINDER_CATEGORY,
+                data: { habitId: habit.id, habitName, targetDate: nextOccStr } as HabitNotificationData,
+              },
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: nextDate,
+              },
+            });
+          }
+        } else {
+          // Programamos el trigger mensual recurrente nativo
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:monthly:${creationDay}`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, day: creationDay } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              day: creationDay,
+              hour: hours,
+              minute: minutes,
+              repeats: true,
+            },
+          });
+          console.log(`[NotificationService] Recordatorio mensual nativo programado (día ${creationDay}) para: ${habit.id}`);
+        }
+      } else {
+        // Hábitos iniciados 29, 30 o 31:
+        // La regla de Habitail los desplaza al último día de meses más cortos (ej: 28/29 feb, 30 abr).
+        // Usamos el motor canónico para generar un horizonte razonable de ocurrencias DATE (6 meses):
+        const occurrences = getUpcomingMonthlyOccurrences(habit, todayStr, 6);
+
+        for (const occStr of occurrences) {
+          if (occStr === todayStr && (isCompletedToday || hasReminderPassedToday)) {
+            continue;
+          }
+
+          const [y, m, d] = occStr.split('-').map(Number);
+          const occDate = new Date(y, m - 1, d, hours, minutes, 0, 0);
+
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:monthly:${occStr}`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, targetDate: occStr } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: occDate,
+            },
+          });
+        }
+        console.log(`[NotificationService] Hábito mensual 29/30/31 ${habit.id}. Horizonte de ${occurrences.length} ocurrencias DATE programado.`);
+      }
     }
   }, undefined);
 }
 
 /**
- * Elimina la notificación programada de un hábito específico usando su identificador.
+ * Reprograma todas las notificaciones pertenecientes al namespace de hábitos de forma serializada.
+ * Cancela ÚNICAMENTE notificaciones cuyo ID empiece por 'habit:' o tengan data de hábito,
+ * preservando intactas las notificaciones del sistema como pet:inactivity.
  * 
- * @param habitId ID del hábito cuyo recordatorio se desea cancelar.
+ * @param habits Lista de hábitos activos a reprogramar.
  */
-export async function cancelHabitReminder(habitId: string): Promise<void> {
-  return runSafeNotificationOperation(async () => {
-    await Notifications.cancelScheduledNotificationAsync(habitId);
-    console.log(`[NotificationService] Recordatorio cancelado con éxito para el hábito: ${habitId}`);
-  }, undefined);
-}
-
-/**
- * Cancela todas las notificaciones activas y las vuelve a programar de forma síncrona y segura.
- * Limpia el stack de triggers del sistema operativo de manera determinista utilizando promesas nativas (Promise.all).
- * Útil para cuando el usuario edita sus hábitos globales o inicia la aplicación.
- * 
- * @param habits Lista de todos los hábitos a reprogramar.
- */
-export function rescheduleAllNotifications(habits: Habit[]): Promise<void> {
+export function rescheduleAllHabitNotifications(habits: Habit[]): Promise<void> {
   if (Platform.OS === 'web') {
     console.log('[NotificationService] Reprogramación no soportada en web.');
     return Promise.resolve();
   }
 
-  // Encadenamos en la cola para asegurar ejecución serializada secuencial
   rescheduleQueue = rescheduleQueue.then(async () => {
-    console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios...');
+    console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios de hábitos...');
     
     await runSafeNotificationOperation(async () => {
       // 1. Obtener todas las notificaciones agendadas nativamente
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
       
-      // 2. Limpiar el stack de triggers del sistema de manera determinista utilizando Promise.all
-      const cancelPromises = scheduled.map(notification => {
-        console.log(`[NotificationService] Cancelando trigger nativo: ${notification.identifier}`);
-        return Notifications.cancelScheduledNotificationAsync(notification.identifier);
-      });
-      await Promise.all(cancelPromises);
+      // 2. Filtrar únicamente las pertenecientes al namespace de hábitos
+      const habitNotifications = scheduled.filter(
+        (n) => n.identifier.startsWith('habit:') || 
+               Boolean((n.content?.data as HabitNotificationData)?.habitId)
+      );
 
-      // 3. Adicionalmente cancelamos todas las programadas para barrer cualquier huérfana.
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      console.log('[NotificationService] Todas las notificaciones previas han sido canceladas de forma segura.');
+      // 3. Cancelar de forma determinista usando Promise.all SOLO las de hábitos
+      await Promise.all(habitNotifications.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+      console.log(`[NotificationService] Canceladas ${habitNotifications.length} notificaciones del namespace de hábitos. Las notificaciones del sistema (como pet:inactivity) se mantuvieron intactas.`);
 
-      // 4. Volvemos a programar recordatorios para cada hábito activo de forma secuencial
+      // 4. Volver a programar recordatorios para cada hábito activo
       for (const habit of habits) {
         if (habit.activo) {
           await scheduleHabitReminder(habit);
         }
       }
-      console.log('[NotificationService] Reprogramación masiva finalizada con éxito.');
+      console.log('[NotificationService] Reprogramación masiva de hábitos finalizada con éxito.');
     }, undefined);
   });
 
@@ -459,8 +807,15 @@ export function rescheduleAllNotifications(habits: Habit[]): Promise<void> {
 }
 
 /**
- * Alias de compatibilidad para rescheduleAllNotifications.
+ * Alias de compatibilidad para rescheduleAllHabitNotifications.
+ */
+export function rescheduleAllNotifications(habits: Habit[]): Promise<void> {
+  return rescheduleAllHabitNotifications(habits);
+}
+
+/**
+ * Alias de compatibilidad para rescheduleAllHabitNotifications.
  */
 export function rescheduleAll(habits: Habit[]): Promise<void> {
-  return rescheduleAllNotifications(habits);
+  return rescheduleAllHabitNotifications(habits);
 }

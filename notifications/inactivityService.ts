@@ -4,8 +4,9 @@ import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { PetState, Pet } from '../types';
 
-// Identificador único para la notificación de inactividad de la mascota
-export const PET_INACTIVITY_NOTIFICATION_ID = 'pet_inactivity_reminder';
+// Identificador único namespaced para la notificación de inactividad de la mascota
+export const PET_INACTIVITY_NOTIFICATION_ID = 'pet:inactivity';
+export const LEGACY_PET_INACTIVITY_NOTIFICATION_ID = 'pet_inactivity_reminder';
 
 // Umbral de recordatorio de retención de alto impacto: 48 horas (2 días) en milisegundos
 export const INACTIVITY_THRESHOLD_MS = 48 * 60 * 60 * 1000;
@@ -68,6 +69,7 @@ export async function cancelInactivityReminder(): Promise<void> {
 
   try {
     await Notifications.cancelScheduledNotificationAsync(PET_INACTIVITY_NOTIFICATION_ID);
+    await Notifications.cancelScheduledNotificationAsync(LEGACY_PET_INACTIVITY_NOTIFICATION_ID);
     console.log('[InactivityService] Notificación de inactividad previa cancelada.');
   } catch (error) {
     console.error('[InactivityService] Error al cancelar la notificación de inactividad:', error);

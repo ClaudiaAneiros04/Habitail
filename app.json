@@ -4,7 +4,7 @@
     "slug": "habitail",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icono.png",
     "userInterfaceStyle": "light",
     "scheme": "habitail",
     "newArchEnabled": true,
@@ -22,8 +22,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E6F4FE"
+        "foregroundImage": "./assets/icono.png",
+        "backgroundColor": "#020620"
       },
       "package": "com.habitail.app",
       "permissions": [

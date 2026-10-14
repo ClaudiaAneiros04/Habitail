@@ -100,6 +100,14 @@
     "banner": {
       "denied": "Las notificaciones están desactivadas. Puedes activarlas en Ajustes",
       "goToSettings": "Ir a Ajustes"
+    },
+    "reminder": {
+      "title": "¡Hora de tu hábito!",
+      "body": "Es momento de realizar tu hábito: {{name}}",
+      "snoozeTitle": "Recordatorio Pospuesto",
+      "snoozeBody": "Es hora de completar tu hábito: {{name}}",
+      "actionDone": "Hecho",
+      "actionSnooze": "Posponer"
     }
   },
   "onboarding": {
