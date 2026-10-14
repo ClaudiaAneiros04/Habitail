@@ -227,4 +227,25 @@ describe('Repository Regression Tests', () => {
     expect(h?.nombre).toBe('H'); // Unchanged
     expect(h?.scheduleHistory?.length).toBe(1); // Unchanged
   });
+
+  it('UserRepository persiste y recupera lastOpenedAt correctamente en SQLite', async () => {
+    const timestamp = 1700000000000;
+    const user: User = {
+      id: 'u-opened',
+      username: 'OpenedUser',
+      fechaRegistro: '2026-01-01',
+      puntos: 50,
+      onboardingCompleted: true,
+      lastOpenedAt: timestamp,
+    };
+
+    await userRepo.create(user);
+    const retrieved = await userRepo.getByUserId('u-opened');
+    expect(retrieved?.lastOpenedAt).toBe(timestamp);
+
+    const newTimestamp = timestamp + 100000;
+    await userRepo.update('u-opened', { lastOpenedAt: newTimestamp });
+    const updated = await userRepo.getByUserId('u-opened');
+    expect(updated?.lastOpenedAt).toBe(newTimestamp);
+  });
 });

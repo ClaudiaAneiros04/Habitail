@@ -134,13 +134,16 @@
     "loading": "Cargando mascota...",
     "levelShort": "Nvl",
     "xpLabel": "XP",
+    "deceasedTitle": "Ha partido definitivamente",
+    "deceasedDescription": "Tu mascota anterior se ha marchado para siempre. La marcha es irreversible. Adopta una nueva mascota para comenzar otra aventura.",
+    "adoptButton": "Adoptar nueva mascota",
     "messages": {
       "absent": [
-        "Te estaré esperando aquí, pase lo que pase. // solo pantalla",
-        "Sé que volverás cuando quieras hacerlo. // solo pantalla",
-        "Guardaré tu lugar hasta tu regreso. // solo pantalla",
-        "Mi cariño por ti no se agota. // solo pantalla",
-        "Tómate tu tiempo, yo no me muevo. // solo pantalla"
+        "Ha partido definitivamente. // solo pantalla",
+        "Se ha marchado para siempre. // solo pantalla",
+        "Esta mascota no regresará. Inicia una nueva adopción. // solo pantalla",
+        "Su viaje ha terminado. // solo pantalla",
+        "... // solo pantalla"
       ],
       "sad": [
         "Te echo mucho de menos, ¿sabes? 🥺",

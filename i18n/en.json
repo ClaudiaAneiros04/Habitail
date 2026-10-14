@@ -134,13 +134,16 @@
     "loading": "Loading pet...",
     "levelShort": "Lvl",
     "xpLabel": "XP",
+    "deceasedTitle": "Has departed permanently",
+    "deceasedDescription": "Your previous pet has left forever. The departure is irreversible. Adopt a new pet to start a new adventure.",
+    "adoptButton": "Adopt new pet",
     "messages": {
       "absent": [
-        "I'll be right here waiting, no matter what. // solo pantalla",
-        "I know you'll come back when you're ready. // solo pantalla",
-        "I'll keep your spot warm until you return. // solo pantalla",
-        "My love for you isn't going anywhere. // solo pantalla",
-        "Take all the time you need, friend. // solo pantalla"
+        "Has departed permanently. // solo pantalla",
+        "Has left forever. // solo pantalla",
+        "This pet will not return. Start a new adoption. // solo pantalla",
+        "Its journey has ended. // solo pantalla",
+        "... // solo pantalla"
       ],
       "sad": [
         "I miss you so much, you know? 🥺",

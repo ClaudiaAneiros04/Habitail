@@ -26,7 +26,8 @@ export const CREATE_TABLES_SQL = `
     puntos INTEGER NOT NULL DEFAULT 0,
     onboardingCompleted INTEGER NOT NULL DEFAULT 0,
     lastPenaltyAppliedDate TEXT,
-    inventario TEXT
+    inventario TEXT,
+    lastOpenedAt INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS ${TABLE_NAMES.PETS} (
@@ -144,6 +145,7 @@ export interface UserRow {
   onboardingCompleted: number;
   lastPenaltyAppliedDate: string | null;
   inventario: string | null;
+  lastOpenedAt: number | null;
 }
 
 export interface PetRow {

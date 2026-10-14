@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Colors } from '../../constants/colors';
 import { Pet, PetState } from '../../types';
 import { PetBubble } from './PetBubble';
+import { usePetStore } from '../../store/usePetStore';
 
 interface PetDisplayProps {
   pet: Pet | null;
@@ -60,6 +61,10 @@ const FloatingDelta = ({ text, onComplete }: { text: string, onComplete: () => v
  * Responsable de renderizar el estado visual de la mascota (el gato).
  * Maneja transiciones de estado, animaciones de recompensas y mensajes dinámicos.
  */
+// Alcance MVP: La progresión de nivel/XP está preparada en el dominio pero oculta en UI
+// hasta que se active el flujo oficial de otorgamiento de XP en fases futuras.
+const ENABLE_XP_PROGRESS = false;
+
 const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => {
   const { t } = useTranslation();
 
@@ -215,16 +220,50 @@ const PetDisplay = forwardRef<PetDisplayRef, PetDisplayProps>(({ pet }, ref) => 
         </Animated.View>
       </View>
 
-      {/* Barra de Experiencia */}
-      <View style={styles.xpContainer}>
-        <View style={styles.xpHeader}>
-          <Text style={styles.xpText}>{t('pet.xpLabel', { defaultValue: 'XP' })}</Text>
-          <Text style={styles.xpText}>{pet.xp} / {pet.xpParaSiguienteNivel}</Text>
+      {/* 
+        Infraestructura de Experiencia (XP) y Nivel preparada en dominio pero oculta en MVP
+        para no mostrar barras de progreso congeladas o simuladas.
+      */}
+      {ENABLE_XP_PROGRESS && (
+        <View style={styles.xpContainer}>
+          <View style={styles.xpHeader}>
+            <Text style={styles.xpText}>{t('pet.xpLabel', { defaultValue: 'XP' })}</Text>
+            <Text style={styles.xpText}>{pet.xp} / {pet.xpParaSiguienteNivel}</Text>
+          </View>
+          <View style={styles.xpBarBackground}>
+            <View style={[styles.xpBarFill, { width: `${Math.min(100, Math.max(0, xpPercentage))}%` }]} />
+          </View>
         </View>
-        <View style={styles.xpBarBackground}>
-          <View style={[styles.xpBarFill, { width: `${Math.min(100, Math.max(0, xpPercentage))}%` }]} />
+      )}
+
+      {/* 
+        Tarjeta de Adopción / Nueva Partida:
+        Cuando la mascota ha partido de forma irreversible (vida = 0 / ABSENT),
+        el flujo de producto permite expresamente adoptar una nueva mascota.
+      */}
+      {(displayedState === PetState.ABSENT || pet.vida === 0) && (
+        <View style={styles.adoptionCard}>
+          <Text style={styles.adoptionTitle}>
+            {t('pet.deceasedTitle', { defaultValue: 'Ha partido definitivamente' })}
+          </Text>
+          <Text style={styles.adoptionDescription}>
+            {t('pet.deceasedDescription', { 
+              defaultValue: 'Tu mascota anterior se ha marchado para siempre. La marcha es irreversible. Adopta una nueva mascota para comenzar otra aventura.' 
+            })}
+          </Text>
+          <TouchableOpacity 
+            style={styles.adoptButton} 
+            onPress={async () => {
+              await usePetStore.getState().adoptNewPet();
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.adoptButtonText}>
+              🐣 {t('pet.adoptButton', { defaultValue: 'Adoptar nueva mascota' })}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      )}
     </View>
   );
 });
@@ -345,5 +384,51 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: Colors.primary,
     borderRadius: 5,
+  },
+  adoptionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 16,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  adoptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.error || '#dc2626',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  adoptionDescription: {
+    fontSize: 13,
+    color: Colors.text,
+    opacity: 0.8,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  adoptButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  adoptButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

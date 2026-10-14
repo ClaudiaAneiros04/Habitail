@@ -7,36 +7,42 @@ import { PetState, Pet } from '../types';
 // Identificador único para la notificación de inactividad de la mascota
 export const PET_INACTIVITY_NOTIFICATION_ID = 'pet_inactivity_reminder';
 
-// Umbral de inactividad por defecto: 2 días (48 horas) en milisegundos
+// Umbral de recordatorio de retención de alto impacto: 48 horas (2 días) en milisegundos
 export const INACTIVITY_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+export const INACTIVITY_REMINDER_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+
+// Umbral de marcha definitiva / pérdida irreversible: 72 horas (3 días) en milisegundos
+export const INACTIVITY_TERMINAL_THRESHOLD_MS = 72 * 60 * 60 * 1000;
 
 /**
  * Obtiene el título y cuerpo del mensaje de motivación en base al estado y vida de la mascota.
- * 
+ * Mensajería ajustada a la pérdida irreversible: si la mascota fallece / se marcha,
+ * se comunica expresamente que la marcha es definitiva y que requiere reinicio o adopción.
+ *
  * @param pet Objeto mascota del cual evaluar su estado.
  * @returns Un objeto con el título y el cuerpo del mensaje.
  */
 export function getPetMotivationMessage(pet: Pet): { title: string; body: string } {
-  const name = 'Tu mascota'; // Alias amigable si no hay un nombre específico en el modelo
+  const name = 'Tu mascota';
 
   if (pet.vida === 0 || pet.estadoActual === PetState.ABSENT) {
     return {
-      title: '¡Oh no!',
-      body: `${name} se ha marchado debido a la inactividad. Vuelve para iniciar una nueva aventura.`,
+      title: 'Ha partido definitivamente',
+      body: `${name} se ha marchado para siempre debido a la prolongada inactividad. Su partida es definitiva. Inicia una nueva partida o adopción para comenzar de nuevo.`,
     };
   }
 
   if (pet.vida <= 25 || pet.estadoActual === PetState.SAD) {
     return {
-      title: '⚠️ ¡ALERTA! Tu mascota te necesita urgente',
-      body: `😭 ${name} está muy triste y débil (${pet.vida} HP). ¡Si no vuelves a Habitail hoy, podría marcharse para siempre!`,
+      title: '⚠️ ¡ALERTA DEFINITIVA! Peligro inminente',
+      body: `😭 ${name} está muy triste y débil (${pet.vida} HP). ¡Si alcanzas las 72 horas de inactividad se marchará para siempre y no podrá recuperarse jamás!`,
     };
   }
 
   if (pet.vida <= 50 || pet.estadoActual === PetState.CONFUSED) {
     return {
       title: '👀 ¿Dónde has estado?',
-      body: `🤔 ${name} se siente un poco sola y confundida (${pet.vida} HP). ¡Completa tus hábitos hoy para subir su ánimo!`,
+      body: `🤔 ${name} se siente un poco sola y confundida (${pet.vida} HP). ¡Completa tus hábitos hoy para protegerla!`,
     };
   }
 
@@ -71,10 +77,11 @@ export async function cancelInactivityReminder(): Promise<void> {
 /**
  * Programa una notificación especial de retención de mascota que se disparará
  * tras un período de inactividad (48 horas por defecto).
+ * Si la mascota está en vida 0 o estado terminal (ABSENT), cancela y omite programar.
  * 
- * @param secondsSecondsToTrigger Tiempo en segundos para disparar la notificación (defecto: 48 horas).
+ * @param secondsToTrigger Tiempo en segundos para disparar la notificación (defecto: 48 horas).
  */
-export async function scheduleInactivityReminder(secondsSecondsToTrigger: number = 48 * 60 * 60): Promise<void> {
+export async function scheduleInactivityReminder(secondsToTrigger: number = 48 * 60 * 60): Promise<void> {
   if (Platform.OS === 'web') {
     console.log('[InactivityService] Notificaciones nativas no soportadas en web. Omitiendo programación de inactividad.');
     return;
@@ -95,18 +102,17 @@ export async function scheduleInactivityReminder(secondsSecondsToTrigger: number
   }
 
   try {
-    // 3. Cancelar cualquier recordatorio anterior de inactividad para asegurar que se reinicie el cronómetro
-    // y mantener estrictamente el límite de 1 notificación máxima cada 48 horas.
+    // 3. Cancelar cualquier recordatorio anterior de inactividad para reiniciar el conteo
     await cancelInactivityReminder();
 
     // 4. Obtener mensaje motivador dinámico según la vida de la mascota
     const { title, body } = getPetMotivationMessage(pet);
 
-    // 5. Configurar el trigger en base a intervalos de tiempo
+    // 5. Configurar el trigger
     const trigger: Notifications.TimeIntervalTriggerInput = {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: secondsSecondsToTrigger,
-      repeats: false, // Disparar una única vez tras el periodo
+      seconds: secondsToTrigger,
+      repeats: false,
     };
 
     // 6. Programar la nueva notificación
@@ -128,7 +134,7 @@ export async function scheduleInactivityReminder(secondsSecondsToTrigger: number
 
     console.log(
       `[InactivityService] Notificación de mascota programada con éxito para dentro de ` +
-      `${secondsSecondsToTrigger} segundos (${(secondsSecondsToTrigger / 3600).toFixed(1)} horas). ` +
+      `${secondsToTrigger} segundos (${(secondsToTrigger / 3600).toFixed(1)} horas). ` +
       `Estado mascota: ${pet.estadoActual} (${pet.vida} HP).`
     );
   } catch (error) {
@@ -139,19 +145,29 @@ export async function scheduleInactivityReminder(secondsSecondsToTrigger: number
 /**
  * Función principal que debe ejecutarse cada vez que la app pase a primer plano (foreground).
  * 
- * 1. Lee la propiedad `lastOpenedAt` actual para evaluar inactividad pasada.
- * 2. Actualiza `lastOpenedAt` con el timestamp de apertura actual.
- * 3. Gestiona y reinicia el ciclo de recordatorios de inactividad.
+ * Reglas de Dominio:
+ * 1. Leer el `lastOpenedAt` previo persistido.
+ * 2. Calcular la inactividad antes de sobrescribir la marca de tiempo.
+ * 3. Si `inactividad >= 72h` y la mascota aún tiene `vida > 0`:
+ *    - Transición terminal definitiva: `vida = 0` y `estadoActual = ABSENT`.
+ *    - La mascota se marcha para siempre de forma atómica e idempotente.
+ * 4. Si la mascota ya estaba en vida 0, no re-ejecutar eventos de daño ni alterar el estado.
+ * 5. Si `48h <= inactividad < 72h`: se dispara únicamente aviso de retención sin alterar vida.
+ * 6. Actualizar `lastOpenedAt` con la fecha y hora actual en SQLite.
+ * 7. Programar o limpiar recordatorios según corresponda.
  * 
- * @param customTriggerSeconds Opcional. Permite sobreescribir las 48 horas por un número
- *                             de segundos menor para facilitar pruebas y desarrollo.
+ * @param customTriggerSeconds Opcional. Segundos para el recordatorio programado.
+ * @param nowTimestamp Opcional. Sobrescribe la hora actual para facilitar tests unitarios.
  */
-export async function handleAppForeground(customTriggerSeconds?: number): Promise<void> {
+export async function handleAppForeground(
+  customTriggerSeconds?: number,
+  nowTimestamp?: number
+): Promise<void> {
   console.log('[InactivityService] Procesando evento de App en primer plano...');
 
   try {
-    // 1. Obtener datos de usuario y mascota
     const userStore = useUserStore.getState();
+    const petStore = usePetStore.getState();
     const user = userStore.user;
     
     if (!user) {
@@ -159,31 +175,46 @@ export async function handleAppForeground(customTriggerSeconds?: number): Promis
       return;
     }
 
-    const now = Date.now();
+    const now = nowTimestamp ?? Date.now();
     const previousLastOpenedAt = user.lastOpenedAt;
 
-    // 2. Verificar si ya se cumplieron 2 días (48 horas) de inactividad
+    // 1 & 2. Calcular inactividad previa antes de sobrescribir
     if (previousLastOpenedAt) {
       const elapsedMs = now - previousLastOpenedAt;
       const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
       console.log(`[InactivityService] Tiempo transcurrido desde la última apertura: ${elapsedHours.toFixed(2)} horas.`);
 
-      if (elapsedMs >= INACTIVITY_THRESHOLD_MS) {
-        console.log('🔔 [InactivityService] ¡El usuario ha estado inactivo más de 48 horas!');
-        // Aquí se podría guardar alguna métrica, reiniciar racha general de la app, etc.
+      // Regla: 72 horas o más -> Marcha irreversible
+      if (elapsedMs >= INACTIVITY_TERMINAL_THRESHOLD_MS) {
+        const pet = petStore.pet;
+        if (pet && pet.vida > 0) {
+          console.log('💀 [InactivityService] Inactividad >= 72 horas detectada. Transición terminal definitiva: vida = 0, ABSENT.');
+          await petStore.updatePet({ vida: 0, estadoActual: PetState.ABSENT });
+          await cancelInactivityReminder();
+        } else {
+          console.log('[InactivityService] Inactividad >= 72 horas detectada, la mascota ya se encontraba en estado terminal.');
+        }
+      } 
+      // Regla: 48 horas a 71h 59m -> Recordatorio de retención sin modificar vida
+      else if (elapsedMs >= INACTIVITY_REMINDER_THRESHOLD_MS) {
+        console.log('🔔 [InactivityService] Inactividad >= 48 horas detectada: Alerta de retención de alto impacto. Vida intacta.');
       }
     } else {
       console.log('[InactivityService] Primera vez que se registra la apertura de la app.');
     }
 
-    // 3. ACTUALIZACIÓN: Guardar la hora de apertura actual
+    // 3. Actualizar lastOpenedAt con la fecha y hora actual en SQLite
     await userStore.updateLastOpenedAt();
 
-    // 4. PROGRAMACIÓN: Cancelar anterior y programar nueva alerta de inactividad
-    // Si la mascota tiene vida > 0 se programa para dentro de 48 horas (o customTriggerSeconds)
-    const triggerSeconds = customTriggerSeconds ?? (48 * 60 * 60);
-    await scheduleInactivityReminder(triggerSeconds);
+    // 4. Programar o limpiar recordatorios
+    const currentPet = usePetStore.getState().pet;
+    if (!currentPet || currentPet.vida === 0 || currentPet.estadoActual === PetState.ABSENT) {
+      await cancelInactivityReminder();
+    } else {
+      const triggerSeconds = customTriggerSeconds ?? (48 * 60 * 60);
+      await scheduleInactivityReminder(triggerSeconds);
+    }
 
   } catch (error) {
     console.error('[InactivityService] Error crítico al manejar el foreground de la app:', error);

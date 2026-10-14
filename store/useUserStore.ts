@@ -56,14 +56,25 @@ export const useUserStore = create<UserStore>((set, get) => ({
       user.onboardingCompleted = onboardingCompleted;
     }
     
-    // Recuperar el último timestamp de apertura desde AsyncStorage
+    // Migración única controlada de lastOpenedAt desde AsyncStorage a SQLite
     try {
       const storedLastOpened = await AsyncStorage.getItem(LAST_OPENED_AT_KEY);
       if (storedLastOpened) {
-        user.lastOpenedAt = parseInt(storedLastOpened, 10);
+        const parsedAsyncTimestamp = parseInt(storedLastOpened, 10);
+        if (!isNaN(parsedAsyncTimestamp)) {
+          // Priorizar el valor válido más reciente entre SQLite y AsyncStorage
+          const currentSqliteTimestamp = user.lastOpenedAt ?? 0;
+          const mostRecent = Math.max(currentSqliteTimestamp, parsedAsyncTimestamp);
+          if (mostRecent > currentSqliteTimestamp) {
+            user.lastOpenedAt = mostRecent;
+            await userRepo.update(user.id, { lastOpenedAt: mostRecent });
+          }
+        }
+        // Descartar AsyncStorage como almacenamiento primario
+        await AsyncStorage.removeItem(LAST_OPENED_AT_KEY);
       }
     } catch (e) {
-      console.warn('[UserStore] Error al cargar lastOpenedAt desde AsyncStorage:', e);
+      console.warn('[UserStore] Error al migrar lastOpenedAt desde AsyncStorage a SQLite:', e);
     }
 
     set({ user });
@@ -90,10 +101,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
     const now = Date.now();
     const updatedUser = { ...user, lastOpenedAt: now };
     
+    // Operar exclusivamente contra SQLite como fuente única de verdad
     try {
-      await AsyncStorage.setItem(LAST_OPENED_AT_KEY, now.toString());
+      await userRepo.update(user.id, { lastOpenedAt: now });
     } catch (e) {
-      console.error('[UserStore] Error al guardar lastOpenedAt en AsyncStorage:', e);
+      console.error('[UserStore] Error al guardar lastOpenedAt en SQLite:', e);
     }
     
     set({ user: updatedUser });

@@ -268,10 +268,14 @@ export const formatShortDate = (date: Date | string): string => {
 };
 
 /**
- * Verifica si la fecha es estrictamente posterior a hoy.
+ * Verifica si la fecha es estrictamente posterior a hoy (o a una fecha de referencia).
  */
-export const isFutureDate = (date: LogicalDate | string | Date): boolean => {
-  return compareLogicalDates(date, getLogicalToday()) > 0;
+export const isFutureDate = (
+  date: LogicalDate | string | Date,
+  referenceDate?: LogicalDate | string | Date
+): boolean => {
+  const base = referenceDate ? toLogicalDate(referenceDate) : getLogicalToday();
+  return compareLogicalDates(date, base) > 0;
 };
 
 /**

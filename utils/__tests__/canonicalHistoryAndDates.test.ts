@@ -114,7 +114,7 @@ describe('Motor Canónico de Frecuencia e Historial (Reglas Definitivas)', () =>
       expect(status).not.toBe('COMPLETED');
 
       // isFutureDate detecta que mañana es estrictamente futuro
-      expect(isFutureDate(TOMORROW)).toBe(true);
+      expect(isFutureDate(TOMORROW, TODAY)).toBe(true);
     });
   });
 
@@ -316,7 +316,7 @@ describe('Motor Canónico de Frecuencia e Historial (Reglas Definitivas)', () =>
     it('7. Mañana no puede completarse ni juzgarse como incumplido', () => {
       const dailyHabit = makeHabit({ fechaInicio: '2026-10-01' });
 
-      expect(isFutureDate(TOMORROW)).toBe(true);
+      expect(isFutureDate(TOMORROW, TODAY)).toBe(true);
       const statusTomorrow = getHabitStatusForDate(dailyHabit, TOMORROW, null, TODAY);
       expect(statusTomorrow).toBe('FUTURE');
       expect(statusTomorrow).not.toBe('FAILED');

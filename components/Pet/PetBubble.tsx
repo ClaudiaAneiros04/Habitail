@@ -13,7 +13,7 @@ const MESSAGES: Record<PetState, string[]> = {
   [PetState.CHEERING]: ["¡Tú puedes!", "¡Vamos, un poco más!", "¡Creo en ti!", "¡No te rindas!"],
   [PetState.SAD]: ["Me vendría bien un poco de atención...", "Hambre...", "Un poco triste hoy..."],
   [PetState.CONFUSED]: ["¿Qué está pasando?", "No entiendo...", "¿Eh?"],
-  [PetState.ABSENT]: ["...", "zZz...", "(Se ha ido)"],
+  [PetState.ABSENT]: ["Ha partido definitivamente...", "Se ha marchado para siempre.", "..."],
 };
 
 /**

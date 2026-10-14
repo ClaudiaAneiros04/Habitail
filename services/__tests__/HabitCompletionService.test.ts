@@ -218,6 +218,29 @@ describe('HabitCompletionService', () => {
       expect(event.isReverted).toBe(0);
     });
 
+    test('IRREVERSIBILIDAD: si la mascota está en vida 0 (ABSENT), un check-in positivo no le devuelve vida', async () => {
+      // Forzar mascota a estado terminal (vida = 0, ABSENT)
+      await db.runAsync('UPDATE pets SET vida = 0, estadoActual = ? WHERE id = ?', [PetState.ABSENT, 'p1']);
+
+      const result = await service.completeHabit({
+        userId: 'u1',
+        habitId: 'h1', // Hábito ESSENTIAL (+20)
+        logicalDate: mockDateToday,
+        source: 'UI',
+      });
+
+      expect(result.success).toBe(true);
+
+      // La mascota en SQLite debe permanecer estrictamente en vida = 0 y ABSENT
+      const pet = await db.getFirstAsync('SELECT * FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(0);
+      expect(pet.estadoActual).toBe(PetState.ABSENT);
+
+      // Puntos sí se otorgan al usuario aunque la mascota haya partido
+      const user = await db.getFirstAsync('SELECT puntos FROM users WHERE id = ?', ['u1']);
+      expect(user.puntos).toBe(120);
+    });
+
     test('corrección de una FECHA PASADA: crea log pero NO cura ni concede puntos retroactivos', async () => {
       // 2026-05-20 fue Miércoles (programado para h-weekly y h1)
       const pastDate = '2026-05-20';

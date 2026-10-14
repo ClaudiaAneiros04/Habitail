@@ -49,13 +49,14 @@ export class UserRepository implements IUserRepository {
       lastPenaltyAppliedDate: row.lastPenaltyAppliedDate || undefined,
       badges,
       inventario,
+      lastOpenedAt: row.lastOpenedAt != null ? Number(row.lastOpenedAt) : undefined,
     } as User;
   }
 
   async create(user: User): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT INTO users (id, username, email, avatar, fechaRegistro, puntos, onboardingCompleted, lastPenaltyAppliedDate, inventario) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, username, email, avatar, fechaRegistro, puntos, onboardingCompleted, lastPenaltyAppliedDate, inventario, lastOpenedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
         user.username,
@@ -66,6 +67,7 @@ export class UserRepository implements IUserRepository {
         user.onboardingCompleted ? 1 : 0,
         user.lastPenaltyAppliedDate || null,
         JSON.stringify(user.inventario || []),
+        user.lastOpenedAt ?? null,
       ]
     );
   }
@@ -80,7 +82,8 @@ export class UserRepository implements IUserRepository {
     await db.runAsync(
       `UPDATE users SET 
         username = ?, email = ?, avatar = ?, fechaRegistro = ?, puntos = ?, 
-        onboardingCompleted = ?, lastPenaltyAppliedDate = ?, inventario = ?
+        onboardingCompleted = ?, lastPenaltyAppliedDate = ?, inventario = ?,
+        lastOpenedAt = ?
        WHERE id = ?`,
       [
         updated.username,
@@ -91,6 +94,7 @@ export class UserRepository implements IUserRepository {
         updated.onboardingCompleted ? 1 : 0,
         updated.lastPenaltyAppliedDate || null,
         JSON.stringify(updated.inventario || []),
+        updated.lastOpenedAt ?? null,
         id
       ]
     );

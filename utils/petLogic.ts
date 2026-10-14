@@ -13,6 +13,33 @@ export type PetAsset =
   | { type: 'emoji'; emoji: string; backgroundColor: string };
 
 /**
+ * Asegura que el valor de vida sea un número entero estrictamente en el rango [0, 100].
+ * Función pura y centralizada de clamp.
+ *
+ * @param vida - Valor numérico a normalizar.
+ * @returns Entero en el rango [0, 100].
+ */
+export function clampHealth(vida: number): number {
+  if (!Number.isFinite(vida)) return 0;
+  return Math.max(0, Math.min(100, Math.round(vida)));
+}
+
+/**
+ * Determina si un estado es terminal definitivo (la mascota ha partido).
+ */
+export function isTerminalPetState(state: PetState | string): boolean {
+  return state === PetState.ABSENT || state === 'DECEASED';
+}
+
+/**
+ * Comprueba si una mascota se encuentra en estado terminal definitivo.
+ * Una vida de 0 o estado ABSENT/DECEASED es irreversible.
+ */
+export function isPetTerminal(pet: { vida: number; estadoActual: PetState | string }): boolean {
+  return pet.vida === 0 || isTerminalPetState(pet.estadoActual);
+}
+
+/**
  * Obtiene el estado emocional de la mascota según su nivel de vida.
  * Función pura que no depende de estado externo.
  * 
@@ -108,6 +135,7 @@ export function getHealthDeltaForPriority(prioridad?: Priority | string, fallbac
 /**
  * Calcula la nueva vida de la mascota tras aplicar los deltas de salud de los check-ins del día.
  * Función pura, no modifica el estado externo.
+ * Si la mascota ya tiene vida 0 (estado terminal), la marcha es IRREVERSIBLE y devuelve 0.
  * Un hábito sin log para el día cuenta como fallido (completado: false).
  * 
  * @param vidaActual - El nivel de vida actual antes de aplicar los cambios [0, 100].
@@ -115,8 +143,12 @@ export function getHealthDeltaForPriority(prioridad?: Priority | string, fallbac
  * @returns El nuevo nivel de vida asegurado en el rango de [0, 100] mediante clamp.
  */
 export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult[]): number {
+  if (vidaActual === 0) {
+    return 0;
+  }
+
   if (habitos.length === 0) {
-    return vidaActual;
+    return clampHealth(vidaActual);
   }
 
   let deltaTotal = 0;
@@ -132,9 +164,40 @@ export function applyHealthDelta(vidaActual: number, habitos: HabitCheckInResult
   }
 
   const nuevaVida = vidaActual + deltaTotal;
-  
-  // Clamp [0, 100]
-  return Math.max(0, Math.min(100, nuevaVida));
+  return clampHealth(nuevaVida);
+}
+
+/**
+ * Calcula la nueva vida y el estado emocional resultante al aplicar un delta de salud.
+ * Implementa la regla estricta de irreversibilidad: una vez en vida 0 o ABSENT,
+ * cualquier delta positivo queda bloqueado y se conserva el estado terminal (0, ABSENT).
+ *
+ * @param currentVida - Nivel de vida actual [0, 100].
+ * @param delta - Cambio de vida (+ o -).
+ * @param currentEstado - Estado actual opcional para verificación de estado terminal.
+ * @returns Objeto con nuevaVida, nuevoEstado y un flag wasTerminal indicando si estaba terminal.
+ */
+export function calculateNewHealth(
+  currentVida: number,
+  delta: number,
+  currentEstado?: PetState | string
+): { nuevaVida: number; nuevoEstado: PetState; wasTerminal: boolean } {
+  if (currentVida === 0 || (currentEstado && isTerminalPetState(currentEstado))) {
+    return {
+      nuevaVida: 0,
+      nuevoEstado: PetState.ABSENT,
+      wasTerminal: true,
+    };
+  }
+
+  const nuevaVida = clampHealth(currentVida + delta);
+  const nuevoEstado = getPetState(nuevaVida);
+
+  return {
+    nuevaVida,
+    nuevoEstado,
+    wasTerminal: false,
+  };
 }
 
 /**
@@ -151,4 +214,35 @@ export function calculatePenaltyDelta(missedHabits: import('../types').Habit[]):
   }
   return delta;
 }
+
+/**
+ * Calcula la progresión de experiencia (XP) y nivel de la mascota.
+ * Función pura que acumula XP, evalúa si se superan uno o más umbrales consecutivos,
+ * conserva íntegramente el excedente de XP y recalcula el siguiente corte.
+ *
+ * @param currentNivel - Nivel actual (mínimo 1).
+ * @param currentXp - XP acumulado actualmente.
+ * @param currentXpParaSiguienteNivel - Umbral de XP para el siguiente nivel.
+ * @param gainedXp - Puntos de experiencia a sumar (debe ser >= 0).
+ * @returns Objeto con nivel, xp restante y el nuevo xpParaSiguienteNivel.
+ */
+export function calculateXpProgress(
+  currentNivel: number,
+  currentXp: number,
+  currentXpParaSiguienteNivel: number,
+  gainedXp: number
+): { nivel: number; xp: number; xpParaSiguienteNivel: number } {
+  let nivel = Math.max(1, Math.round(currentNivel || 1));
+  let xp = Math.max(0, Math.round(currentXp || 0) + Math.max(0, Math.round(gainedXp || 0)));
+  let xpParaSiguienteNivel = Math.max(10, Math.round(currentXpParaSiguienteNivel || 100));
+
+  while (xp >= xpParaSiguienteNivel) {
+    xp -= xpParaSiguienteNivel;
+    nivel += 1;
+    xpParaSiguienteNivel = Math.floor(xpParaSiguienteNivel * 1.5);
+  }
+
+  return { nivel, xp, xpParaSiguienteNivel };
+}
+
 

@@ -14,7 +14,7 @@ import {
   generateLogId 
 } from '../utils/dateUtils';
 import { isHabitExpectedOnDate } from '../utils/frequencyEngine';
-import { getHealthDeltaForPriority, getPetState } from '../utils/petLogic';
+import { getHealthDeltaForPriority, getPetState, clampHealth, isTerminalPetState } from '../utils/petLogic';
 import { calcPointsDelta } from '../utils/pointsEngine';
 import { evaluateBadges } from '../utils/badgeEngine';
 import { useLogStore } from '../store/useLogStore';
@@ -258,14 +258,21 @@ export class HabitCompletionService {
 
       // B. Actualizar vida y estado de la mascota si aplica
       if (healthDelta > 0) {
-        const freshPet = await db.getFirstAsync<PetRow>('SELECT vida FROM pets WHERE id = ?', [petRow.id]);
+        const freshPet = await db.getFirstAsync<PetRow>('SELECT vida, estadoActual FROM pets WHERE id = ?', [petRow.id]);
         const currentVida = freshPet ? freshPet.vida : petRow.vida;
-        finalHealth = Math.min(100, Math.max(0, currentVida + healthDelta));
-        const newState = getPetState(finalHealth);
-        await db.runAsync(
-          'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
-          [finalHealth, newState, petRow.id]
-        );
+        const currentEstado = freshPet ? freshPet.estadoActual : petRow.estadoActual;
+
+        // Regla de Irreversibilidad: si la mascota está en estado terminal (vida = 0 / ABSENT), ningún check-in la recupera.
+        if (currentVida > 0 && !isTerminalPetState(currentEstado)) {
+          finalHealth = clampHealth(currentVida + healthDelta);
+          const newState = getPetState(finalHealth);
+          await db.runAsync(
+            'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
+            [finalHealth, newState, petRow.id]
+          );
+        } else {
+          finalHealth = 0;
+        }
       }
 
       // C. Actualizar puntos del usuario si aplica
@@ -445,9 +452,9 @@ export class HabitCompletionService {
 
       // B. Revertir salud en la mascota
       if (petRow && healthDeltaToRevert > 0) {
-        const freshPet = await db.getFirstAsync<PetRow>('SELECT vida FROM pets WHERE id = ?', [petRow.id]);
+        const freshPet = await db.getFirstAsync<PetRow>('SELECT vida, estadoActual FROM pets WHERE id = ?', [petRow.id]);
         const currentVida = freshPet ? freshPet.vida : petRow.vida;
-        finalHealth = Math.min(100, Math.max(0, currentVida - healthDeltaToRevert));
+        finalHealth = clampHealth(currentVida - healthDeltaToRevert);
         const newState = getPetState(finalHealth);
         await db.runAsync(
           'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',

@@ -10,6 +10,8 @@ import { usePetStore } from '../../store/usePetStore';
  * Un componente reducido (60x60) que muestra la cara de la mascota,
  * su barra de XP y un indicador de salud baja. Actúa como acceso directo a la PetScreen.
  */
+const ENABLE_XP_PROGRESS = false;
+
 export const MiniPet = () => {
   const router = useRouter();
   const { pet } = usePetStore();
@@ -86,10 +88,12 @@ export const MiniPet = () => {
         {isHealthLow && <View style={styles.healthBadge} />}
       </View>
 
-      {/* Mini barra de progreso XP */}
-      <View style={styles.miniXpBar}>
-        <View style={[styles.xpFill, { width: `${Math.min(100, Math.max(0, xpPercentage))}%` }]} />
-      </View>
+      {/* Mini barra de progreso XP (oculta en MVP para no mostrar progreso congelado) */}
+      {ENABLE_XP_PROGRESS && (
+        <View style={styles.miniXpBar}>
+          <View style={[styles.xpFill, { width: `${Math.min(100, Math.max(0, xpPercentage))}%` }]} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
