@@ -1,7 +1,6 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MotiView } from 'moti';
 import { useTranslation } from 'react-i18next';
 import { Theme } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
@@ -11,6 +10,30 @@ export default function WelcomeScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { petName, setPetName } = useOnboardingFlow();
+
+  const anim1 = useRef(new Animated.Value(0)).current;
+  const anim2 = useRef(new Animated.Value(0)).current;
+  const anim3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(150, [
+      Animated.spring(anim1, { toValue: 1, useNativeDriver: true, tension: 50, friction: 7 }),
+      Animated.spring(anim2, { toValue: 1, useNativeDriver: true, tension: 50, friction: 7 }),
+      Animated.spring(anim3, { toValue: 1, useNativeDriver: true, tension: 50, friction: 7 }),
+    ]).start();
+  }, [anim1, anim2, anim3]);
+
+  const getAnimatedStyle = (anim: Animated.Value) => ({
+    opacity: anim,
+    transform: [
+      {
+        translateY: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [30, 0],
+        }),
+      },
+    ],
+  });
 
   const isValid = petName.trim().length >= 2;
 
@@ -25,35 +48,19 @@ export default function WelcomeScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.content}>
         {/*
-          Decisión de animación: 
-          Se usa type: 'spring' en lugar de 'timing' porque el efecto de rebote sutil (bounciness) 
-          refuerza el tono lúdico y amigable de la aplicación (una mascota virtual).
-          El escalonamiento de 150ms dirige la atención del usuario en el orden lógico de lectura:
-          primero la mascota, luego el saludo/instrucción y por último el control interactivo.
+          Animación escalonada con rebote sutil que dirige la atención:
+          mascota -> saludo -> input interactivo.
         */}
-        <MotiView 
-          from={{ opacity: 0, translateY: 30 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'spring', delay: 100 }}
-          style={styles.imageContainer}
-        >
+        <Animated.View style={[styles.imageContainer, getAnimatedStyle(anim1)]}>
           {/* El fallback es un emoji de 120px que se acerca visualmente a 200x200 */}
           <Text style={styles.emojiFallback}>🐶</Text>
-        </MotiView>
+        </Animated.View>
         
-        <MotiView 
-          from={{ opacity: 0, translateY: 30 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'spring', delay: 250 }}
-        >
+        <Animated.View style={getAnimatedStyle(anim2)}>
           <Text style={styles.title}>{t('onboarding.welcome.title')}</Text>
-        </MotiView>
+        </Animated.View>
 
-        <MotiView 
-          from={{ opacity: 0, translateY: 30 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'spring', delay: 400 }}
-        >
+        <Animated.View style={getAnimatedStyle(anim3)}>
           <TextInput
             style={styles.input}
             placeholder={t('onboarding.welcome.placeholder')}
@@ -62,7 +69,7 @@ export default function WelcomeScreen() {
             onChangeText={setPetName}
             autoFocus
           />
-        </MotiView>
+        </Animated.View>
       </View>
 
       <View style={styles.footer}>

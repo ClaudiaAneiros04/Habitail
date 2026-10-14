@@ -9,7 +9,6 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MotiView } from 'moti';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitLibrary } from '../../hooks/useHabitLibrary';
