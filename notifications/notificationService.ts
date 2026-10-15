@@ -467,6 +467,7 @@ export async function hasNotificationPermissionSilently(): Promise<boolean> {
 
 /**
  * Wrapper de seguridad para ejecutar operaciones de notificaciones.
+ * Comprueba de forma segura los permisos de notificación del SO sin alterar la preferencia del usuario.
  */
 export async function runSafeNotificationOperation<T>(
   operation: () => Promise<T>,
@@ -477,15 +478,6 @@ export async function runSafeNotificationOperation<T>(
   }
   try {
     const hasPermission = await hasNotificationPermissionSilently();
-    
-    try {
-      const habitStore = useHabitStore.getState();
-      if (habitStore && typeof habitStore.setNotificationsEnabled === 'function') {
-        habitStore.setNotificationsEnabled(hasPermission);
-      }
-    } catch (storeError) {
-      console.warn('[NotificationService] No se pudo sincronizar el estado del permiso con el store:', storeError);
-    }
 
     if (!hasPermission) {
       console.log('[NotificationService] Operación omitida debido a la falta de permisos de notificación.');
@@ -500,14 +492,39 @@ export async function runSafeNotificationOperation<T>(
 }
 
 /**
+ * Cancela de forma segura todos los triggers programados pertenecientes al namespace de hábitos.
+ * Esta operación NO depende de tener permisos de notificación concedidos por el SO.
+ */
+export async function cancelAllHabitReminders(): Promise<void> {
+  if (Platform.OS === 'web') {
+    return;
+  }
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const habitNotifications = scheduled.filter(
+      (n) => n.identifier.startsWith('habit:') || 
+             Boolean((n.content?.data as HabitNotificationData)?.habitId)
+    );
+    await Promise.all(habitNotifications.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+    console.log(`[NotificationService] Canceladas ${habitNotifications.length} notificaciones del namespace de hábitos.`);
+  } catch (error) {
+    console.warn('[NotificationService] Error al cancelar recordatorios de hábitos:', error);
+  }
+}
+
+/**
  * Cancela exclusivamente los triggers programados pertenecientes a un hábito específico.
  * Identifica triggers mediante el prefijo namespaced `habit:<habitId>:`, el ID directo o data.habitId.
  * No afecta a otros hábitos ni a notificaciones del sistema como pet:inactivity.
+ * NOTA: La cancelación no requiere permisos de envío de notificaciones.
  * 
  * @param habitId ID del hábito cuyo recordatorio se desea cancelar.
  */
 export async function cancelHabitReminder(habitId: string): Promise<void> {
-  return runSafeNotificationOperation(async () => {
+  if (Platform.OS === 'web') {
+    return;
+  }
+  try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const habitPrefix = `habit:${habitId}:`;
     const toCancel = scheduled.filter(
@@ -517,7 +534,9 @@ export async function cancelHabitReminder(habitId: string): Promise<void> {
     );
     await Promise.all(toCancel.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
     console.log(`[NotificationService] Recordatorio(s) cancelado(s) para el hábito: ${habitId} (${toCancel.length} triggers)`);
-  }, undefined);
+  } catch (error) {
+    console.warn(`[NotificationService] Error al cancelar recordatorio para hábito ${habitId}:`, error);
+  }
 }
 
 /**
@@ -529,6 +548,13 @@ export async function cancelHabitReminder(habitId: string): Promise<void> {
  */
 export async function scheduleHabitReminder(habit: Habit): Promise<void> {
   return runSafeNotificationOperation(async () => {
+    // Solo programar recordatorios si el usuario tiene las notificaciones habilitadas en sus preferencias
+    const userNotificationsEnabled = useHabitStore.getState()?.notificationsEnabled ?? true;
+    if (!userNotificationsEnabled) {
+      console.log(`[NotificationService] Las notificaciones están deshabilitadas por preferencia del usuario. Omitiendo recordatorio para: ${habit.id}`);
+      return;
+    }
+
     const reminderTime = habit.horaRecordatorio || (habit as any).reminderTime;
 
     if (!habit.activo) {
@@ -780,6 +806,14 @@ export function rescheduleAllHabitNotifications(habits: Habit[]): Promise<void> 
   rescheduleQueue = rescheduleQueue.then(async () => {
     console.log('[NotificationService] Iniciando reprogramación masiva de recordatorios de hábitos...');
     
+    // Si el usuario deshabilitó las notificaciones en la app, cancelamos los recordatorios de hábitos y salimos
+    const userNotificationsEnabled = useHabitStore.getState()?.notificationsEnabled ?? true;
+    if (!userNotificationsEnabled) {
+      console.log('[NotificationService] Preferencia del usuario deshabilitada: cancelando todos los recordatorios de hábitos.');
+      await cancelAllHabitReminders();
+      return;
+    }
+
     await runSafeNotificationOperation(async () => {
       // 1. Obtener todas las notificaciones agendadas nativamente
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();

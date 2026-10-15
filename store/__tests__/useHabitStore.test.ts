@@ -52,4 +52,40 @@ describe('useHabitStore', () => {
     expect(typeof savedHabit.id).toBe('string');
     expect(savedHabit.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
+
+  describe('Preferencia de notificaciones del usuario', () => {
+    it('setNotificationsEnabled(false) persiste en AsyncStorage y desactiva en el estado', async () => {
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      
+      await useHabitStore.getState().setNotificationsEnabled(false);
+
+      expect(useHabitStore.getState().notificationsEnabled).toBe(false);
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+        '@habitail_user_notifications_enabled',
+        'false'
+      );
+    });
+
+    it('loadNotificationPreference recupera correctamente la preferencia guardada en AsyncStorage', async () => {
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      AsyncStorage.getItem.mockResolvedValueOnce('false');
+
+      const result = await useHabitStore.getState().loadNotificationPreference();
+
+      expect(result).toBe(false);
+      expect(useHabitStore.getState().notificationsEnabled).toBe(false);
+    });
+
+    it('loadNotificationPreference preserva el valor por defecto si no hay nada guardado', async () => {
+      const AsyncStorage = require('@react-native-async-storage/async-storage');
+      AsyncStorage.getItem.mockResolvedValueOnce(null);
+      useHabitStore.setState({ notificationsEnabled: true });
+
+      const result = await useHabitStore.getState().loadNotificationPreference();
+
+      expect(result).toBe(true);
+      expect(useHabitStore.getState().notificationsEnabled).toBe(true);
+    });
+  });
 });
+

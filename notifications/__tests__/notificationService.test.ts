@@ -655,4 +655,57 @@ describe('NotificationService - Cobertura Integral de Reglas Canónicas', () => 
       );
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 17. SEPARACIÓN DE PERMISOS DEL SO Y PREFERENCIAS DEL USUARIO
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('17. Separación de permisos del SO y preferencias del usuario', () => {
+    test('Permiso concedido pero preferencia del usuario desactivada: NO programa recordatorio', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+      useHabitStore.setState({ notificationsEnabled: false });
+
+      await scheduleHabitReminder(baseHabit);
+
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Permiso concedido pero preferencia del usuario desactivada: rescheduleAllHabitNotifications cancela y NO programa', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+      useHabitStore.setState({ notificationsEnabled: false });
+      (Notifications.getAllScheduledNotificationsAsync as jest.Mock).mockResolvedValue([
+        { identifier: 'habit:habit-1:daily', content: { data: { habitId: 'habit-1' } } }
+      ]);
+
+      await rescheduleAllHabitNotifications([baseHabit]);
+
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('habit:habit-1:daily');
+      expect(Notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    });
+
+    test('Permiso denegado por el SO: cancelHabitReminder se ejecuta correctamente sin abortar por falta de permisos', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied' });
+      (Notifications.getAllScheduledNotificationsAsync as jest.Mock).mockResolvedValue([
+        { identifier: 'habit:habit-1:daily', content: { data: { habitId: 'habit-1' } } }
+      ]);
+
+      await cancelHabitReminder('habit-1');
+
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('habit:habit-1:daily');
+    });
+
+    test('runSafeNotificationOperation NUNCA altera o sobrescribe notificationsEnabled en el store', async () => {
+      (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'granted' });
+      const mockSetNotificationsEnabled = jest.fn();
+      useHabitStore.setState({ 
+        notificationsEnabled: false,
+        setNotificationsEnabled: mockSetNotificationsEnabled 
+      });
+
+      await scheduleHabitReminder(baseHabit);
+
+      expect(mockSetNotificationsEnabled).not.toHaveBeenCalled();
+      expect(useHabitStore.getState().notificationsEnabled).toBe(false);
+    });
+  });
 });
+

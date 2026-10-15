@@ -2,7 +2,13 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '../types';
 import { HabitRepository } from '../storage/HabitRepository';
-import { scheduleHabitReminder, cancelHabitReminder } from '../notifications/notificationService';
+import { 
+  scheduleHabitReminder, 
+  cancelHabitReminder, 
+  cancelAllHabitReminders, 
+  rescheduleAllHabitNotifications, 
+  hasNotificationPermissionSilently 
+} from '../notifications/notificationService';
 import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
 import { CacheInvalidationService } from '../services/cacheInvalidationService';
@@ -13,11 +19,13 @@ import { useLogStore } from './useLogStore';
 export const habitRepo = new HabitRepository();
 export const HABIT_MIGRATION_KEY = '@habit_storage_migrated';
 export const LEGACY_HABIT_STORAGE_KEY = 'habit-storage';
+export const USER_NOTIFICATIONS_PREF_KEY = '@habitail_user_notifications_enabled';
 
 interface HabitState {
   habits: Habit[];
   notificationsEnabled: boolean;
-  setNotificationsEnabled: (enabled: boolean) => void;
+  setNotificationsEnabled: (enabled: boolean) => Promise<void>;
+  loadNotificationPreference: () => Promise<boolean>;
   addHabit: (habitData: Omit<Habit, 'id'> & { id?: string }) => Promise<void>;
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   archiveHabit: (id: string) => Promise<void>;
@@ -29,8 +37,39 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
   habits: [],
   notificationsEnabled: true,
 
-  setNotificationsEnabled: (enabled: boolean) => {
+  loadNotificationPreference: async () => {
+    try {
+      const stored = await AsyncStorage.getItem(USER_NOTIFICATIONS_PREF_KEY);
+      if (stored !== null) {
+        const isEnabled = stored === 'true';
+        set({ notificationsEnabled: isEnabled });
+        return isEnabled;
+      }
+    } catch (error) {
+      console.warn('[HabitStore] Error al cargar preferencia de notificaciones:', error);
+    }
+    return get().notificationsEnabled;
+  },
+
+  setNotificationsEnabled: async (enabled: boolean) => {
     set({ notificationsEnabled: enabled });
+    try {
+      await AsyncStorage.setItem(USER_NOTIFICATIONS_PREF_KEY, String(enabled));
+    } catch (error) {
+      console.warn('[HabitStore] Error al guardar preferencia de notificaciones:', error);
+    }
+
+    if (!enabled) {
+      // Si el usuario desactiva las notificaciones, cancelamos todos los recordatorios de hábitos
+      // de forma limpia sin importar el estado de permisos del SO
+      await cancelAllHabitReminders();
+    } else {
+      // Si el usuario las activa, reprogramamos si el SO tiene permisos otorgados
+      const hasPermission = await hasNotificationPermissionSilently();
+      if (hasPermission) {
+        await rescheduleAllHabitNotifications(get().habits);
+      }
+    }
   },
 
   addHabit: async (habitData) => {
@@ -127,10 +166,13 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     try {
       const targetUserId = userId || useUserStore.getState().user?.id || 'default-user';
 
-      // 1. Ejecutar proceso de migración seguro desde AsyncStorage a SQLite si procede
+      // 1. Cargar preferencia persistente de notificaciones del usuario
+      await get().loadNotificationPreference();
+
+      // 2. Ejecutar proceso de migración seguro desde AsyncStorage a SQLite si procede
       await migrateLegacyHabits(targetUserId, repository);
 
-      // 2. Cargar hábitos completamente hidratados desde SQLite para el usuario
+      // 3. Cargar hábitos completamente hidratados desde SQLite para el usuario
       const dbHabits = await repository.get(targetUserId);
 
       set({ habits: dbHabits });

@@ -101,6 +101,10 @@
       "denied": "Notifications are disabled. You can enable them in Settings",
       "goToSettings": "Go to Settings"
     },
+    "settings": {
+      "title": "Reminder notifications",
+      "subtitle": "Enable or disable alerts from Habitail"
+    },
     "reminder": {
       "title": "Time for your habit!",
       "body": "It's time to do your habit: {{name}}",
