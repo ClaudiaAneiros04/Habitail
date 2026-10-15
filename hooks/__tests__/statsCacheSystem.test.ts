@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useStatsStore, buildStatsCacheKey } from '../../store/useStatsStore';
 import { useHeatmapStore, buildHeatmapCacheKey } from '../../store/useHeatmapStore';
 import { CacheInvalidationService } from '../../services/cacheInvalidationService';
@@ -68,8 +68,12 @@ describe('Stats Temporal Cache and User Isolation System', () => {
       getByHabit: jest.fn().mockResolvedValue([]),
       getByDate: jest.fn(),
       getLogsForRange: jest.fn(),
-      getStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 10, totalDays: 30 } as PeriodStats),
-      getGlobalStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 25, totalDays: 30 } as PeriodStats),
+      getStatsByPeriod: jest
+        .fn()
+        .mockResolvedValue({ totalCompleted: 10, totalDays: 30 } as PeriodStats),
+      getGlobalStatsByPeriod: jest
+        .fn()
+        .mockResolvedValue({ totalCompleted: 25, totalDays: 30 } as PeriodStats),
       getHeatmapForHabit: jest.fn(),
       getHeatmapGlobal: jest.fn(),
       getLogsForRangeGlobal: jest.fn(),
@@ -93,23 +97,31 @@ describe('Stats Temporal Cache and User Isolation System', () => {
     expect(keyGlobalUser1).toBe('user-1:global:monthly');
     expect(keyGlobalUser2).toBe('user-2:global:monthly');
 
-    useStatsStore.getState().setData(keyUser1Weekly, {
-      totalCompleted: 7,
-      totalDays: 7,
-      expectedCompletions: 7,
-      completionRate: 100,
-      currentStreak: 7,
-      maxStreak: 7,
-    }, todayStr);
+    useStatsStore.getState().setData(
+      keyUser1Weekly,
+      {
+        totalCompleted: 7,
+        totalDays: 7,
+        expectedCompletions: 7,
+        completionRate: 100,
+        currentStreak: 7,
+        maxStreak: 7,
+      },
+      todayStr,
+    );
 
-    useStatsStore.getState().setData(keyUser2Weekly, {
-      totalCompleted: 2,
-      totalDays: 7,
-      expectedCompletions: 7,
-      completionRate: 28.5,
-      currentStreak: 1,
-      maxStreak: 2,
-    }, todayStr);
+    useStatsStore.getState().setData(
+      keyUser2Weekly,
+      {
+        totalCompleted: 2,
+        totalDays: 7,
+        expectedCompletions: 7,
+        completionRate: 28.5,
+        currentStreak: 1,
+        maxStreak: 2,
+      },
+      todayStr,
+    );
 
     // Los datos están perfectamente aislados
     expect(useStatsStore.getState().cache[keyUser1Weekly]?.data?.completionRate).toBe(100);
@@ -123,8 +135,34 @@ describe('Stats Temporal Cache and User Isolation System', () => {
     const hm1 = buildHeatmapCacheKey('habit-u1', 'user-1');
     const hm2 = buildHeatmapCacheKey('habit-u2', 'user-2');
 
-    useStatsStore.getState().setData(k1, { totalCompleted: 5, totalDays: 7, expectedCompletions: 7, completionRate: 71, currentStreak: 3, maxStreak: 5 }, todayStr);
-    useStatsStore.getState().setData(k2, { totalCompleted: 4, totalDays: 7, expectedCompletions: 7, completionRate: 57, currentStreak: 2, maxStreak: 4 }, todayStr);
+    useStatsStore
+      .getState()
+      .setData(
+        k1,
+        {
+          totalCompleted: 5,
+          totalDays: 7,
+          expectedCompletions: 7,
+          completionRate: 71,
+          currentStreak: 3,
+          maxStreak: 5,
+        },
+        todayStr,
+      );
+    useStatsStore
+      .getState()
+      .setData(
+        k2,
+        {
+          totalCompleted: 4,
+          totalDays: 7,
+          expectedCompletions: 7,
+          completionRate: 57,
+          currentStreak: 2,
+          maxStreak: 4,
+        },
+        todayStr,
+      );
     useHeatmapStore.getState().setData(hm1, [{ date: todayStr, value: 2 }], todayStr);
     useHeatmapStore.getState().setData(hm2, [{ date: todayStr, value: 1 }], todayStr);
 
@@ -145,9 +183,48 @@ describe('Stats Temporal Cache and User Isolation System', () => {
     const globalKey = buildStatsCacheKey(undefined, 'weekly', 'user-1');
     const otherHabitKey = buildStatsCacheKey('habit-other', 'weekly', 'user-1');
 
-    useStatsStore.getState().setData(habitKey, { totalCompleted: 5, totalDays: 7, expectedCompletions: 7, completionRate: 71, currentStreak: 3, maxStreak: 5 }, todayStr);
-    useStatsStore.getState().setData(globalKey, { totalCompleted: 15, totalDays: 14, expectedCompletions: 14, completionRate: 71, currentStreak: 3, maxStreak: 5 }, todayStr);
-    useStatsStore.getState().setData(otherHabitKey, { totalCompleted: 2, totalDays: 7, expectedCompletions: 7, completionRate: 28, currentStreak: 1, maxStreak: 2 }, todayStr);
+    useStatsStore
+      .getState()
+      .setData(
+        habitKey,
+        {
+          totalCompleted: 5,
+          totalDays: 7,
+          expectedCompletions: 7,
+          completionRate: 71,
+          currentStreak: 3,
+          maxStreak: 5,
+        },
+        todayStr,
+      );
+    useStatsStore
+      .getState()
+      .setData(
+        globalKey,
+        {
+          totalCompleted: 15,
+          totalDays: 14,
+          expectedCompletions: 14,
+          completionRate: 71,
+          currentStreak: 3,
+          maxStreak: 5,
+        },
+        todayStr,
+      );
+    useStatsStore
+      .getState()
+      .setData(
+        otherHabitKey,
+        {
+          totalCompleted: 2,
+          totalDays: 7,
+          expectedCompletions: 7,
+          completionRate: 28,
+          currentStreak: 1,
+          maxStreak: 2,
+        },
+        todayStr,
+      );
 
     // Invalidar 'habit-u1' del usuario 1
     CacheInvalidationService.invalidateHabitCaches('habit-u1', 'user-1');
@@ -163,45 +240,18 @@ describe('Stats Temporal Cache and User Isolation System', () => {
     const habitKey = buildStatsCacheKey('habit-u1', 'weekly', 'user-1');
 
     // Supongamos que había una entrada calculada ayer
-    useStatsStore.getState().setData(habitKey, {
-      totalCompleted: 3,
-      totalDays: 7,
-      expectedCompletions: 7,
-      completionRate: 42,
-      currentStreak: 2,
-      maxStreak: 2,
-    }, yesterdayStr);
-
-    const { result, waitForNextUpdate } = renderHook(() =>
-      useHabitStats({
-        habitId: 'habit-u1',
-        period: 'weekly',
-        userId: 'user-1',
-        _habitRepo: mockHabitRepo,
-        _logRepo: mockLogRepo,
-      })
+    useStatsStore.getState().setData(
+      habitKey,
+      {
+        totalCompleted: 3,
+        totalDays: 7,
+        expectedCompletions: 7,
+        completionRate: 42,
+        currentStreak: 2,
+        maxStreak: 2,
+      },
+      yesterdayStr,
     );
-
-    await waitForNextUpdate();
-
-    // LogRepo debe haber sido consultado porque la entrada era del día anterior (stale-day)
-    expect(mockLogRepo.getStatsByPeriod).toHaveBeenCalled();
-    // La nueva entrada debe tener calculatedForDate de hoy
-    expect(useStatsStore.getState().cache[habitKey]?.calculatedForDate).toBe(todayStr);
-  });
-
-  // 5. Evita consultas redundantes a SQLite si los datos están vigentes (hit de caché)
-  test('5. No repite consultas a SQLite si el dato ya existe para hoy y no está en loading', async () => {
-    const habitKey = buildStatsCacheKey('habit-u1', 'weekly', 'user-1');
-
-    useStatsStore.getState().setData(habitKey, {
-      totalCompleted: 10,
-      totalDays: 7,
-      expectedCompletions: 7,
-      completionRate: 100,
-      currentStreak: 5,
-      maxStreak: 5,
-    }, todayStr);
 
     const { result } = renderHook(() =>
       useHabitStats({
@@ -210,7 +260,42 @@ describe('Stats Temporal Cache and User Isolation System', () => {
         userId: 'user-1',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
+    );
+
+    await waitFor(() => {
+      // LogRepo debe haber sido consultado porque la entrada era del día anterior (stale-day)
+      expect(mockLogRepo.getStatsByPeriod).toHaveBeenCalled();
+      // La nueva entrada debe tener calculatedForDate de hoy
+      expect(useStatsStore.getState().cache[habitKey]?.calculatedForDate).toBe(todayStr);
+    });
+  });
+
+  // 5. Evita consultas redundantes a SQLite si los datos están vigentes (hit de caché)
+  test('5. No repite consultas a SQLite si el dato ya existe para hoy y no está en loading', async () => {
+    const habitKey = buildStatsCacheKey('habit-u1', 'weekly', 'user-1');
+
+    useStatsStore.getState().setData(
+      habitKey,
+      {
+        totalCompleted: 10,
+        totalDays: 7,
+        expectedCompletions: 7,
+        completionRate: 100,
+        currentStreak: 5,
+        maxStreak: 5,
+      },
+      todayStr,
+    );
+
+    const { result } = renderHook(() =>
+      useHabitStats({
+        habitId: 'habit-u1',
+        period: 'weekly',
+        userId: 'user-1',
+        _habitRepo: mockHabitRepo,
+        _logRepo: mockLogRepo,
+      }),
     );
 
     // No debe haber llamado a SQLite
@@ -222,7 +307,7 @@ describe('Stats Temporal Cache and User Isolation System', () => {
   // 6. Varias consultas simultáneas no sobrescriben con respuestas lentas fuera de orden
   test('6. Condiciones de carrera: consulta rápida posterior no es pisada por respuesta tardía anterior', async () => {
     let slowResolve: (v: any) => void = () => {};
-    const slowPromise = new Promise<PeriodStats>((res) => {
+    const slowPromise = new Promise<PeriodStats>(res => {
       slowResolve = res;
     });
 
@@ -239,7 +324,7 @@ describe('Stats Temporal Cache and User Isolation System', () => {
         userId: 'user-1',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
     // Segunda consulta para 'monthly' que resuelve rápido
@@ -251,17 +336,19 @@ describe('Stats Temporal Cache and User Isolation System', () => {
         userId: 'user-1',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
-    await hookMonthly.waitForNextUpdate();
-
-    expect(useStatsStore.getState().cache[key2]?.data?.totalCompleted).toBe(20);
+    await waitFor(() => {
+      expect(useStatsStore.getState().cache[key2]?.data?.totalCompleted).toBe(20);
+    });
 
     // Ahora la promesa lenta de 'weekly' responde después
     slowResolve({ totalCompleted: 5, totalDays: 7 });
 
-    await hookWeekly.waitForNextUpdate();
+    await waitFor(() => {
+      expect(useStatsStore.getState().cache[key1]?.data?.totalCompleted).toBe(5);
+    });
 
     // Cada periodo mantiene sus propios resultados sin pisar al otro
     expect(useStatsStore.getState().cache[key1]?.data?.totalCompleted).toBe(5);
@@ -272,14 +359,18 @@ describe('Stats Temporal Cache and User Isolation System', () => {
   test('7. Control de límite de memoria: poda entradas antiguas al sobrepasar el límite', () => {
     for (let i = 0; i < 65; i++) {
       const key = `user-1:habit-${i}:weekly`;
-      useStatsStore.getState().setData(key, {
-        totalCompleted: i,
-        totalDays: 7,
-        expectedCompletions: 7,
-        completionRate: 50,
-        currentStreak: 1,
-        maxStreak: 1,
-      }, todayStr);
+      useStatsStore.getState().setData(
+        key,
+        {
+          totalCompleted: i,
+          totalDays: 7,
+          expectedCompletions: 7,
+          completionRate: 50,
+          currentStreak: 1,
+          maxStreak: 1,
+        },
+        todayStr,
+      );
     }
 
     const currentCache = useStatsStore.getState().cache;

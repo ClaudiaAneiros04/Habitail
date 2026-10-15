@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook, waitFor } from '@testing-library/react-native';
 import { useHabitStats } from '../useHabitStats';
 import { ILogRepository, PeriodStats } from '../../storage/LogRepository';
 import { IHabitRepository } from '../../storage/HabitRepository';
@@ -48,8 +48,12 @@ describe('useHabitStats Hook', () => {
       getByHabit: jest.fn().mockResolvedValue([]),
       getByDate: jest.fn(),
       getLogsForRange: jest.fn(),
-      getStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 5, totalDays: 30 } as PeriodStats),
-      getGlobalStatsByPeriod: jest.fn().mockResolvedValue({ totalCompleted: 15, totalDays: 30 } as PeriodStats),
+      getStatsByPeriod: jest
+        .fn()
+        .mockResolvedValue({ totalCompleted: 5, totalDays: 30 } as PeriodStats),
+      getGlobalStatsByPeriod: jest
+        .fn()
+        .mockResolvedValue({ totalCompleted: 15, totalDays: 30 } as PeriodStats),
       getHeatmapForHabit: jest.fn(),
       getHeatmapGlobal: jest.fn(),
       getLogsForRangeGlobal: jest.fn(),
@@ -76,47 +80,45 @@ describe('useHabitStats Hook', () => {
 
     mockLogRepo.getByHabit.mockResolvedValueOnce(mockLogs);
 
-    const { result, waitForNextUpdate } = renderHook(() =>
+    const { result } = renderHook(() =>
       useHabitStats({
         habitId: 'habit-123',
         period: 'monthly',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
-    await waitForNextUpdate();
-
-    expect(mockHabitRepo.getById).toHaveBeenCalledWith('habit-123');
-    expect(mockLogRepo.getByHabit).toHaveBeenCalledWith('habit-123');
-
-    expect(result.current.currentStreak).toBe(1);
-    expect(result.current.totalCompleted).toBe(5);
+    await waitFor(() => {
+      expect(mockHabitRepo.getById).toHaveBeenCalledWith('habit-123');
+      expect(mockLogRepo.getByHabit).toHaveBeenCalledWith('habit-123');
+      expect(result.current.currentStreak).toBe(1);
+      expect(result.current.totalCompleted).toBe(5);
+    });
   });
 
   test('Debería cargar estadísticas globales usando getGlobalActiveDates', async () => {
     mockHabitRepo.get.mockResolvedValueOnce([mockHabit]);
-    
+
     // El usuario tiene actividad hoy y ayer
     mockLogRepo.getGlobalActiveDates.mockResolvedValueOnce([todayStr, yesterdayStr]);
 
-    const { result, waitForNextUpdate } = renderHook(() =>
+    const { result } = renderHook(() =>
       useHabitStats({
         habitId: undefined, // Global
         userId: 'user-456',
         period: 'monthly',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
-    await waitForNextUpdate();
-
-    expect(mockHabitRepo.get).toHaveBeenCalled();
-    expect(mockLogRepo.getGlobalActiveDates).toHaveBeenCalledWith('user-456');
-
-    expect(result.current.currentStreak).toBe(2);
-    expect(result.current.totalCompleted).toBe(15);
+    await waitFor(() => {
+      expect(mockHabitRepo.get).toHaveBeenCalled();
+      expect(mockLogRepo.getGlobalActiveDates).toHaveBeenCalledWith('user-456');
+      expect(result.current.currentStreak).toBe(2);
+      expect(result.current.totalCompleted).toBe(15);
+    });
   });
 
   test('Periodo "total" no debe usar 1970-01-01 y debe iniciar en fechaInicio del hábito', async () => {
@@ -128,24 +130,24 @@ describe('useHabitStats Hook', () => {
     mockLogRepo.getByHabit.mockResolvedValueOnce([]);
     mockLogRepo.getStatsByPeriod.mockResolvedValueOnce({ totalCompleted: 10, totalDays: 30 });
 
-    const { result, waitForNextUpdate } = renderHook(() =>
+    const { result } = renderHook(() =>
       useHabitStats({
         habitId: 'habit-123',
         period: 'total',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
-    await waitForNextUpdate();
-
-    // Comprobamos que getStatsByPeriod se llamó con fechaInicio '2026-06-15' y NO con '1970-01-01'
-    expect(mockLogRepo.getStatsByPeriod).toHaveBeenCalledWith(
-      'habit-123',
-      '2026-06-15',
-      todayStr
-    );
-    expect(result.current.totalCompleted).toBe(10);
+    await waitFor(() => {
+      // Comprobamos que getStatsByPeriod se llamó con fechaInicio '2026-06-15' y NO con '1970-01-01'
+      expect(mockLogRepo.getStatsByPeriod).toHaveBeenCalledWith(
+        'habit-123',
+        '2026-06-15',
+        todayStr,
+      );
+      expect(result.current.totalCompleted).toBe(10);
+    });
   });
 
   test('Periodo "total" global no debe usar 1970-01-01 y debe calcular inicio lógico de los hábitos del usuario', async () => {
@@ -164,24 +166,24 @@ describe('useHabitStats Hook', () => {
     mockLogRepo.getGlobalActiveDates.mockResolvedValueOnce(['2026-08-10', '2026-07-05']);
     mockLogRepo.getGlobalStatsByPeriod.mockResolvedValueOnce({ totalCompleted: 20, totalDays: 50 });
 
-    const { result, waitForNextUpdate } = renderHook(() =>
+    const { result } = renderHook(() =>
       useHabitStats({
         habitId: undefined, // Global
         userId: 'user-456',
         period: 'total',
         _habitRepo: mockHabitRepo,
         _logRepo: mockLogRepo,
-      })
+      }),
     );
 
-    await waitForNextUpdate();
-
-    // Debe comenzar en la fecha más antigua de sus hábitos ('2026-07-01'), NUNCA '1970-01-01'
-    expect(mockLogRepo.getGlobalStatsByPeriod).toHaveBeenCalledWith(
-      'user-456',
-      '2026-07-01',
-      todayStr
-    );
-    expect(result.current.totalCompleted).toBe(20);
+    await waitFor(() => {
+      // Debe comenzar en la fecha más antigua de sus hábitos ('2026-07-01'), NUNCA '1970-01-01'
+      expect(mockLogRepo.getGlobalStatsByPeriod).toHaveBeenCalledWith(
+        'user-456',
+        '2026-07-01',
+        todayStr,
+      );
+      expect(result.current.totalCompleted).toBe(20);
+    });
   });
 });

@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { View as MotiView } from 'moti';
 import { ChipSelector } from '../../components/ChipSelector';
 import { Theme } from '../../constants/theme';
 import { Colors } from '../../constants/colors';
@@ -25,10 +26,18 @@ import { useOnboardingFlow } from './_layout';
 const CATEGORY_CONFIG: { id: Category; icon: keyof typeof Ionicons.glyphMap; i18nKey: string }[] = [
   { id: Category.SALUD, icon: 'heart', i18nKey: 'onboarding.interests.categories.salud' },
   { id: Category.DEPORTE, icon: 'fitness', i18nKey: 'onboarding.interests.categories.deporte' },
-  { id: Category.PRODUCTIVIDAD, icon: 'briefcase', i18nKey: 'onboarding.interests.categories.productividad' },
+  {
+    id: Category.PRODUCTIVIDAD,
+    icon: 'briefcase',
+    i18nKey: 'onboarding.interests.categories.productividad',
+  },
   { id: Category.BIENESTAR, icon: 'leaf', i18nKey: 'onboarding.interests.categories.bienestar' },
   { id: Category.FINANZAS, icon: 'wallet', i18nKey: 'onboarding.interests.categories.finanzas' },
-  { id: Category.APRENDIZAJE, icon: 'book', i18nKey: 'onboarding.interests.categories.aprendizaje' },
+  {
+    id: Category.APRENDIZAJE,
+    icon: 'book',
+    i18nKey: 'onboarding.interests.categories.aprendizaje',
+  },
 ];
 
 export default function InterestsScreen() {
@@ -50,7 +59,7 @@ export default function InterestsScreen() {
     setSelectedCategories(
       selectedCategories.includes(cat)
         ? selectedCategories.filter(c => c !== cat)
-        : [...selectedCategories, cat]
+        : [...selectedCategories, cat],
     );
   };
 

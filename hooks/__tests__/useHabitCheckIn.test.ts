@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useHabitCheckIn } from '../useHabitCheckIn';
 import { useLogStore } from '../../store/useLogStore';
 import { useHabitStore } from '../../store/useHabitStore';
@@ -98,16 +98,11 @@ describe('useHabitCheckIn (UI Wrapper)', () => {
     test('should calculate shouldLaunchConfetti when all daily tasks are done', async () => {
       // Setup: 2 habits, 1 already completed
       (useHabitStore as any).mockReturnValue({
-        habits: [
-          mockHabit('h-1', Priority.NORMAL),
-          mockHabit('h-2', Priority.NORMAL),
-        ],
+        habits: [mockHabit('h-1', Priority.NORMAL), mockHabit('h-2', Priority.NORMAL)],
       });
 
       (useLogStore as any).mockReturnValue({
-        logs: [
-          { habitId: 'h-1', fecha: '2026-05-22', completado: true },
-        ],
+        logs: [{ habitId: 'h-1', fecha: '2026-05-22', completado: true }],
       });
 
       const { result } = renderHook(() => useHabitCheckIn());
@@ -158,9 +153,7 @@ describe('useHabitCheckIn (UI Wrapper)', () => {
   describe('UI helpers', () => {
     test('getStatusForDay reflects store logs', () => {
       (useLogStore as any).mockReturnValue({
-        logs: [
-          { habitId: 'h-essential', fecha: '2026-05-22', completado: true },
-        ],
+        logs: [{ habitId: 'h-essential', fecha: '2026-05-22', completado: true }],
       });
 
       const { result } = renderHook(() => useHabitCheckIn());
@@ -171,16 +164,11 @@ describe('useHabitCheckIn (UI Wrapper)', () => {
 
     test('getDailyProgress calculates ratio of completed habits', () => {
       (useHabitStore as any).mockReturnValue({
-        habits: [
-          mockHabit('h-1', Priority.NORMAL),
-          mockHabit('h-2', Priority.NORMAL),
-        ],
+        habits: [mockHabit('h-1', Priority.NORMAL), mockHabit('h-2', Priority.NORMAL)],
       });
 
       (useLogStore as any).mockReturnValue({
-        logs: [
-          { habitId: 'h-1', fecha: '2026-05-22', completado: true },
-        ],
+        logs: [{ habitId: 'h-1', fecha: '2026-05-22', completado: true }],
       });
 
       const { result } = renderHook(() => useHabitCheckIn());

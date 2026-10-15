@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { View as MotiView } from 'moti';
 import { Ionicons } from '@expo/vector-icons';
 import { useHabitLibrary } from '../../hooks/useHabitLibrary';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -49,7 +50,7 @@ export default function HabitsScreen() {
     setSelectedHabits(
       (current.some(h => h.nombre === habit.nombre)
         ? current.filter(h => h.nombre !== habit.nombre)
-        : [...current, habit]) as any
+        : [...current, habit]) as any,
     );
   };
 
@@ -174,8 +175,19 @@ export default function HabitsScreen() {
               onPress={() => router.back()}
               accessibilityRole="button"
             >
-              <Ionicons name="arrow-back" size={16} color={Colors.primary} style={styles.changeInterestsIcon} />
-              <Text style={[styles.changeInterestsText, { flexShrink: 1 }]} adjustsFontSizeToFit numberOfLines={1}>{t('onboarding.habits.changeInterests')}</Text>
+              <Ionicons
+                name="arrow-back"
+                size={16}
+                color={Colors.primary}
+                style={styles.changeInterestsIcon}
+              />
+              <Text
+                style={[styles.changeInterestsText, { flexShrink: 1 }]}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
+                {t('onboarding.habits.changeInterests')}
+              </Text>
             </TouchableOpacity>
           </MotiView>
         )}
@@ -191,11 +203,7 @@ export default function HabitsScreen() {
             })}
           </Text>
         )}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleStart}
-          accessibilityRole="button"
-        >
+        <TouchableOpacity style={styles.button} onPress={handleStart} accessibilityRole="button">
           <Text style={styles.buttonText}>{t('onboarding.habits.startButton')}</Text>
         </TouchableOpacity>
       </View>

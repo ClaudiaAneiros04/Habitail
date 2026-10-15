@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook } from '@testing-library/react-native';
 import { useDailyPenaltyJob } from '../useDailyPenaltyJob';
 import { useUserStore } from '../../store/useUserStore';
 import { useHabitStore } from '../../store/useHabitStore';
@@ -34,12 +34,14 @@ jest.mock('../../storage/LogRepository', () => {
 
 // Mock de base de datos para no requerir SQLite nativo en tests unitarios del hook
 jest.mock('../../storage/database', () => ({
-  getDb: jest.fn().mockRejectedValue(new Error('Unit test environment: fallback to store updateHealth')),
+  getDb: jest
+    .fn()
+    .mockRejectedValue(new Error('Unit test environment: fallback to store updateHealth')),
 }));
 
 describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
   const todayString = format(new Date(), 'yyyy-MM-dd');
-  
+
   let mockUpdateUser: jest.Mock;
   let mockUpdateHealth: jest.Mock;
   let mockGetMissedHabits: jest.Mock;
@@ -49,9 +51,9 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     mockUpdateHealth = jest.fn();
     (calculatePenaltyDelta as jest.Mock).mockReturnValue(-10);
 
-    const mockInstance = (LogRepository as any).mock.results[0]?.value || 
-                         (LogRepository as any).mock.instances[0];
-                         
+    const mockInstance =
+      (LogRepository as any).mock.results[0]?.value || (LogRepository as any).mock.instances[0];
+
     mockGetMissedHabits = mockInstance?.getMissedHabitsForDate || jest.fn().mockResolvedValue([]);
     mockGetMissedHabits.mockReset();
     mockGetMissedHabits.mockResolvedValue([]);
@@ -62,12 +64,14 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     });
 
     (useHabitStore as any).mockReturnValue({
-      habits: [{ 
-        id: 'h1', 
-        activo: true, 
-        diasSemana: [1, 2, 3, 4, 5], 
-        fechaInicio: '2026-01-01' 
-      }],
+      habits: [
+        {
+          id: 'h1',
+          activo: true,
+          diasSemana: [1, 2, 3, 4, 5],
+          fechaInicio: '2026-01-01',
+        },
+      ],
     });
 
     (usePetStore as any).mockReturnValue({
@@ -106,10 +110,10 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
     (useUserStore as any).mockReturnValue({
-      user: { 
-        id: 'u1', 
-        lastPenaltyAppliedDate: twoDaysAgo, 
-        lastOpenedAt: Date.now() - (48 * 60 * 60 * 1000) 
+      user: {
+        id: 'u1',
+        lastPenaltyAppliedDate: twoDaysAgo,
+        lastOpenedAt: Date.now() - 48 * 60 * 60 * 1000,
       },
       updateUser: mockUpdateUser,
     });
@@ -132,10 +136,10 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     const fiveDaysAgo = format(subDays(new Date(), 5), 'yyyy-MM-dd');
 
     (useUserStore as any).mockReturnValue({
-      user: { 
-        id: 'u1', 
-        lastPenaltyAppliedDate: fiveDaysAgo, 
-        lastOpenedAt: Date.now() - (75 * 60 * 60 * 1000) // Inactividad >= 72h
+      user: {
+        id: 'u1',
+        lastPenaltyAppliedDate: fiveDaysAgo,
+        lastOpenedAt: Date.now() - 75 * 60 * 60 * 1000, // Inactividad >= 72h
       },
       updateUser: mockUpdateUser,
     });
@@ -174,8 +178,8 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     mockGetMissedHabits.mockResolvedValue([]);
 
     const { rerender } = renderHook(() => useDailyPenaltyJob());
-    rerender();
-    
+    rerender(undefined);
+
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
