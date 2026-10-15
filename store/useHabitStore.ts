@@ -9,8 +9,9 @@ import { CacheInvalidationService } from '../services/cacheInvalidationService';
 import { useUserStore } from './useUserStore';
 import { useLogStore } from './useLogStore';
 
-const habitRepo = new HabitRepository();
-const HABIT_MIGRATION_KEY = '@habit_storage_migrated';
+export const habitRepo = new HabitRepository();
+export const HABIT_MIGRATION_KEY = '@habit_storage_migrated';
+export const LEGACY_HABIT_STORAGE_KEY = 'habit-storage';
 
 interface HabitState {
   habits: Habit[];
@@ -20,7 +21,7 @@ interface HabitState {
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>;
   archiveHabit: (id: string) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
-  loadHabits: (userId?: string) => Promise<void>;
+  loadHabits: (userId?: string, repository?: HabitRepository) => Promise<void>;
 }
 
 export const useHabitStore = create<HabitState>()((set, get) => ({
@@ -121,63 +122,15 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     CacheInvalidationService.invalidateHabitCaches(id);
   },
 
-  loadHabits: async (userId?: string) => {
+  loadHabits: async (userId?: string, repository: HabitRepository = habitRepo) => {
     try {
       const targetUserId = userId || useUserStore.getState().user?.id || 'default-user';
-      let dbHabits = await habitRepo.get(targetUserId);
 
-      // Comprobar si ya se realizó la migración one-shot desde AsyncStorage
-      const migrationDone = await AsyncStorage.getItem(HABIT_MIGRATION_KEY);
+      // 1. Ejecutar proceso de migración seguro desde AsyncStorage a SQLite si procede
+      await migrateLegacyHabits(targetUserId, repository);
 
-      if (!migrationDone && dbHabits.length === 0) {
-        // Verificar que SQLite está realmente vacío antes de importar
-        const allHabitsInDb = await habitRepo.get();
-        if (allHabitsInDb.length === 0) {
-          const legacyData = await AsyncStorage.getItem('habit-storage');
-          if (legacyData) {
-            try {
-              const parsed = JSON.parse(legacyData);
-              const rawHabits = parsed?.state?.habits;
-
-              if (Array.isArray(rawHabits) && rawHabits.length > 0) {
-                const sanitizedHabits: Habit[] = rawHabits.map((h: any) => ({
-                  id: h.id || generateUUID(),
-                  userId: h.userId || targetUserId,
-                  nombre: h.nombre || 'Hábito sin nombre',
-                  descripcion: h.descripcion || undefined,
-                  categoria: h.categoria || 'General',
-                  icono: h.icono || 'leaf-outline',
-                  colorHex: h.colorHex || '#4CAF50',
-                  frecuencia: h.frecuencia || 'DAILY',
-                  diasSemana: Array.isArray(h.diasSemana) ? h.diasSemana : [0, 1, 2, 3, 4, 5, 6],
-                  horaRecordatorio: h.horaRecordatorio || undefined,
-                  tipoVerificacion: h.tipoVerificacion || 'BOOLEAN',
-                  nivelPrioridad: h.nivelPrioridad || 'NORMAL',
-                  fechaInicio: toLogicalDate(h.fechaInicio || getLogicalToday()),
-                  fechaFin: h.fechaFin ? toLogicalDate(h.fechaFin) : undefined,
-                  activo: h.activo !== undefined ? Boolean(h.activo) : true,
-                }));
-
-                for (const h of sanitizedHabits) {
-                  try {
-                    await habitRepo.upsert(h);
-                  } catch (dbError) {
-                    console.error(`[HabitStore] Error al guardar hábito migrado ${h.id} en SQLite:`, dbError);
-                  }
-                }
-
-                // Recargar desde SQLite las entidades completamente hidratadas
-                dbHabits = await habitRepo.get(targetUserId);
-              }
-            } catch (parseError) {
-              console.error('[HabitStore] Error al procesar datos heredados de habit-storage:', parseError);
-            }
-          }
-        }
-        // Marcar la migración como realizada y descartar habit-storage de AsyncStorage
-        await AsyncStorage.setItem(HABIT_MIGRATION_KEY, 'true');
-        await AsyncStorage.removeItem('habit-storage');
-      }
+      // 2. Cargar hábitos completamente hidratados desde SQLite para el usuario
+      const dbHabits = await repository.get(targetUserId);
 
       set({ habits: dbHabits });
     } catch (error) {
@@ -185,3 +138,116 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }
   },
 }));
+
+let migrationInProgressPromise: Promise<{ migratedCount: number; success: boolean }> | null = null;
+
+/**
+ * Ejecuta la migración segura desde AsyncStorage a SQLite:
+ * 1. Comprueba si la migración ya se completó previamente.
+ * 2. Si no hay datos antiguos o es una instalación nueva, marca como completada sin borrar nada.
+ * 3. Si hay datos, los deserializa y sanitiza conservando IDs originales, usuario y todos los campos.
+ * 4. Inserta/actualiza todos los hábitos en una única transacción SQLite atómica.
+ * 5. Verifica que todos los hábitos existen en SQLite antes de completar.
+ * 6. Solo si la verificación es exitosa, marca como completada y remueve habit-storage de AsyncStorage.
+ * 7. Si falla cualquier hábito o paso, NO elimina AsyncStorage y la transacción de SQLite se revierte.
+ */
+export const migrateLegacyHabits = async (
+  targetUserId: string,
+  repo: HabitRepository = habitRepo
+): Promise<{ migratedCount: number; success: boolean }> => {
+  if (migrationInProgressPromise) {
+    return migrationInProgressPromise;
+  }
+
+  migrationInProgressPromise = (async () => {
+    try {
+      // Comprobar si ya se realizó la migración one-shot previamente
+      const migrationDone = await AsyncStorage.getItem(HABIT_MIGRATION_KEY);
+      if (migrationDone === 'true') {
+        return { migratedCount: 0, success: true };
+      }
+
+      const legacyData = await AsyncStorage.getItem(LEGACY_HABIT_STORAGE_KEY);
+      if (!legacyData) {
+        // Instalación nueva o sin información previa en AsyncStorage:
+        // Se marca como migrada de forma segura sin eliminar nada
+        await AsyncStorage.setItem(HABIT_MIGRATION_KEY, 'true');
+        return { migratedCount: 0, success: true };
+      }
+
+      let rawHabits: any[] = [];
+      try {
+        const parsed = JSON.parse(legacyData);
+        if (Array.isArray(parsed)) {
+          rawHabits = parsed;
+        } else if (parsed && Array.isArray(parsed?.state?.habits)) {
+          rawHabits = parsed.state.habits;
+        }
+      } catch (parseError) {
+        console.error('[HabitMigration] Error crítico al deserializar JSON de habit-storage:', parseError);
+        // Garantía absoluta: NO marcar migración y NO eliminar habit-storage para evitar pérdida permanente
+        return { migratedCount: 0, success: false };
+      }
+
+      if (!Array.isArray(rawHabits) || rawHabits.length === 0) {
+        // Datos heredados presentes pero vacíos: marcar como completado y limpiar clave obsoleta
+        await AsyncStorage.setItem(HABIT_MIGRATION_KEY, 'true');
+        await AsyncStorage.removeItem(LEGACY_HABIT_STORAGE_KEY);
+        return { migratedCount: 0, success: true };
+      }
+
+      // Sanitizar conservando identificadores originales, usuario y todos los campos
+      const sanitizedHabits: Habit[] = rawHabits.map((h: any) => ({
+        id: h.id || generateUUID(),
+        userId: h.userId || targetUserId,
+        nombre: h.nombre || h.name || 'Hábito sin nombre',
+        descripcion: h.descripcion !== undefined ? h.descripcion : (h.description !== undefined ? h.description : undefined),
+        categoria: h.categoria || h.category || 'General',
+        icono: h.icono || h.icon || 'leaf-outline',
+        colorHex: h.colorHex || h.color || '#4CAF50',
+        frecuencia: h.frecuencia || h.frequency || 'DAILY',
+        diasSemana: Array.isArray(h.diasSemana)
+          ? h.diasSemana
+          : (Array.isArray(h.daysOfWeek) ? h.daysOfWeek : [0, 1, 2, 3, 4, 5, 6]),
+        horaRecordatorio: h.horaRecordatorio || h.reminderTime || undefined,
+        tipoVerificacion: h.tipoVerificacion || h.verificationType || 'BOOLEAN',
+        nivelPrioridad: h.nivelPrioridad || h.priority || 'NORMAL',
+        fechaInicio: toLogicalDate(h.fechaInicio || h.startDate || getLogicalToday()),
+        fechaFin: (h.fechaFin || h.endDate) ? toLogicalDate(h.fechaFin || h.endDate) : undefined,
+        activo: h.activo !== undefined ? Boolean(h.activo) : (h.active !== undefined ? Boolean(h.active) : true),
+        // Preservar propiedades adicionales si existían
+        name: h.name || h.nombre || undefined,
+        reminderTime: h.reminderTime || h.horaRecordatorio || undefined,
+        completedDays: Array.isArray(h.completedDays) ? h.completedDays : undefined,
+      }));
+
+      // 1. Ejecutar la migración atómica en una única transacción SQLite (upsert idempotente)
+      await repo.upsertMany(sanitizedHabits);
+
+      // 2. Verificación estricta posterior: confirmar que todos los IDs existen en SQLite
+      const habitIds = sanitizedHabits.map((h) => h.id);
+      const isVerified = await repo.verifyHabitsExist(habitIds);
+
+      if (!isVerified) {
+        throw new Error(
+          `[HabitMigration] Verificación fallida: no todos los ${sanitizedHabits.length} hábitos fueron confirmados en SQLite.`
+        );
+      }
+
+      // 3. Solo cuando la verificación es 100% exitosa:
+      // Se marca la migración como completada y se elimina habit-storage de AsyncStorage
+      await AsyncStorage.setItem(HABIT_MIGRATION_KEY, 'true');
+      await AsyncStorage.removeItem(LEGACY_HABIT_STORAGE_KEY);
+
+      return { migratedCount: sanitizedHabits.length, success: true };
+    } catch (migrationError) {
+      console.error('[HabitMigration] Error durante la migración de hábitos desde AsyncStorage a SQLite:', migrationError);
+      // Garantía absoluta: NUNCA se elimina habit-storage ni se marca migrationDone si falló algún paso
+      return { migratedCount: 0, success: false };
+    } finally {
+      migrationInProgressPromise = null;
+    }
+  })();
+
+  return migrationInProgressPromise;
+};

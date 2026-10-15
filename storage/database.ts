@@ -36,3 +36,18 @@ export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
  * antes de que las pantallas intenten leer datos.
  */
 export const initDb = (): Promise<SQLite.SQLiteDatabase> => getDb();
+
+/**
+ * Ejecuta una operación dentro de una transacción SQLite.
+ * Si ocurre cualquier error, la transacción se revierte automáticamente (ROLLBACK).
+ */
+export const runInTransaction = async <T>(
+  action: (db: SQLite.SQLiteDatabase) => Promise<T>
+): Promise<T> => {
+  const db = await getDb();
+  let result: T;
+  await db.withTransactionAsync(async () => {
+    result = await action(db);
+  });
+  return result!;
+};

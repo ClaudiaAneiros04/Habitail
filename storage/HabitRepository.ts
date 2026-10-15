@@ -1,5 +1,5 @@
 import { Habit, HabitScheduleHistory, LogicalDate } from '../types';
-import { getDb } from './database';
+import { getDb, runInTransaction } from './database';
 import { HabitRow, HabitScheduleHistoryRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
 import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
@@ -8,22 +8,34 @@ import { generateUUID } from '../utils/uuid';
 export interface IHabitRepository {
   get(userId?: string): Promise<Habit[]>;
   getById(id: string): Promise<Habit | null>;
+  getByIds?(ids: string[]): Promise<Habit[]>;
+  verifyHabitsExist?(ids: string[]): Promise<boolean>;
   create(habit: Habit): Promise<void>;
   update(id: string, changes: Partial<Habit>): Promise<void>;
   upsert(habit: Habit): Promise<void>;
+  upsertMany?(habits: Habit[]): Promise<void>;
   archive(id: string): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
 export class HabitRepository implements IHabitRepository {
   private mapRowToHabit(row: HabitRow): Habit {
+    let diasSemana = [0, 1, 2, 3, 4, 5, 6];
+    try {
+      if (row.diasSemana) {
+        diasSemana = JSON.parse(row.diasSemana);
+      }
+    } catch {
+      diasSemana = [0, 1, 2, 3, 4, 5, 6];
+    }
+
     return {
       ...row,
       descripcion: row.descripcion || undefined,
       horaRecordatorio: row.horaRecordatorio || undefined,
       fechaInicio: toLogicalDate(row.fechaInicio),
       fechaFin: row.fechaFin ? toLogicalDate(row.fechaFin) : undefined,
-      diasSemana: JSON.parse(row.diasSemana),
+      diasSemana,
       activo: Boolean(row.activo),
     } as Habit;
   }
@@ -160,15 +172,61 @@ export class HabitRepository implements IHabitRepository {
     return habit;
   }
 
-  async create(habit: Habit): Promise<void> {
-    const db = await getDb();
+  /**
+   * Operación interna para insertar o actualizar un hábito y sincronizar su historial
+   * de forma atómica dentro de la conexión o transacción SQLite provista.
+   */
+  private async upsertHabitInternal(db: SQLite.SQLiteDatabase, habit: Habit): Promise<void> {
     const normalizedHabit: Habit = {
       ...habit,
       fechaInicio: toLogicalDate(habit.fechaInicio || getLogicalToday()),
       fechaFin: habit.fechaFin ? toLogicalDate(habit.fechaFin) : undefined,
+      activo: habit.activo !== undefined ? Boolean(habit.activo) : true,
     };
 
-    await db.withTransactionAsync(async () => {
+    // Asegurar que el usuario existe en users para respetar foreign key (ON DELETE CASCADE)
+    const userRow = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM users WHERE id = ?',
+      [normalizedHabit.userId]
+    );
+    if (!userRow) {
+      await db.runAsync(
+        'INSERT OR IGNORE INTO users (id, username, fechaRegistro, puntos, onboardingCompleted) VALUES (?, ?, ?, ?, ?)',
+        [normalizedHabit.userId, 'Usuario', new Date().toISOString(), 0, 0]
+      );
+    }
+
+    const existing = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM habits WHERE id = ?',
+      [normalizedHabit.id]
+    );
+
+    if (existing) {
+      await db.runAsync(
+        `UPDATE habits SET 
+        userId = ?, nombre = ?, descripcion = ?, categoria = ?, icono = ?, colorHex = ?, frecuencia = ?, 
+        diasSemana = ?, horaRecordatorio = ?, tipoVerificacion = ?, nivelPrioridad = ?, fechaInicio = ?, 
+        fechaFin = ?, activo = ?
+        WHERE id = ?`,
+        [
+          normalizedHabit.userId,
+          normalizedHabit.nombre,
+          normalizedHabit.descripcion || null,
+          normalizedHabit.categoria,
+          normalizedHabit.icono,
+          normalizedHabit.colorHex,
+          normalizedHabit.frecuencia,
+          JSON.stringify(normalizedHabit.diasSemana),
+          normalizedHabit.horaRecordatorio || null,
+          normalizedHabit.tipoVerificacion,
+          normalizedHabit.nivelPrioridad,
+          normalizedHabit.fechaInicio,
+          normalizedHabit.fechaFin || null,
+          normalizedHabit.activo ? 1 : 0,
+          normalizedHabit.id,
+        ]
+      );
+    } else {
       await db.runAsync(
         `INSERT INTO habits 
         (id, userId, nombre, descripcion, categoria, icono, colorHex, frecuencia, diasSemana, horaRecordatorio, tipoVerificacion, nivelPrioridad, fechaInicio, fechaFin, activo) 
@@ -191,7 +249,14 @@ export class HabitRepository implements IHabitRepository {
           normalizedHabit.activo ? 1 : 0,
         ]
       );
-      await this.syncScheduleHistory(db, normalizedHabit);
+    }
+
+    await this.syncScheduleHistory(db, normalizedHabit);
+  }
+
+  async create(habit: Habit): Promise<void> {
+    await runInTransaction(async (db) => {
+      await this.upsertHabitInternal(db, habit);
     });
   }
 
@@ -209,44 +274,74 @@ export class HabitRepository implements IHabitRepository {
       activo: changes.activo !== undefined ? Boolean(changes.activo) : current.activo,
     };
 
-    const db = await getDb();
-
-    await db.withTransactionAsync(async () => {
-      await db.runAsync(
-        `UPDATE habits SET 
-        userId = ?, nombre = ?, descripcion = ?, categoria = ?, icono = ?, colorHex = ?, frecuencia = ?, 
-        diasSemana = ?, horaRecordatorio = ?, tipoVerificacion = ?, nivelPrioridad = ?, fechaInicio = ?, 
-        fechaFin = ?, activo = ?
-        WHERE id = ?`,
-        [
-          updated.userId,
-          updated.nombre,
-          updated.descripcion || null,
-          updated.categoria,
-          updated.icono,
-          updated.colorHex,
-          updated.frecuencia,
-          JSON.stringify(updated.diasSemana),
-          updated.horaRecordatorio || null,
-          updated.tipoVerificacion,
-          updated.nivelPrioridad,
-          updated.fechaInicio,
-          updated.fechaFin || null,
-          updated.activo ? 1 : 0,
-          id,
-        ]
-      );
-      await this.syncScheduleHistory(db, updated);
+    await runInTransaction(async (db) => {
+      await this.upsertHabitInternal(db, updated);
     });
   }
 
   async upsert(habit: Habit): Promise<void> {
-    const current = await this.getById(habit.id);
-    if (current) {
-      await this.update(habit.id, habit);
-    } else {
-      await this.create(habit);
+    await runInTransaction(async (db) => {
+      await this.upsertHabitInternal(db, habit);
+    });
+  }
+
+  /**
+   * Guarda o actualiza múltiples hábitos atómicamente en una única transacción SQLite.
+   * Si cualquiera falla, la transacción completa se revierte automáticamente (ROLLBACK).
+   */
+  async upsertMany(habits: Habit[]): Promise<void> {
+    if (habits.length === 0) return;
+    await runInTransaction(async (db) => {
+      for (const habit of habits) {
+        await this.upsertHabitInternal(db, habit);
+      }
+    });
+  }
+
+  /**
+   * Obtiene una lista de hábitos a partir de un conjunto de IDs.
+   */
+  async getByIds(ids: string[]): Promise<Habit[]> {
+    if (ids.length === 0) return [];
+    const db = await getDb();
+    const uniqueIds = Array.from(new Set(ids));
+    const CHUNK_SIZE = 100;
+    const allRows: HabitRow[] = [];
+
+    for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(',');
+      const rows = await db.getAllAsync<HabitRow>(
+        `SELECT * FROM habits WHERE id IN (${placeholders})`,
+        chunk
+      );
+      allRows.push(...rows);
     }
+
+    return allRows.map((row) => this.mapRowToHabit(row));
+  }
+
+  /**
+   * Verifica estrictamente que todos los IDs proporcionados existan en la tabla habits de SQLite.
+   */
+  async verifyHabitsExist(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return true;
+    const db = await getDb();
+    const uniqueIds = Array.from(new Set(ids));
+    const CHUNK_SIZE = 100;
+
+    for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(',');
+      const row = await db.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(DISTINCT id) as count FROM habits WHERE id IN (${placeholders})`,
+        chunk
+      );
+      if (!row || Number(row.count) !== chunk.length) {
+        return false;
+      }
+    }
+    return true;
   }
 
   async archive(id: string): Promise<void> {
