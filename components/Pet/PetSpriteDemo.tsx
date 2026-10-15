@@ -60,18 +60,16 @@ const SIZES = [100, 150, 200];
 
 /**
  * Pantalla interactiva de demostración para el componente PetSprite.
- * Permite cambiar de estado de ánimo en tiempo real con TouchableOpacity,
- * alternar tamaños, y verificar la excepción del estado 'ghost'.
+ * Permite cambiar de estado de ánimo en tiempo real con TouchableOpacity
+ * y alternar tamaños y posicionamiento.
  */
 export const PetSpriteDemoScreen: React.FC = () => {
   const [currentMood, setCurrentMood] = useState<PetMood>('happy');
   const [size, setSize] = useState<number>(150);
   const [positioning, setPositioning] = useState<'transform' | 'absolute'>('transform');
-  // Key para forzar el re-montaje/reinicio de la animación si se desea probar 'ghost' desde cero
   const [resetKey, setResetKey] = useState<number>(0);
 
   const activeRow = getRowForMood(currentMood);
-  const isGhost = isGhostMood(currentMood);
 
   const handleSelectMood = (mood: PetMood) => {
     setCurrentMood(mood);
@@ -101,16 +99,16 @@ export const PetSpriteDemoScreen: React.FC = () => {
             <View
               style={[
                 styles.badge,
-                isGhost ? styles.badgeWarning : styles.badgeSuccess,
+                styles.badgeSuccess,
               ]}
             >
               <Text
                 style={[
                   styles.badgeText,
-                  isGhost ? styles.badgeTextWarning : styles.badgeTextSuccess,
+                  styles.badgeTextSuccess,
                 ]}
               >
-                {isGhost ? 'Ghost (Detiene en frame 3)' : 'Bucle continuo (4 frames)'}
+                Bucle continuo (4 frames)
               </Text>
             </View>
           </View>
@@ -128,16 +126,6 @@ export const PetSpriteDemoScreen: React.FC = () => {
           <Text style={styles.activeMoodLabel}>
             Estado activo: <Text style={styles.activeMoodHighlight}>{String(currentMood).toUpperCase()}</Text>
           </Text>
-
-          {isGhost && (
-            <TouchableOpacity
-              style={styles.replayButton}
-              onPress={() => setResetKey((k) => k + 1)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.replayButtonText}>🔄 Reiniciar animación fantasma</Text>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Selector de Estado de Ánimo (Botones TouchableOpacity) */}

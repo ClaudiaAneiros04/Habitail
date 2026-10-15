@@ -161,7 +161,7 @@ describe('PetSprite Logic & Component', () => {
       );
     });
 
-    it('excepción para "ghost": se detiene permanentemente en el frame 3', () => {
+    it('reproduce animación continua en bucle para el estado "ghost" (fila 4, frames 0 a 3)', () => {
       const size = 100;
       let testRenderer: any;
       act(() => {
@@ -173,7 +173,7 @@ describe('PetSprite Logic & Component', () => {
       const root = testRenderer!.root;
       const image = root.findByProps({ testID: 'pet-sprite-image' });
 
-      // Fila 4 para 'ghost' -> translateY: -400
+      // Frame inicial 0: Fila 4 para 'ghost' -> translateY: -400, translateX: 0
       expect(image.props.style).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -182,11 +182,34 @@ describe('PetSprite Logic & Component', () => {
         ])
       );
 
-      // Avanzar 3 frames (3 * 150ms = 450ms) para llegar al frame 3
+      // Avanzar al frame 1 (+150ms)
       act(() => {
-        jest.advanceTimersByTime(450);
+        jest.advanceTimersByTime(150);
       });
+      expect(image.props.style).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            transform: [{ translateX: -100 }, { translateY: -400 }],
+          }),
+        ])
+      );
 
+      // Avanzar al frame 2 (+150ms)
+      act(() => {
+        jest.advanceTimersByTime(150);
+      });
+      expect(image.props.style).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            transform: [{ translateX: -200 }, { translateY: -400 }],
+          }),
+        ])
+      );
+
+      // Avanzar al frame 3 (+150ms)
+      act(() => {
+        jest.advanceTimersByTime(150);
+      });
       expect(image.props.style).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -195,15 +218,26 @@ describe('PetSprite Logic & Component', () => {
         ])
       );
 
-      // Avanzar más tiempo (e.g. 1000ms más) -> Debe permanecer en el frame 3 sin repetir
+      // Ciclo continuo: Vuelve al frame 0 (+150ms)
       act(() => {
-        jest.advanceTimersByTime(1000);
+        jest.advanceTimersByTime(150);
       });
-
       expect(image.props.style).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            transform: [{ translateX: -300 }, { translateY: -400 }],
+            transform: [{ translateX: 0 }, { translateY: -400 }],
+          }),
+        ])
+      );
+
+      // Continuar ciclo: Avanza al frame 1 de nuevo (+150ms)
+      act(() => {
+        jest.advanceTimersByTime(150);
+      });
+      expect(image.props.style).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            transform: [{ translateX: -100 }, { translateY: -400 }],
           }),
         ])
       );

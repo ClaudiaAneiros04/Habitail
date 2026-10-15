@@ -102,8 +102,7 @@ export function getRowForMood(mood: PetMood): number {
 }
 
 /**
- * Determina si el estado corresponde a 'ghost' / 'absent',
- * cuya animación debe detenerse en el frame final (frame 3).
+ * Determina si el estado corresponde a 'ghost' / 'absent'.
  */
 export function isGhostMood(mood: PetMood): boolean {
   const normalized = String(mood).trim().toLowerCase();
@@ -130,25 +129,15 @@ export const PetSprite: React.FC<PetSpriteProps> = ({
 
   // Fila del spritesheet según el estado de ánimo
   const currentRow = getRowForMood(mood);
-  const isGhost = isGhostMood(mood);
 
   // Control de animación con setInterval dentro de useEffect
   useEffect(() => {
-    // Requisito 3: Al cambiar 'mood', reiniciar el frame a 0
+    // Al cambiar 'mood', reiniciar el frame a 0
     setCurrentFrame(0);
 
     const timer = setInterval(() => {
       setCurrentFrame((prevFrame) => {
-        // Requisito 4: Excepción para 'ghost': detenerse en el último frame (frame 3)
-        if (isGhost) {
-          if (prevFrame >= SPRITE_GRID.COLUMNS - 1) {
-            clearInterval(timer);
-            return SPRITE_GRID.COLUMNS - 1; // Permanece en 3
-          }
-          return prevFrame + 1;
-        }
-
-        // Bucle infinito continuo para el resto de estados de ánimo (0 -> 1 -> 2 -> 3 -> 0)
+        // Bucle continuo para todos los estados de ánimo (incluyendo ghost/absent): 0 -> 1 -> 2 -> 3 -> 0
         return (prevFrame + 1) % SPRITE_GRID.COLUMNS;
       });
     }, frameDurationMs);
@@ -156,7 +145,7 @@ export const PetSprite: React.FC<PetSpriteProps> = ({
     return () => {
       clearInterval(timer);
     };
-  }, [mood, isGhost, frameDurationMs]);
+  }, [mood, frameDurationMs]);
 
   // Dimensiones totales del spritesheet escalado
   const sheetWidth = size * SPRITE_GRID.COLUMNS; // size * 4
