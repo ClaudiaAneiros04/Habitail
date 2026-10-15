@@ -143,6 +143,7 @@ export interface GamificationEvent {
   logicalDate: LogicalDate;
   eventType: string;
   healthDelta: number;
+  appliedHealthDelta?: number;
   pointsDelta: number;
   createdAt: Instant;
   isReverted: boolean;

@@ -42,6 +42,7 @@ export interface HabitCompletionResult {
   eventKey: string;
   alreadyCompleted: boolean;
   healthDelta: number;
+  appliedHealthDelta: number;
   pointsDelta: number;
   newHealth?: number;
   newPoints?: number;
@@ -55,6 +56,7 @@ export interface HabitUncompletionResult {
   eventKey: string;
   alreadyUncompleted: boolean;
   healthDeltaReverted: number;
+  appliedHealthDeltaReverted: number;
   pointsDeltaReverted: number;
   newHealth?: number;
   newPoints?: number;
@@ -203,6 +205,7 @@ export class HabitCompletionService {
         eventKey,
         alreadyCompleted: true,
         healthDelta: 0,
+        appliedHealthDelta: 0,
         pointsDelta: 0,
         isHistorical,
       };
@@ -220,7 +223,7 @@ export class HabitCompletionService {
     if (!isHistorical) {
       if (existingEvent) {
         // Restauración de un evento previo que fue desmarcado:
-        // Se restituye EXACTAMENTE el delta original, ignorando cambios de prioridad intermedios
+        // Se restituye EXACTAMENTE el delta teórico original, ignorando cambios de prioridad intermedios
         healthDelta = existingEvent.healthDelta;
         pointsDelta = existingEvent.pointsDelta;
       } else {
@@ -233,6 +236,7 @@ export class HabitCompletionService {
     // 9. Actualización atómica dentro de una transacción en SQLite
     let finalHealth = petRow.vida;
     let finalPoints = userRow.puntos;
+    let appliedHealthDelta = 0;
     const nowInstant = getCurrentInstant();
 
     await db.withTransactionAsync(async () => {
@@ -264,6 +268,7 @@ export class HabitCompletionService {
         // Regla de Irreversibilidad: si la mascota está en estado terminal (vida = 0 / ABSENT), ningún check-in la recupera.
         if (currentVida > 0 && !isTerminalPetState(currentEstado)) {
           finalHealth = clampHealth(currentVida + healthDelta);
+          appliedHealthDelta = finalHealth - currentVida;
           const newState = getPetState(finalHealth);
           await db.runAsync(
             'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
@@ -271,6 +276,7 @@ export class HabitCompletionService {
           );
         } else {
           finalHealth = 0;
+          appliedHealthDelta = 0;
         }
       }
 
@@ -288,14 +294,14 @@ export class HabitCompletionService {
       // D. Registrar o restaurar en el ledger de gamificación
       if (existingEvent) {
         await db.runAsync(
-          'UPDATE gamification_events SET isReverted = 0, revertedAt = NULL WHERE eventKey = ?',
-          [eventKey]
+          'UPDATE gamification_events SET isReverted = 0, revertedAt = NULL, appliedHealthDelta = ? WHERE eventKey = ?',
+          [appliedHealthDelta, eventKey]
         );
       } else {
         await db.runAsync(
           `INSERT INTO gamification_events
-           (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, pointsDelta, createdAt, isReverted, revertedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)`,
+           (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted, revertedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)`,
           [
             eventKey,
             params.userId,
@@ -304,6 +310,7 @@ export class HabitCompletionService {
             targetDate,
             isHistorical ? 'HISTORICAL_COMPLETION' : 'DAILY_COMPLETION',
             healthDelta,
+            appliedHealthDelta,
             pointsDelta,
             nowInstant,
           ]
@@ -366,6 +373,7 @@ export class HabitCompletionService {
       eventKey,
       alreadyCompleted: false,
       healthDelta,
+      appliedHealthDelta,
       pointsDelta,
       newHealth: finalHealth,
       newPoints: finalPoints,
@@ -421,6 +429,7 @@ export class HabitCompletionService {
         eventKey,
         alreadyUncompleted: true,
         healthDeltaReverted: 0,
+        appliedHealthDeltaReverted: 0,
         pointsDeltaReverted: 0,
       };
     }
@@ -432,10 +441,14 @@ export class HabitCompletionService {
     );
 
     let healthDeltaToRevert = 0;
+    let appliedHealthDeltaToRevert = 0;
     let pointsDeltaToRevert = 0;
 
     if (event && Number(event.isReverted) === 0) {
       healthDeltaToRevert = event.healthDelta;
+      appliedHealthDeltaToRevert = event.appliedHealthDelta !== undefined && event.appliedHealthDelta !== null
+        ? event.appliedHealthDelta
+        : event.healthDelta;
       pointsDeltaToRevert = event.pointsDelta;
     }
 
@@ -448,11 +461,11 @@ export class HabitCompletionService {
       // A. Eliminar el log
       await db.runAsync('DELETE FROM habit_logs WHERE habitId = ? AND fecha = ?', [params.habitId, targetDate]);
 
-      // B. Revertir salud en la mascota
-      if (petRow && healthDeltaToRevert > 0) {
+      // B. Revertir salud en la mascota (restando exactamente el incremento aplicado)
+      if (petRow && appliedHealthDeltaToRevert > 0) {
         const freshPet = await db.getFirstAsync<PetRow>('SELECT vida, estadoActual FROM pets WHERE id = ?', [petRow.id]);
         const currentVida = freshPet ? freshPet.vida : petRow.vida;
-        finalHealth = clampHealth(currentVida - healthDeltaToRevert);
+        finalHealth = clampHealth(currentVida - appliedHealthDeltaToRevert);
         const newState = getPetState(finalHealth);
         await db.runAsync(
           'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
@@ -506,6 +519,7 @@ export class HabitCompletionService {
       eventKey,
       alreadyUncompleted: false,
       healthDeltaReverted: healthDeltaToRevert,
+      appliedHealthDeltaReverted: appliedHealthDeltaToRevert,
       pointsDeltaReverted: pointsDeltaToRevert,
       newHealth: finalHealth,
       newPoints: finalPoints,

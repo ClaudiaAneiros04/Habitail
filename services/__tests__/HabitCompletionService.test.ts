@@ -475,4 +475,93 @@ describe('HabitCompletionService', () => {
       expect(event).toBeNull();
     });
   });
+
+  describe('Pruebas Específicas de Recompensas de Salud y Reversión', () => {
+    test('Salud 30 y recompensa +20: alcanza 50 HP y al desmarcar vuelve a 30 HP', async () => {
+      await db.runAsync('UPDATE pets SET vida = 30, estadoActual = ? WHERE id = ?', [PetState.CONFUSED, 'p1']);
+
+      const compRes = await service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(compRes.healthDelta).toBe(20);
+      expect(compRes.appliedHealthDelta).toBe(20);
+      expect(compRes.newHealth).toBe(50);
+
+      let pet = await db.getFirstAsync('SELECT vida, estadoActual FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(50);
+      expect(pet.estadoActual).toBe(PetState.CONFUSED);
+
+      const uncompRes = await service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(uncompRes.appliedHealthDeltaReverted).toBe(20);
+      expect(uncompRes.newHealth).toBe(30);
+
+      pet = await db.getFirstAsync('SELECT vida, estadoActual FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(30);
+    });
+
+    test('Salud 95 y recompensa +20: alcanza tope de 100 HP, registra appliedHealthDelta=5 y al desmarcar vuelve exactamente a 95 HP', async () => {
+      // Caso clave reportado por el usuario:
+      // Salud 95 + 20 -> tope 100. Al desmarcar, debe volver a 95 y NO a 80.
+      await db.runAsync('UPDATE pets SET vida = 95, estadoActual = ? WHERE id = ?', [PetState.HAPPY, 'p1']);
+
+      const compRes = await service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(compRes.healthDelta).toBe(20); // Recompensa teórica
+      expect(compRes.appliedHealthDelta).toBe(5); // Incremento efectivamente aplicado
+      expect(compRes.newHealth).toBe(100);
+
+      let pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(100);
+
+      const event = await db.getFirstAsync('SELECT * FROM gamification_events WHERE eventKey = ?', [compRes.eventKey]);
+      expect(event.healthDelta).toBe(20);
+      expect(event.appliedHealthDelta).toBe(5);
+
+      // Desmarcar hábito
+      const uncompRes = await service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(uncompRes.healthDeltaReverted).toBe(20);
+      expect(uncompRes.appliedHealthDeltaReverted).toBe(5);
+      expect(uncompRes.newHealth).toBe(95);
+
+      pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(95); // Vuelve exactamente a 95
+    });
+
+    test('Salud 100 y recompensa +20: se mantiene en 100 HP, appliedHealthDelta=0 y al desmarcar queda en 100 HP', async () => {
+      await db.runAsync('UPDATE pets SET vida = 100, estadoActual = ? WHERE id = ?', [PetState.HAPPY, 'p1']);
+
+      const compRes = await service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(compRes.healthDelta).toBe(20);
+      expect(compRes.appliedHealthDelta).toBe(0);
+      expect(compRes.newHealth).toBe(100);
+
+      let pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(100);
+
+      const uncompRes = await service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(uncompRes.appliedHealthDeltaReverted).toBe(0);
+      expect(uncompRes.newHealth).toBe(100);
+
+      pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(100);
+    });
+
+    test('Desmarcar un hábito después de que la salud haya cambiado por otra operación intermedia respeta el clamp y el delta aplicado', async () => {
+      // 1. Salud inicial: 90
+      await db.runAsync('UPDATE pets SET vida = 90, estadoActual = ? WHERE id = ?', [PetState.HAPPY, 'p1']);
+
+      // 2. Completar hábito ESSENTIAL (+20) -> sube a 100, appliedHealthDelta = 10
+      await service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      let pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(100);
+
+      // 3. Otra operación intermedia modifica la vida (por ejemplo una penalización o daño resta 20 -> vida queda en 80)
+      await db.runAsync('UPDATE pets SET vida = 80 WHERE id = ?', ['p1']);
+
+      // 4. Se desmarca el hábito original: debe restar exactamente el incremento aplicado (+10), dejando la salud en 70 (80 - 10)
+      const uncompRes = await service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday });
+      expect(uncompRes.appliedHealthDeltaReverted).toBe(10);
+      expect(uncompRes.newHealth).toBe(70);
+
+      pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      expect(pet.vida).toBe(70);
+    });
+  });
 });

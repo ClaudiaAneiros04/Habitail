@@ -123,6 +123,7 @@ export const CREATE_TABLES_SQL = `
     logicalDate TEXT NOT NULL,
     eventType TEXT NOT NULL,
     healthDelta INTEGER NOT NULL,
+    appliedHealthDelta INTEGER NOT NULL DEFAULT 0,
     pointsDelta INTEGER NOT NULL,
     createdAt TEXT NOT NULL,
     isReverted INTEGER NOT NULL DEFAULT 0,
@@ -207,6 +208,7 @@ export interface GamificationEventRow {
   logicalDate: string;
   eventType: string;
   healthDelta: number;
+  appliedHealthDelta?: number | null;
   pointsDelta: number;
   createdAt: string;
   isReverted: number;

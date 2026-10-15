@@ -147,11 +147,13 @@ export const useDailyPenaltyJob = () => {
                 [nuevaVida, nuevoEstado, pet.id]
               );
 
+              const appliedDelta = nuevaVida - currentVida;
+
               await db.runAsync(
                 `INSERT INTO gamification_events
-                 (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, pointsDelta, createdAt, isReverted)
-                 VALUES (?, ?, ?, NULL, ?, 'DAILY_PENALTY', ?, 0, ?, 0)`,
-                [eventKey, user.id, pet.id, targetDate, delta, getCurrentInstant()]
+                 (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted)
+                 VALUES (?, ?, ?, NULL, ?, 'DAILY_PENALTY', ?, ?, 0, ?, 0)`,
+                [eventKey, user.id, pet.id, targetDate, delta, appliedDelta, getCurrentInstant()]
               );
             }
           }

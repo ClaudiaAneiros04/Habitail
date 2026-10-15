@@ -21,6 +21,9 @@ export class GamificationEventRepository implements IGamificationEventRepository
       logicalDate: toLogicalDate(row.logicalDate),
       eventType: row.eventType,
       healthDelta: Number(row.healthDelta),
+      appliedHealthDelta: row.appliedHealthDelta !== undefined && row.appliedHealthDelta !== null
+        ? Number(row.appliedHealthDelta)
+        : Number(row.healthDelta),
       pointsDelta: Number(row.pointsDelta),
       createdAt: toInstant(row.createdAt),
       isReverted: Number(row.isReverted) === 1,
@@ -48,10 +51,13 @@ export class GamificationEventRepository implements IGamificationEventRepository
 
   async create(event: GamificationEvent): Promise<void> {
     const db = await getDb();
+    const appliedHealth = event.appliedHealthDelta !== undefined
+      ? event.appliedHealthDelta
+      : event.healthDelta;
     await db.runAsync(
       `INSERT INTO gamification_events 
-       (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, pointsDelta, createdAt, isReverted, revertedAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted, revertedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         event.eventKey,
         event.userId,
@@ -60,6 +66,7 @@ export class GamificationEventRepository implements IGamificationEventRepository
         toLogicalDate(event.logicalDate),
         event.eventType,
         event.healthDelta,
+        appliedHealth,
         event.pointsDelta,
         toInstant(event.createdAt),
         event.isReverted ? 1 : 0,
@@ -73,10 +80,13 @@ export class GamificationEventRepository implements IGamificationEventRepository
     const current = await this.getByEventKey(eventKey);
     if (!current) return;
     const merged = { ...current, ...updates };
+    const appliedHealth = merged.appliedHealthDelta !== undefined
+      ? merged.appliedHealthDelta
+      : merged.healthDelta;
     await db.runAsync(
       `UPDATE gamification_events SET
          userId = ?, petId = ?, habitId = ?, logicalDate = ?, eventType = ?,
-         healthDelta = ?, pointsDelta = ?, isReverted = ?, revertedAt = ?
+         healthDelta = ?, appliedHealthDelta = ?, pointsDelta = ?, isReverted = ?, revertedAt = ?
        WHERE eventKey = ?`,
       [
         merged.userId,
@@ -85,6 +95,7 @@ export class GamificationEventRepository implements IGamificationEventRepository
         toLogicalDate(merged.logicalDate),
         merged.eventType,
         merged.healthDelta,
+        appliedHealth,
         merged.pointsDelta,
         merged.isReverted ? 1 : 0,
         merged.revertedAt ? toInstant(merged.revertedAt) : null,

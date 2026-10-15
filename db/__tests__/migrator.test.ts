@@ -120,6 +120,13 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
       const indexNames = indices.map((i) => i.name);
       expect(indexNames).toContain('idx_habit_logs_habit_completado_fecha');
       expect(indexNames).toContain('idx_habit_logs_user_completado_fecha');
+
+      // Verificar que gamification_events tiene appliedHealthDelta (v9)
+      const eventColumns = await db.getAllAsync<{ name: string }>(
+        `PRAGMA table_info(${TABLE_NAMES.GAMIFICATION_EVENTS});`
+      );
+      const eventColNames = eventColumns.map((c) => c.name);
+      expect(eventColNames).toContain('appliedHealthDelta');
     });
   });
 
