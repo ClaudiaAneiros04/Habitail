@@ -94,6 +94,14 @@ export const useDailyPenaltyJob = () => {
         // Para ausencias inferiores a 72h, procesar como máximo el día cerrado pendiente más reciente (ayer)
         const targetDate = subDaysFromLogicalDate(todayString, 1);
 
+        // Regla de dominio: ningún usuario debe recibir penalizaciones por días anteriores a su registro
+        const userRegistrationDate = user.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
+        if (userRegistrationDate && compareLogicalDates(targetDate, userRegistrationDate) < 0) {
+          await updateUser({ lastPenaltyAppliedDate: todayString });
+          lastRunDateRef.current = todayString;
+          return;
+        }
+
         // Si el día pendiente ya fue cubierto en una fecha igual o posterior
         if (compareLogicalDates(lastProcessedDateStr, targetDate) >= 0) {
           await updateUser({ lastPenaltyAppliedDate: todayString });

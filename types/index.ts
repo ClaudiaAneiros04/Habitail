@@ -71,6 +71,7 @@ export interface Pet {
   estadoActual: PetState;
   skinEquipada: string;
   accesorios: string[];
+  lifecycle?: number; // Identificador secuencial del ciclo de vida de la mascota
 }
 
 export interface Habit {

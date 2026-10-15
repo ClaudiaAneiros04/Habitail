@@ -117,7 +117,7 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
       diasSemana: [1, 2, 3, 4, 5],
       nivelPrioridad: 'ESSENTIAL',
       tipoVerificacion: 'BOOLEAN',
-      fechaInicio: '2026-05-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     };
 
@@ -168,7 +168,7 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
       diasSemana: [0, 1, 2, 3, 4, 5, 6],
       tipoVerificacion: VerificationType.BOOLEAN,
       nivelPrioridad: Priority.NORMAL,
-      fechaInicio: '2026-05-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     });
     await habitRepo.create({
@@ -182,11 +182,11 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
       diasSemana: [0, 1, 2, 3, 4, 5, 6],
       tipoVerificacion: VerificationType.BOOLEAN,
       nivelPrioridad: Priority.NORMAL,
-      fechaInicio: '2026-05-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     });
 
-    const date = '2026-05-25';
+    const date = '2026-10-15';
     const log1: HabitLog = {
       id: 'log-1',
       habitId: 'habit-1',
@@ -300,7 +300,7 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
       diasSemana: [1, 2, 3, 4, 5, 6, 7],
       tipoVerificacion: VerificationType.BOOLEAN,
       nivelPrioridad: Priority.NORMAL,
-      fechaInicio: '2026-05-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     });
 
@@ -314,7 +314,7 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
     await useUserStore.getState().loadUser();
     await usePetStore.getState().loadPet();
     await useHabitStore.getState().loadHabits();
-    await useLogStore.getState().loadLogs('2026-05-01');
+    await useLogStore.getState().loadLogs('2026-10-15');
 
     // 4. Aserciones de rehidratación
     expect(useUserStore.getState().user?.username).toBe('Ada Lovelace');
@@ -339,7 +339,7 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
       diasSemana: [0, 1, 2, 3, 4, 5, 6],
       tipoVerificacion: VerificationType.BOOLEAN,
       nivelPrioridad: Priority.NORMAL,
-      fechaInicio: '2026-05-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     });
     await useHabitStore.getState().loadHabits();
@@ -347,8 +347,8 @@ describe('Consistencia de Arquitectura de Stores (Habitail)', () => {
     // Poblar cachés de stats y heatmap
     useStatsStore.getState().setData(`${habitId}:weekly`, { totalCompleted: 5, totalDays: 7, expectedCompletions: 7, completionRate: 71, currentStreak: 3, maxStreak: 5 });
     useStatsStore.getState().setData('global:weekly', { totalCompleted: 10, totalDays: 14, expectedCompletions: 14, completionRate: 71, currentStreak: 3, maxStreak: 5 });
-    useHeatmapStore.getState().setData(habitId, [{ date: '2026-05-01', value: 2 }]);
-    useHeatmapStore.getState().setData('global', [{ date: '2026-05-01', value: 2 }]);
+    useHeatmapStore.getState().setData(habitId, [{ date: '2026-10-15', value: 2 }]);
+    useHeatmapStore.getState().setData('global', [{ date: '2026-10-15', value: 2 }]);
 
     expect(useStatsStore.getState().cache[`${habitId}:weekly`]?.data).not.toBeNull();
     expect(useHeatmapStore.getState().cache[habitId]?.data).not.toBeNull();

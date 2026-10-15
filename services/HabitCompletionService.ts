@@ -145,6 +145,12 @@ export class HabitCompletionService {
       throw new Error(`User not found: ${params.userId}`);
     }
 
+    // Validación temporal: la fecha solicitada no puede ser anterior a la fecha de registro del usuario
+    const userRegistrationDate = toLogicalDate(userRow.fechaRegistro);
+    if (compareLogicalDates(targetDate, userRegistrationDate) < 0) {
+      throw new Error(`Cannot complete habit for a date prior to user registration: ${targetDate} < ${userRegistrationDate}`);
+    }
+
     // 3. Validación de hábito en SQLite
     const habitRow = await db.getFirstAsync<HabitRow>('SELECT * FROM habits WHERE id = ?', [params.habitId]);
     if (!habitRow) {
@@ -154,6 +160,12 @@ export class HabitCompletionService {
     // 4. Validación de pertenencia del hábito
     if (habitRow.userId !== params.userId) {
       throw new Error(`Habit ${params.habitId} does not belong to user ${params.userId}`);
+    }
+
+    // Validación temporal: la fecha solicitada no puede ser anterior al inicio efectivo del hábito
+    const habitEffectiveStartDate = toLogicalDate(habitRow.fechaInicio);
+    if (compareLogicalDates(targetDate, habitEffectiveStartDate) < 0) {
+      throw new Error(`Cannot complete habit for a date prior to habit start date: ${targetDate} < ${habitEffectiveStartDate}`);
     }
 
     // 5. Validación de mascota asociada al usuario
@@ -191,7 +203,8 @@ export class HabitCompletionService {
       throw new Error(`Habit ${params.habitId} is not scheduled on date ${targetDate}`);
     }
 
-    const eventKey = `completion:${params.habitId}:${targetDate}`;
+    const petCycle = petRow.lifecycle !== undefined && petRow.lifecycle !== null ? petRow.lifecycle : 1;
+    const eventKey = `completion:${params.habitId}:${targetDate}:${petCycle}`;
     const logId = generateLogId(params.habitId, targetDate);
 
     // 7. Comprobación de idempotencia en SQLite (¿ya está completado?)
@@ -214,10 +227,18 @@ export class HabitCompletionService {
     }
 
     // 8. Cálculo de recompensas según ledger de gamificación y reglas anti-exploit
-    const existingEvent = await db.getFirstAsync<GamificationEventRow>(
+    // Buscamos evento para el ciclo actual, o fallback al formato legacy de clave única si aún no tiene sufijo de ciclo
+    let existingEvent = await db.getFirstAsync<GamificationEventRow>(
       'SELECT * FROM gamification_events WHERE eventKey = ?',
       [eventKey]
     );
+    if (!existingEvent && petCycle === 1) {
+      const legacyKey = `completion:${params.habitId}:${targetDate}`;
+      existingEvent = await db.getFirstAsync<GamificationEventRow>(
+        'SELECT * FROM gamification_events WHERE eventKey = ?',
+        [legacyKey]
+      );
+    }
 
     let healthDelta = 0;
     let pointsDelta = 0;
@@ -403,6 +424,12 @@ export class HabitCompletionService {
       throw new Error(`User not found: ${params.userId}`);
     }
 
+    // Validación temporal: la fecha solicitada no puede ser anterior a la fecha de registro del usuario
+    const userRegistrationDate = toLogicalDate(userRow.fechaRegistro);
+    if (compareLogicalDates(targetDate, userRegistrationDate) < 0) {
+      throw new Error(`Cannot uncomplete habit for a date prior to user registration: ${targetDate} < ${userRegistrationDate}`);
+    }
+
     const habitRow = await db.getFirstAsync<HabitRow>('SELECT * FROM habits WHERE id = ?', [params.habitId]);
     if (!habitRow) {
       throw new Error(`Habit not found: ${params.habitId}`);
@@ -412,9 +439,16 @@ export class HabitCompletionService {
       throw new Error(`Habit ${params.habitId} does not belong to user ${params.userId}`);
     }
 
-    const petRow = await db.getFirstAsync<PetRow>('SELECT * FROM pets WHERE userId = ? LIMIT 1', [params.userId]);
+    // Validación temporal: la fecha solicitada no puede ser anterior al inicio efectivo del hábito
+    const habitEffectiveStartDate = toLogicalDate(habitRow.fechaInicio);
+    if (compareLogicalDates(targetDate, habitEffectiveStartDate) < 0) {
+      throw new Error(`Cannot uncomplete habit for a date prior to habit start date: ${targetDate} < ${habitEffectiveStartDate}`);
+    }
 
-    const eventKey = `completion:${params.habitId}:${targetDate}`;
+    const petRow = await db.getFirstAsync<PetRow>('SELECT * FROM pets WHERE userId = ? LIMIT 1', [params.userId]);
+    const petCycle = petRow?.lifecycle !== undefined && petRow?.lifecycle !== null ? petRow.lifecycle : 1;
+    const scopedEventKey = `completion:${params.habitId}:${targetDate}:${petCycle}`;
+    const legacyEventKey = `completion:${params.habitId}:${targetDate}`;
     const logId = generateLogId(params.habitId, targetDate);
 
     // 3. Comprobación de estado actual en SQLite
@@ -428,7 +462,7 @@ export class HabitCompletionService {
       return {
         success: true,
         logId,
-        eventKey,
+        eventKey: scopedEventKey,
         alreadyUncompleted: true,
         healthDeltaReverted: 0,
         appliedHealthDeltaReverted: 0,
@@ -437,20 +471,49 @@ export class HabitCompletionService {
     }
 
     // 4. Buscar evento original en el ledger para revertir EXACTAMENTE los deltas concedidos
-    const event = await db.getFirstAsync<GamificationEventRow>(
+    // Primero buscamos el evento correspondiente al ciclo de vida actual de la mascota
+    let event = await db.getFirstAsync<GamificationEventRow>(
       'SELECT * FROM gamification_events WHERE eventKey = ?',
-      [eventKey]
+      [scopedEventKey]
     );
+    let resolvedEventKey = scopedEventKey;
+
+    if (!event) {
+      // Intentamos con la clave legacy (creada antes del soporte multiciclo o en pruebas anteriores)
+      const fallbackEvent = await db.getFirstAsync<GamificationEventRow>(
+        'SELECT * FROM gamification_events WHERE eventKey = ?',
+        [legacyEventKey]
+      );
+      if (fallbackEvent) {
+        event = fallbackEvent;
+        resolvedEventKey = legacyEventKey;
+      }
+    }
 
     let healthDeltaToRevert = 0;
     let appliedHealthDeltaToRevert = 0;
     let pointsDeltaToRevert = 0;
 
+    // Regla de Aislamiento de Ciclo de Vida:
+    // Solo revertimos la salud de la mascota si el evento pertenece al ciclo actual de esta mascota.
+    // Si el evento fue generado bajo una mascota o ciclo anterior (eventKey tiene otro sufijo o petId distinto),
+    // NO se debe restar salud a la nueva mascota (appliedHealthDeltaToRevert = 0).
+    const isEventFromCurrentPetCycle = !event || (
+      resolvedEventKey === scopedEventKey ||
+      (resolvedEventKey === legacyEventKey && petCycle === 1)
+    );
+
     if (event && !parseSqliteBoolean(event.isReverted)) {
-      healthDeltaToRevert = event.healthDelta;
-      appliedHealthDeltaToRevert = event.appliedHealthDelta !== undefined && event.appliedHealthDelta !== null
-        ? event.appliedHealthDelta
-        : event.healthDelta;
+      if (isEventFromCurrentPetCycle) {
+        healthDeltaToRevert = event.healthDelta;
+        appliedHealthDeltaToRevert = event.appliedHealthDelta !== undefined && event.appliedHealthDelta !== null
+          ? event.appliedHealthDelta
+          : event.healthDelta;
+      } else {
+        // Evento perteneciente a una mascota previa: no altera la salud de la nueva mascota
+        healthDeltaToRevert = 0;
+        appliedHealthDeltaToRevert = 0;
+      }
       pointsDeltaToRevert = event.pointsDelta;
     }
 
@@ -463,7 +526,7 @@ export class HabitCompletionService {
       // A. Eliminar el log
       await db.runAsync('DELETE FROM habit_logs WHERE habitId = ? AND fecha = ?', [params.habitId, targetDate]);
 
-      // B. Revertir salud en la mascota (restando exactamente el incremento aplicado)
+      // B. Revertir salud en la mascota (restando exactamente el incremento aplicado, solo si aplica a su ciclo)
       if (petRow && appliedHealthDeltaToRevert > 0) {
         const freshPet = await db.getFirstAsync<PetRow>('SELECT vida, estadoActual FROM pets WHERE id = ?', [petRow.id]);
         const currentVida = freshPet ? freshPet.vida : petRow.vida;
@@ -490,7 +553,7 @@ export class HabitCompletionService {
       if (event) {
         await db.runAsync(
           'UPDATE gamification_events SET isReverted = 1, revertedAt = ? WHERE eventKey = ?',
-          [nowInstant, eventKey]
+          [nowInstant, resolvedEventKey]
         );
       }
     });
@@ -518,7 +581,7 @@ export class HabitCompletionService {
     return {
       success: true,
       logId,
-      eventKey,
+      eventKey: resolvedEventKey,
       alreadyUncompleted: false,
       healthDeltaReverted: healthDeltaToRevert,
       appliedHealthDeltaReverted: appliedHealthDeltaToRevert,

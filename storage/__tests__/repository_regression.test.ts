@@ -130,7 +130,7 @@ describe('Repository Regression Tests', () => {
     const user: User = { id: 'u1', username: 'U', fechaRegistro: '2026', puntos: 0, onboardingCompleted: true };
     await userRepo.create(user);
 
-    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H1', categoria: 'C1', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026', activo: true };
+    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H1', categoria: 'C1', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026-10-15', activo: true };
     await habitRepo.create(habit);
 
     const log: HabitLog = { id: 'l1', habitId: 'h1', userId: 'u1', fecha: '2026-10-06', completado: true, timestampRegistro: '2026' };
@@ -151,11 +151,14 @@ describe('Repository Regression Tests', () => {
   });
 
   it('Cambiar frecuencia comprueba que el historial anterior permanece', async () => {
-    const user: User = { id: 'u1', username: 'U', fechaRegistro: '2026', puntos: 0, onboardingCompleted: true };
+    const user: User = { id: 'u1', username: 'U', fechaRegistro: '2026-10-14', puntos: 0, onboardingCompleted: true };
     await userRepo.create(user);
     
-    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026', activo: true };
-    await habitRepo.create(habit);
+    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026-10-14', activo: true };
+    await habitRepo.create(habit, { allowHistorical: true });
+
+    // Manually ensure the active interval started on a previous day so today's update closes it and opens a new interval
+    await db.runAsync('UPDATE habit_schedule_history SET validFrom = ? WHERE habitId = ?', ['2026-10-14', 'h1']);
 
     let h = await habitRepo.getById('h1');
     expect(h?.scheduleHistory?.length).toBe(1);
@@ -171,7 +174,7 @@ describe('Repository Regression Tests', () => {
     const user: User = { id: 'u1', username: 'U', fechaRegistro: '2026', puntos: 0, onboardingCompleted: true };
     await userRepo.create(user);
     
-    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026', activo: true };
+    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026-10-15', activo: true };
     await habitRepo.create(habit);
 
     const log1: HabitLog = { id: 'l1', habitId: 'h1', userId: 'u1', fecha: '2026-10-06', completado: true, timestampRegistro: '2026-10-06T10:00:00Z' };
@@ -194,7 +197,7 @@ describe('Repository Regression Tests', () => {
     const user: User = { id: 'u1', username: 'U', fechaRegistro: '2026', puntos: 0, onboardingCompleted: true };
     await userRepo.create(user);
     
-    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026', activo: true };
+    const habit: Habit = { id: 'h1', userId: 'u1', nombre: 'H', categoria: 'C', icono: 'I', colorHex: '#000', frecuencia: 'DAILY', diasSemana: [1], tipoVerificacion: 'BOOLEAN', nivelPrioridad: 'NORMAL', fechaInicio: '2026-10-15', activo: true };
     await habitRepo.create(habit);
 
     // To simulate a failure we modify the db method temporarily
@@ -315,7 +318,7 @@ describe('Repository Regression Tests', () => {
       diasSemana: [0, 1, 2, 3, 4, 5, 6],
       tipoVerificacion: 'BOOLEAN',
       nivelPrioridad: 'NORMAL',
-      fechaInicio: '2026-01-01',
+      fechaInicio: '2026-10-15',
       activo: true,
     };
     await habitRepo.create(habit);

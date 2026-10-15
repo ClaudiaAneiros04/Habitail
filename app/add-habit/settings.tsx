@@ -11,7 +11,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHabitStore } from '../../store/useHabitStore';
 import { Frequency, VerificationType, Priority } from '../../types';
 import { useTranslation } from 'react-i18next';
-import { getLogicalToday } from '../../utils/dateUtils';
+import { 
+  getLogicalToday, 
+  toLogicalDate, 
+  compareLogicalDates, 
+  addLogicalDays, 
+  formatDateLocally 
+} from '../../utils/dateUtils';
 
 const DAYS_OF_WEEK = [
   { id: 1, key: 'lun' },
@@ -39,6 +45,15 @@ export default function SettingsScreen() {
   const [priority, setPriority] = useState<Priority>(editingHabit ? (editingHabit.nivelPrioridad as Priority) : Priority.NORMAL);
   const [reminderEnabled, setReminderEnabled] = useState(editingHabit ? Boolean(editingHabit.horaRecordatorio) : false);
 
+  const today = getLogicalToday();
+  const originalStartDate = editingHabit ? toLogicalDate(editingHabit.fechaInicio) : today;
+  // La fecha mínima permitida es hoy para nuevos hábitos, o la fecha original para hábitos existentes
+  const minAllowedDate = editHabitId ? originalStartDate : today;
+  const [startDate, setStartDate] = useState<string>(originalStartDate);
+  const [startDateError, setStartDateError] = useState<string | null>(null);
+
+  const isMinDateReached = compareLogicalDates(startDate, minAllowedDate) <= 0;
+
   const toggleDay = (dayId: number) => {
     if (selectedDays.includes(dayId)) {
       // Evitar que se deseleccionen todos
@@ -51,6 +66,22 @@ export default function SettingsScreen() {
   };
 
   const handleSave = async () => {
+    const chosenStartDate = toLogicalDate(startDate || today);
+
+    // Validación 1: Creación nueva no puede ser anterior a hoy
+    if (!editHabitId && compareLogicalDates(chosenStartDate, today) < 0) {
+      setStartDateError(t('addHabit.settings.startDateErrorPast', { defaultValue: 'La fecha de inicio no puede ser anterior a hoy.' }));
+      return;
+    }
+
+    // Validación 2: Edición no puede cambiar la fecha a una anterior a la original
+    if (editHabitId && compareLogicalDates(chosenStartDate, originalStartDate) < 0) {
+      setStartDateError(t('addHabit.settings.startDateErrorEditRetroactive', { defaultValue: 'No se puede cambiar la fecha de inicio a una anterior a la original.' }));
+      return;
+    }
+
+    setStartDateError(null);
+
     // Resolver días de la semana según frecuencia
     let diasSemana = [0, 1, 2, 3, 4, 5, 6];
     if (frequency === Frequency.WEEKLY) {
@@ -69,6 +100,7 @@ export default function SettingsScreen() {
           diasSemana,
           horaRecordatorio: reminderEnabled ? (editingHabit?.horaRecordatorio || '09:00') : undefined,
           nivelPrioridad: priority,
+          fechaInicio: chosenStartDate,
         });
       } else {
         await addHabit({
@@ -83,7 +115,7 @@ export default function SettingsScreen() {
           horaRecordatorio: reminderEnabled ? '09:00' : undefined, // MVP: Mock hour for reminder
           tipoVerificacion: VerificationType.BOOLEAN, // MVP: Only boolean
           nivelPrioridad: priority,
-          fechaInicio: getLogicalToday(),
+          fechaInicio: chosenStartDate,
           activo: true,
         });
       }
@@ -191,6 +223,52 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Fecha de Inicio */}
+          <Text style={[styles.label, { marginTop: 32 }]}>{t('addHabit.settings.startDateLabel', { defaultValue: 'Fecha de inicio' })}</Text>
+          <Text style={styles.descriptionText}>{t('addHabit.settings.startDateDescription', { defaultValue: 'Día a partir del cual el hábito entra en vigor.' })}</Text>
+          
+          <View style={styles.startDateContainer}>
+            <TouchableOpacity
+              style={[styles.startDateNavBtn, isMinDateReached && styles.startDateNavBtnDisabled]}
+              disabled={isMinDateReached}
+              onPress={() => {
+                if (!isMinDateReached) {
+                  const prevDay = addLogicalDays(startDate, -1);
+                  if (compareLogicalDates(prevDay, minAllowedDate) >= 0) {
+                    setStartDate(prevDay);
+                    setStartDateError(null);
+                  }
+                }
+              }}
+            >
+              <Ionicons 
+                name="chevron-back" 
+                size={20} 
+                color={isMinDateReached ? Colors.inactive : Colors.text} 
+              />
+            </TouchableOpacity>
+
+            <View style={styles.startDateDisplay}>
+              <Ionicons name="calendar-outline" size={18} color={Colors.primary} style={{ marginRight: 8 }} />
+              <Text style={styles.startDateText}>{formatDateLocally(startDate)}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.startDateNavBtn}
+              onPress={() => {
+                const nextDay = addLogicalDays(startDate, 1);
+                setStartDate(nextDay);
+                setStartDateError(null);
+              }}
+            >
+              <Ionicons name="chevron-forward" size={20} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {startDateError && (
+            <Text style={styles.startDateErrorText}>{startDateError}</Text>
+          )}
+
           {/* Recordatorio */}
           <View style={styles.reminderContainer}>
             <View>
@@ -289,4 +367,40 @@ const styles = StyleSheet.create({
   footer: { padding: 24, backgroundColor: Colors.background, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
   nextButton: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 16, gap: 8 },
   nextText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  startDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  startDateNavBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startDateNavBtnDisabled: {
+    opacity: 0.4,
+    backgroundColor: '#F8FAFC',
+  },
+  startDateDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  startDateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  startDateErrorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '500',
+  },
 });

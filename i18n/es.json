@@ -234,7 +234,11 @@
       },
       "reminderLabel": "Recordatorio",
       "reminderDescription": "Recibe una notificación diaria.",
-      "mockReminderText": "* Hora de recordatorio por defecto: 09:00 (configurable en futuras versiones)."
+      "mockReminderText": "* Hora de recordatorio por defecto: 09:00 (configurable en futuras versiones).",
+      "startDateLabel": "Fecha de inicio",
+      "startDateDescription": "Día a partir del cual el hábito entra en vigor.",
+      "startDateErrorPast": "La fecha de inicio no puede ser anterior a hoy.",
+      "startDateErrorEditRetroactive": "No se puede cambiar la fecha de inicio a una anterior a la original."
     }
   },
   "stats": {

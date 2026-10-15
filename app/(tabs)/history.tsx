@@ -4,11 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useHabitStore } from '../../store/useHabitStore';
 import { useLogStore } from '../../store/useLogStore';
+import { useUserStore } from '../../store/useUserStore';
 import { Colors } from '../../constants/colors';
 import { HabitLog, LogicalDate } from '../../types';
 import { getHabitHistoryForDate, EvaluatedHabitHistoryItem } from '../../utils/frequencyEngine';
 import { 
   getLogicalToday, 
+  toLogicalDate,
   addLogicalDays, 
   compareLogicalDates, 
   formatDateLocally 
@@ -59,10 +61,17 @@ export default function HistoryScreen() {
     return () => { isMounted = false; };
   }, [selectedDate, getLogsForDay]);
 
+  const user = useUserStore((state) => state.user);
+  const userRegistrationDate = user?.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
+
   // Consulta canónica de dominio: evalúa qué hábitos correspondían y su estado exacto
   const historyItems = useMemo(() => {
+    // Si la fecha evaluada es anterior al registro del usuario, no existían obligaciones
+    if (userRegistrationDate && compareLogicalDates(selectedDate, userRegistrationDate) < 0) {
+      return [];
+    }
     return getHabitHistoryForDate(allHabits, selectedDate, logsObj);
-  }, [allHabits, selectedDate, logsObj]);
+  }, [allHabits, selectedDate, logsObj, userRegistrationDate]);
 
   // Navegación pura con LogicalDate: no permite avanzar más allá de hoy
   const changeDateBy = (offset: number) => {

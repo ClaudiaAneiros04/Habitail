@@ -218,6 +218,14 @@ export const useHabitStats = ({
           }
         }
 
+        // Clamp to user registration date if available
+        if (activeUser?.fechaRegistro) {
+          const userRegDate = toLogicalDate(activeUser.fechaRegistro);
+          if (userRegDate > effectiveFrom) {
+            effectiveFrom = userRegDate;
+          }
+        }
+
         // Si la petición ya quedó obsoleta por un cambio posterior de parámetros, ignorar resultado
         if (requestTokenRef.current !== currentToken) {
           return;
@@ -305,6 +313,14 @@ export const useHabitStats = ({
           const range = buildPeriodRange(period, today);
           effectiveFrom = range.fromDate;
           effectiveTo = range.toDate;
+        }
+
+        // Clamp global effectiveFrom to user registration date if available
+        if (activeUser?.fechaRegistro) {
+          const userRegDate = toLogicalDate(activeUser.fechaRegistro);
+          if (userRegDate > effectiveFrom) {
+            effectiveFrom = userRegDate;
+          }
         }
 
         // a) Query SQL agregada global

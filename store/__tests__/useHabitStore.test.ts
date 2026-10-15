@@ -26,7 +26,7 @@ describe('useHabitStore', () => {
       horaRecordatorio: '2026-04-16T20:00:00.000Z',
       nivelPrioridad: 'NORMAL',
       tipoVerificacion: 'BOOLEAN',
-      fechaInicio: '2026-04-16',
+      fechaInicio: '2026-10-15',
       activo: true,
     };
 

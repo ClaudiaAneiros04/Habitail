@@ -40,6 +40,7 @@ export const CREATE_TABLES_SQL = `
     estadoActual TEXT NOT NULL,
     skinEquipada TEXT NOT NULL,
     accesorios TEXT NOT NULL,
+    lifecycle INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (userId) REFERENCES ${TABLE_NAMES.USERS} (id) ON DELETE CASCADE
   );
 
@@ -159,6 +160,7 @@ export interface PetRow {
   estadoActual: string;
   skinEquipada: string;
   accesorios: string;
+  lifecycle?: number;
 }
 
 export interface HabitRow {

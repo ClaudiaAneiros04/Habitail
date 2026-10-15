@@ -127,6 +127,13 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
       );
       const eventColNames = eventColumns.map((c) => c.name);
       expect(eventColNames).toContain('appliedHealthDelta');
+
+      // Verificar que pets tiene lifecycle (v10)
+      const petColumns = await db.getAllAsync<{ name: string }>(
+        `PRAGMA table_info(${TABLE_NAMES.PETS});`
+      );
+      const petColNames = petColumns.map((c) => c.name);
+      expect(petColNames).toContain('lifecycle');
     });
   });
 

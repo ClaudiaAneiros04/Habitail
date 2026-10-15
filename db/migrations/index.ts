@@ -8,6 +8,7 @@ import { migrationV6 } from './v6_historical_schedule_and_logical_dates';
 import { migrationV7 } from './v7_gamification_events';
 import { migrationV8 } from './v8_user_last_opened_at';
 import { migrationV9 } from './v9_applied_health_delta';
+import { migrationV10 } from './v10_pet_lifecycle';
 
 export * from './types';
 export * from './v1_initial_schema';
@@ -19,6 +20,7 @@ export * from './v6_historical_schedule_and_logical_dates';
 export * from './v7_gamification_events';
 export * from './v8_user_last_opened_at';
 export * from './v9_applied_health_delta';
+export * from './v10_pet_lifecycle';
 
 /**
  * Registro ordenado de todas las migraciones del sistema.
@@ -34,6 +36,7 @@ export const migrations: readonly Migration[] = [
   migrationV7,
   migrationV8,
   migrationV9,
+  migrationV10,
 ];
 
 /**

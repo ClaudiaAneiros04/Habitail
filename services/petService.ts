@@ -44,6 +44,7 @@ export class PetService {
         estadoActual: PetState.HAPPY,
         skinEquipada: 'default-cat',
         accesorios: [],
+        lifecycle: 1,
       };
       await this.petRepo.create(defaultPet);
       return defaultPet;
@@ -147,9 +148,12 @@ export class PetService {
 
   /**
    * Adopta una nueva mascota tras la marcha definitiva de la anterior o inicio de juego.
+   * Restablece la salud a 100 puntos y su estado a HAPPY, incrementando el ciclo de vida (lifecycle)
+   * para aislar estrictamente los eventos y recompensas de la nueva mascota respecto a las anteriores.
    */
   async adoptNewPet(userId: string = 'default-user', skin?: string): Promise<Pet> {
     const existing = await this.petRepo.getByUserId(userId);
+    const nextLifecycle = existing ? (existing.lifecycle || 1) + 1 : 1;
     const newPet: Pet = {
       id: existing?.id || generateUUID(),
       userId,
@@ -160,6 +164,7 @@ export class PetService {
       estadoActual: PetState.HAPPY,
       skinEquipada: skin || 'default-cat',
       accesorios: [],
+      lifecycle: nextLifecycle,
     };
 
     if (existing) {

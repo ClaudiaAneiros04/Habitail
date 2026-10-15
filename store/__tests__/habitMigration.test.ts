@@ -276,7 +276,7 @@ describe('Sistema de Migración de Hábitos (AsyncStorage -> SQLite)', () => {
       createSampleHabit(1, { nombre: 'Hábito ya en SQLite con ID habit-legacy-1', id: 'habit-legacy-1' }),
     ];
     for (const h of preExistingHabits) {
-      await habitRepo.create(h);
+      await habitRepo.create(h, { allowHistorical: true });
     }
 
     // Verificar que los 3 están en SQLite

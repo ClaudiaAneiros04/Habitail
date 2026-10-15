@@ -234,7 +234,11 @@
       },
       "reminderLabel": "Reminder",
       "reminderDescription": "Receive a daily notification.",
-      "mockReminderText": "* Default reminder time: 09:00 (configurable in future versions)."
+      "mockReminderText": "* Default reminder time: 09:00 (configurable in future versions).",
+      "startDateLabel": "Start Date",
+      "startDateDescription": "Day from which the habit becomes active.",
+      "startDateErrorPast": "The start date cannot be before today.",
+      "startDateErrorEditRetroactive": "Cannot change the start date to before its original date."
     }
   },
   "stats": {

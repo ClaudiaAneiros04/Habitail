@@ -9,7 +9,7 @@ import {
   rescheduleAllHabitNotifications, 
   hasNotificationPermissionSilently 
 } from '../notifications/notificationService';
-import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
+import { toLogicalDate, getLogicalToday, compareLogicalDates } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
 import { CacheInvalidationService } from '../services/cacheInvalidationService';
 import { parseSqliteBoolean } from '../utils/booleanUtils';
@@ -73,6 +73,14 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
   },
 
   addHabit: async (habitData) => {
+    const today = getLogicalToday();
+    const habitStartDate = toLogicalDate(habitData.fechaInicio || today);
+
+    // Regla 1 de Dominio: ningún hábito nuevo puede crearse con una fecha de inicio anterior al día actual
+    if (compareLogicalDates(habitStartDate, today) < 0) {
+      throw new Error(`Cannot create habit with a start date earlier than today: ${habitStartDate} < ${today}`);
+    }
+
     const newId = habitData.id || generateUUID();
     const targetUserId = habitData.userId || useUserStore.getState().user?.id || 'default-user';
 
@@ -80,7 +88,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
       ...habitData,
       id: newId,
       userId: targetUserId,
-      fechaInicio: toLogicalDate(habitData.fechaInicio || getLogicalToday()),
+      fechaInicio: habitStartDate,
       fechaFin: habitData.fechaFin ? toLogicalDate(habitData.fechaFin) : undefined,
     };
 
@@ -103,6 +111,17 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
   },
 
   updateHabit: async (id: string, updates: Partial<Habit>) => {
+    const existing = get().habits.find(h => h.id === id);
+    if (existing && updates.fechaInicio) {
+      const newStartDate = toLogicalDate(updates.fechaInicio);
+      const originalStartDate = toLogicalDate(existing.fechaInicio);
+      // Regla de Dominio: cuando se edita un hábito existente, no debe poder cambiarse
+      // su fecha de inicio a una fecha anterior a la original para evitar generar cumplimientos retroactivos.
+      if (compareLogicalDates(newStartDate, originalStartDate) < 0) {
+        throw new Error(`Cannot change habit start date to an earlier date than original: ${newStartDate} < ${originalStartDate}`);
+      }
+    }
+
     await habitRepo.update(id, updates);
     // Hidratar la entidad completa desde SQLite asegurando que contenga scheduleHistory actualizado
     const updatedFromDb = await habitRepo.getById(id);

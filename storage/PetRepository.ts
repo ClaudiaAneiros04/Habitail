@@ -21,6 +21,7 @@ export class PetRepository implements IPetRepository {
       estadoActual: row.estadoActual as PetState,
       skinEquipada: row.skinEquipada,
       accesorios: row.accesorios ? JSON.parse(row.accesorios) : [],
+      lifecycle: row.lifecycle !== undefined && row.lifecycle !== null ? Number(row.lifecycle) : 1,
     };
   }
 
@@ -42,7 +43,7 @@ export class PetRepository implements IPetRepository {
   async create(pet: Pet): Promise<void> {
     const db = await getDb();
     await db.runAsync(
-      `INSERT INTO pets (id, userId, vida, nivel, xp, xpParaSiguienteNivel, estadoActual, skinEquipada, accesorios) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO pets (id, userId, vida, nivel, xp, xpParaSiguienteNivel, estadoActual, skinEquipada, accesorios, lifecycle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         pet.id,
         pet.userId,
@@ -52,7 +53,8 @@ export class PetRepository implements IPetRepository {
         pet.xpParaSiguienteNivel,
         pet.estadoActual,
         pet.skinEquipada,
-        JSON.stringify(pet.accesorios || [])
+        JSON.stringify(pet.accesorios || []),
+        pet.lifecycle || 1,
       ]
     );
   }
@@ -66,7 +68,7 @@ export class PetRepository implements IPetRepository {
     const updated = { ...current, ...updates };
     
     await db.runAsync(
-      `UPDATE pets SET vida = ?, nivel = ?, xp = ?, xpParaSiguienteNivel = ?, estadoActual = ?, skinEquipada = ?, accesorios = ? WHERE id = ?`,
+      `UPDATE pets SET vida = ?, nivel = ?, xp = ?, xpParaSiguienteNivel = ?, estadoActual = ?, skinEquipada = ?, accesorios = ?, lifecycle = ? WHERE id = ?`,
       [
         updated.vida,
         updated.nivel,
@@ -75,6 +77,7 @@ export class PetRepository implements IPetRepository {
         updated.estadoActual,
         updated.skinEquipada,
         JSON.stringify(updated.accesorios || []),
+        updated.lifecycle || 1,
         id
       ]
     );

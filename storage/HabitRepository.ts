@@ -2,7 +2,7 @@ import { Habit, HabitScheduleHistory, LogicalDate } from '../types';
 import { getDb, runInTransaction } from './database';
 import { HabitRow, HabitScheduleHistoryRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
-import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
+import { toLogicalDate, getLogicalToday, compareLogicalDates } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
 import { parseSqliteBoolean } from '../utils/booleanUtils';
 
@@ -11,7 +11,7 @@ export interface IHabitRepository {
   getById(id: string): Promise<Habit | null>;
   getByIds?(ids: string[]): Promise<Habit[]>;
   verifyHabitsExist?(ids: string[]): Promise<boolean>;
-  create(habit: Habit): Promise<void>;
+  create(habit: Habit, options?: { allowHistorical?: boolean }): Promise<void>;
   update(id: string, changes: Partial<Habit>): Promise<void>;
   upsert(habit: Habit): Promise<void>;
   upsertMany?(habits: Habit[]): Promise<void>;
@@ -255,7 +255,13 @@ export class HabitRepository implements IHabitRepository {
     await this.syncScheduleHistory(db, normalizedHabit);
   }
 
-  async create(habit: Habit): Promise<void> {
+  async create(habit: Habit, options: { allowHistorical?: boolean } = {}): Promise<void> {
+    const today = getLogicalToday();
+    const habitStart = toLogicalDate(habit.fechaInicio || today);
+    if (!options.allowHistorical && compareLogicalDates(habitStart, today) < 0) {
+      throw new Error(`Cannot create habit with a start date earlier than today: ${habitStart} < ${today}`);
+    }
+
     await runInTransaction(async (db) => {
       await this.upsertHabitInternal(db, habit);
     });
@@ -264,6 +270,14 @@ export class HabitRepository implements IHabitRepository {
   async update(id: string, changes: Partial<Habit>): Promise<void> {
     const current = await this.getById(id);
     if (!current) return;
+
+    if (changes.fechaInicio) {
+      const newStart = toLogicalDate(changes.fechaInicio);
+      const originalStart = toLogicalDate(current.fechaInicio);
+      if (compareLogicalDates(newStart, originalStart) < 0) {
+        throw new Error(`Cannot change habit start date to an earlier date than original: ${newStart} < ${originalStart}`);
+      }
+    }
 
     const updated: Habit = {
       ...current,

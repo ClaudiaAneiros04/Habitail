@@ -14,9 +14,11 @@ import ProgressBar from '../../components/ProgressBar';
 import { MiniPet } from '../../components/Pet/MiniPet';
 import { PermissionBanner } from '../../components/PermissionBanner';
 import { usePetStore } from '../../store/usePetStore';
+import { useUserStore } from '../../store/useUserStore';
 import { useHabitCheckIn } from '../../hooks/useHabitCheckIn';
 import { 
   getLogicalToday, 
+  toLogicalDate,
   addLogicalDays, 
   compareLogicalDates, 
   generateLogId, 
@@ -54,6 +56,8 @@ export default function HomeScreen() {
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevLogsRef = useRef<Record<string, HabitLog>>({});
   const lastRefreshFromAppState = useRef(false);
+  const pendingTogglesRef = useRef<Set<string>>(new Set());
+  const fetchLogsSeqRef = useRef<number>(0);
 
   const { t } = useTranslation();
   const router = useRouter();
@@ -96,12 +100,13 @@ export default function HomeScreen() {
   // Cargar los logs cada vez que cambia la fecha seleccionada o AppState refresh
   useEffect(() => {
     let isMounted = true;
+    const currentSeq = ++fetchLogsSeqRef.current;
     const fetchLogs = async () => {
       setIsLoadingLogs(true);
       try {
         const dateStr = selectedDate;
         const logs = await getLogsForDay(dateStr);
-        if (!isMounted) return;
+        if (!isMounted || currentSeq !== fetchLogsSeqRef.current) return;
         
         const logsMap: Record<string, HabitLog> = {};
         logs.forEach(log => {
@@ -125,7 +130,9 @@ export default function HomeScreen() {
       } catch (error) {
         console.error('Error fetching logs:', error);
       } finally {
-        if (isMounted) setIsLoadingLogs(false);
+        if (isMounted && currentSeq === fetchLogsSeqRef.current) {
+          setIsLoadingLogs(false);
+        }
       }
     };
     fetchLogs();
@@ -133,10 +140,17 @@ export default function HomeScreen() {
     return () => { isMounted = false; };
   }, [selectedDate, getLogsForDay, refreshTrigger, showToast, t]);
 
+  const user = useUserStore((state) => state.user);
+  const userRegistrationDate = user?.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
+
   // Selección de hábitos correspondientes al día seleccionado según motor canónico
   const habitsForDate = React.useMemo(() => {
+    // Si la fecha seleccionada es anterior al registro del usuario, los hábitos no aplican (fuera del periodo de actividad)
+    if (userRegistrationDate && compareLogicalDates(selectedDate, userRegistrationDate) < 0) {
+      return [];
+    }
     return getHabitsExpectedOnDate(allHabits, selectedDate);
-  }, [allHabits, selectedDate]);
+  }, [allHabits, selectedDate, userRegistrationDate]);
 
   // Ordenar los hábitos
   const sortedHabits = React.useMemo(() => {
@@ -192,58 +206,79 @@ export default function HomeScreen() {
    * @param {Habit} habit - El hábito seleccionado a reconfigurar.
    */
   const handleToggleHabit = useCallback(async (habit: Habit) => {
+    // Si ya hay una operación en curso para este hábito, ignoramos llamadas concurrentes
+    if (pendingTogglesRef.current.has(habit.id)) {
+      return;
+    }
+
     // Regla de dominio: nunca se puede completar una fecha futura
     if (compareLogicalDates(selectedDate, getLogicalToday()) > 0) {
       return;
     }
+
+    // Regla de dominio: no se puede completar ni desmarcar en fechas anteriores al registro del usuario
+    if (userRegistrationDate && compareLogicalDates(selectedDate, userRegistrationDate) < 0) {
+      return;
+    }
+
+    // Regla de dominio: no se puede completar ni desmarcar en fechas anteriores al inicio del hábito
+    if (compareLogicalDates(selectedDate, toLogicalDate(habit.fechaInicio)) < 0) {
+      return;
+    }
+
+    pendingTogglesRef.current.add(habit.id);
 
     const currentLog = completedHabitsObj[habit.id];
     const isCurrentlyCompleted = currentLog?.completado === true;
     const dateStr = selectedDate;
     const logId = generateLogId(habit.id, selectedDate);
 
-    if (isCurrentlyCompleted) {
-      // El usuario DESMARCA: eliminamos el registro de la DB usando el hook de gamificación
-      setCompletedHabitsObj(prev => {
-        const next = { ...prev };
-        delete next[habit.id];
-        return next;
-      });
-      try {
-        await markIncomplete(habit.id, selectedDate);
-      } catch (error) {
-        console.error('Failed to mark incomplete', error);
-        if (currentLog) {
-          setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: currentLog }));
+    try {
+      if (isCurrentlyCompleted) {
+        // El usuario DESMARCA: eliminamos el registro de la DB usando el hook de gamificación
+        setCompletedHabitsObj(prev => {
+          const next = { ...prev };
+          delete next[habit.id];
+          return next;
+        });
+        try {
+          await markIncomplete(habit.id, selectedDate);
+        } catch (error) {
+          console.error('Failed to mark incomplete', error);
+          if (currentLog) {
+            setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: currentLog }));
+          }
+        }
+      } else {
+        // El usuario MARCA como completado: guardamos usando el hook de gamificación
+        const newLog: HabitLog = {
+          id: logId,
+          habitId: habit.id,
+          userId: habit.userId || 'default-user',
+          fecha: dateStr,
+          completado: true,
+          timestampRegistro: getCurrentInstant(),
+        };
+        setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: newLog }));
+        try {
+          await markComplete(habit.id, selectedDate);
+        } catch (error) {
+          console.error('Failed to mark complete', error);
+          setCompletedHabitsObj(prev => {
+            const reverted = { ...prev };
+            if (currentLog) {
+              reverted[habit.id] = currentLog;
+            } else {
+              delete reverted[habit.id];
+            }
+            return reverted;
+          });
         }
       }
-    } else {
-      // El usuario MARCA como completado: guardamos usando el hook de gamificación
-      const newLog: HabitLog = {
-        id: logId,
-        habitId: habit.id,
-        userId: habit.userId || 'default-user',
-        fecha: dateStr,
-        completado: true,
-        timestampRegistro: getCurrentInstant(),
-      };
-      setCompletedHabitsObj(prev => ({ ...prev, [habit.id]: newLog }));
-      try {
-        await markComplete(habit.id, selectedDate);
-      } catch (error) {
-        console.error('Failed to mark complete', error);
-        setCompletedHabitsObj(prev => {
-          const reverted = { ...prev };
-          if (currentLog) {
-            reverted[habit.id] = currentLog;
-          } else {
-            delete reverted[habit.id];
-          }
-          return reverted;
-        });
-      }
+    } finally {
+      pendingTogglesRef.current.delete(habit.id);
     }
-  }, [completedHabitsObj, selectedDate, markComplete, markIncomplete]);
+  }, [completedHabitsObj, selectedDate, markComplete, markIncomplete, userRegistrationDate]);
 
   /**
    * Genera el saludo de la cabecera en base a si es mañana, tarde o noche 
