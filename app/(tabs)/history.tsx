@@ -73,15 +73,19 @@ export default function HistoryScreen() {
     return getHabitHistoryForDate(allHabits, selectedDate, logsObj);
   }, [allHabits, selectedDate, logsObj, userRegistrationDate]);
 
-  // Navegación pura con LogicalDate: no permite avanzar más allá de hoy
+  // Navegación pura con LogicalDate: no permite avanzar más allá de hoy ni retroceder antes del registro
   const changeDateBy = (offset: number) => {
     const newDate = addLogicalDays(selectedDate, offset);
+    if (userRegistrationDate && offset < 0 && compareLogicalDates(selectedDate, userRegistrationDate) <= 0) {
+      return;
+    }
     if (compareLogicalDates(newDate, getLogicalToday()) <= 0) {
       setSelectedDate(newDate);
     }
   };
 
   const isToday = compareLogicalDates(selectedDate, getLogicalToday()) === 0;
+  const isMinDateReached = userRegistrationDate ? compareLogicalDates(selectedDate, userRegistrationDate) <= 0 : false;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -91,8 +95,16 @@ export default function HistoryScreen() {
 
       {/* Rownav de fecha */}
       <View style={styles.dateSelector}>
-        <TouchableOpacity onPress={() => changeDateBy(-1)} style={styles.dateNavBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+        <TouchableOpacity 
+          onPress={() => changeDateBy(-1)} 
+          style={styles.dateNavBtn}
+          disabled={isMinDateReached}
+        >
+          <Ionicons 
+            name="chevron-back" 
+            size={24} 
+            color={isMinDateReached ? Colors.inactive : Colors.text} 
+          />
         </TouchableOpacity>
         
         <View style={styles.dateCenter}>

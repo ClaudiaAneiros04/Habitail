@@ -299,11 +299,18 @@ export default function HomeScreen() {
    */
   const changeDateBy = (offset: number) => {
     const newDate = addLogicalDays(selectedDate, offset);
+    // No permitir navegar antes de la fecha de registro del usuario
+    if (userRegistrationDate && offset < 0 && compareLogicalDates(selectedDate, userRegistrationDate) <= 0) {
+      return;
+    }
     // No permitir navegar hacia el futuro
     if (compareLogicalDates(newDate, getLogicalToday()) <= 0) {
       setSelectedDate(newDate);
     }
   };
+
+  const isBeforeRegistration = userRegistrationDate ? compareLogicalDates(selectedDate, userRegistrationDate) < 0 : false;
+  const isMinDateReached = userRegistrationDate ? compareLogicalDates(selectedDate, userRegistrationDate) <= 0 : false;
 
   if (!hasHydrated) {
     return (
@@ -350,8 +357,16 @@ export default function HomeScreen() {
 
       {/* Selector de Fecha */}
       <View style={styles.dateSelector}>
-        <TouchableOpacity onPress={() => changeDateBy(-1)} style={styles.dateNavBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text} />
+        <TouchableOpacity 
+          onPress={() => changeDateBy(-1)} 
+          style={styles.dateNavBtn}
+          disabled={isMinDateReached}
+        >
+          <Ionicons 
+            name="chevron-back" 
+            size={24} 
+            color={isMinDateReached ? Colors.inactive : Colors.text} 
+          />
         </TouchableOpacity>
         
         <View style={styles.dateCenter}>
@@ -405,13 +420,15 @@ export default function HomeScreen() {
               />
             )}
             ListEmptyComponent={
-              <EmptyState
-                icon="calendar-clear-outline"
-                title={t('home.empty.no_habits', { defaultValue: 'No hay hábitos programados para este día.' })}
-                description={t('home.empty.subtitulo', { defaultValue: '¡Tómate un descanso o crea un nuevo hábito!' })}
-                actionLabel={t('home.empty.cta', { defaultValue: 'Crear mi primer hábito' })}
-                onAction={() => router.push('/add-habit/basic-info')}
-              />
+              isBeforeRegistration ? null : (
+                <EmptyState
+                  icon="calendar-clear-outline"
+                  title={t('home.empty.no_habits', { defaultValue: 'No hay hábitos programados para este día.' })}
+                  description={t('home.empty.subtitulo', { defaultValue: '¡Tómate un descanso o crea un nuevo hábito!' })}
+                  actionLabel={t('home.empty.cta', { defaultValue: 'Crear mi primer hábito' })}
+                  onAction={() => router.push('/add-habit/basic-info')}
+                />
+              )
             }
           />
         )}
