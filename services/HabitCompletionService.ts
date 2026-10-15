@@ -92,14 +92,15 @@ export class HabitCompletionService {
     const current = new Promise<void>((resolve) => {
       release = resolve;
     });
-    this.mutexes.set(key, previous.then(() => current, () => current));
+    const chained = previous.then(() => current, () => current);
+    this.mutexes.set(key, chained);
 
     await previous;
     try {
       return await fn();
     } finally {
       release();
-      if (this.mutexes.get(key) === current) {
+      if (this.mutexes.get(key) === chained) {
         this.mutexes.delete(key);
       }
     }

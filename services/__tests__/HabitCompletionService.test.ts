@@ -35,14 +35,27 @@ class RealSqliteTestAdapter {
     return rows as T[];
   }
 
+  private txMutex: Promise<void> = Promise.resolve();
+
   async withTransactionAsync(task: () => Promise<void>): Promise<void> {
-    this.rawDb.exec('BEGIN TRANSACTION;');
+    const prevTx = this.txMutex;
+    let releaseTx: () => void = () => {};
+    this.txMutex = new Promise<void>((resolve) => {
+      releaseTx = resolve;
+    });
+
+    await prevTx;
     try {
-      await task();
-      this.rawDb.exec('COMMIT;');
-    } catch (error) {
-      this.rawDb.exec('ROLLBACK;');
-      throw error;
+      this.rawDb.exec('BEGIN TRANSACTION;');
+      try {
+        await task();
+        this.rawDb.exec('COMMIT;');
+      } catch (error) {
+        this.rawDb.exec('ROLLBACK;');
+        throw error;
+      }
+    } finally {
+      releaseTx();
     }
   }
 
@@ -429,6 +442,89 @@ describe('HabitCompletionService', () => {
 
       const pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
       expect(pet.vida).toBe(70);
+    });
+
+    test('completar y desmarcar simultáneamente no corrompe el estado y limpia los bloqueos', async () => {
+      // Lanzamos completar y desmarcar en paralelo
+      const [compRes, uncompRes] = await Promise.all([
+        service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+      ]);
+
+      expect(compRes.success).toBe(true);
+      expect(uncompRes.success).toBe(true);
+
+      // Dado que se ejecutaron secuencialmente bajo el mismo cerrojo:
+      // Si completeHabit fue primero: completó (+20) y uncompleteHabit desmarcó (-20). Estado final: desmarcado.
+      // Si uncompleteHabit fue primero: no hizo nada (alreadyUncompleted) y completeHabit marcó (+20).
+      // En cualquiera de los dos casos, el estado de DB debe ser coherente.
+      const log = await db.getFirstAsync('SELECT * FROM habit_logs WHERE habitId = ? AND fecha = ?', ['h1', mockDateToday]);
+      const pet = await db.getFirstAsync('SELECT vida FROM pets WHERE id = ?', ['p1']);
+      const user = await db.getFirstAsync('SELECT puntos FROM users WHERE id = ?', ['u1']);
+
+      if (log && log.completado === 1) {
+        expect(pet.vida).toBe(70);
+        expect(user.puntos).toBe(120);
+      } else {
+        expect(log).toBeNull();
+        expect(pet.vida).toBe(50);
+        expect(user.puntos).toBe(100);
+      }
+
+      // El mapa de mutexes debe estar completamente limpio
+      expect((service as any).mutexes.size).toBe(0);
+    });
+
+    test('operaciones sobre hábitos distintos se ejecutan independientemente y limpian sus bloqueos', async () => {
+      const [res1, resWeekly] = await Promise.all([
+        service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.completeHabit({ userId: 'u1', habitId: 'h-weekly', logicalDate: mockDateToday }),
+      ]);
+
+      expect(res1.success).toBe(true);
+      expect(res1.alreadyCompleted).toBe(false);
+      expect(resWeekly.success).toBe(true);
+      expect(resWeekly.alreadyCompleted).toBe(false);
+
+      const logs = await db.getAllAsync('SELECT * FROM habit_logs WHERE fecha = ?', [mockDateToday]);
+      expect(logs).toHaveLength(2);
+
+      // El mapa no debe acumular entradas
+      expect((service as any).mutexes.size).toBe(0);
+    });
+
+    test('error durante una operación no bloquea futuras operaciones y limpia el Map', async () => {
+      // Simular un error en la primera operación pasando un usuario inexistente
+      await expect(
+        service.completeHabit({ userId: 'non-existent', habitId: 'h1', logicalDate: mockDateToday })
+      ).rejects.toThrow('User not found: non-existent');
+
+      // Comprobar que el Map limpió la entrada a pesar del error
+      expect((service as any).mutexes.size).toBe(0);
+
+      // Nueva operación sobre el mismo hábito después del error debe completarse exitosamente
+      const recoveryRes = await service.completeHabit({
+        userId: 'u1',
+        habitId: 'h1',
+        logicalDate: mockDateToday,
+      });
+
+      expect(recoveryRes.success).toBe(true);
+      expect(recoveryRes.alreadyCompleted).toBe(false);
+      expect((service as any).mutexes.size).toBe(0);
+    });
+
+    test('el Map de mutexes no acumula entradas innecesarias tras ráfaga secuencial y concurrente', async () => {
+      // Ráfaga concurrente de 5 operaciones sobre el mismo hábito
+      await Promise.all([
+        service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.completeHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+        service.uncompleteHabit({ userId: 'u1', habitId: 'h1', logicalDate: mockDateToday }),
+      ]);
+
+      expect((service as any).mutexes.size).toBe(0);
     });
   });
 
