@@ -6,6 +6,7 @@ import { scheduleHabitReminder, cancelHabitReminder } from '../notifications/not
 import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
 import { CacheInvalidationService } from '../services/cacheInvalidationService';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 import { useUserStore } from './useUserStore';
 import { useLogStore } from './useLogStore';
 
@@ -214,7 +215,9 @@ export const migrateLegacyHabits = async (
         nivelPrioridad: h.nivelPrioridad || h.priority || 'NORMAL',
         fechaInicio: toLogicalDate(h.fechaInicio || h.startDate || getLogicalToday()),
         fechaFin: (h.fechaFin || h.endDate) ? toLogicalDate(h.fechaFin || h.endDate) : undefined,
-        activo: h.activo !== undefined ? Boolean(h.activo) : (h.active !== undefined ? Boolean(h.active) : true),
+        activo: h.activo !== undefined
+          ? parseSqliteBoolean(h.activo)
+          : (h.active !== undefined ? parseSqliteBoolean(h.active) : true),
         // Preservar propiedades adicionales si existían
         name: h.name || h.nombre || undefined,
         reminderTime: h.reminderTime || h.horaRecordatorio || undefined,

@@ -2,6 +2,7 @@ import { HabitLog } from '../types';
 import { getDb } from './database';
 import { HabitLogRow } from '../db/schema';
 import { toLogicalDate, toInstant } from '../utils/dateUtils';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 
 /**
  * Resultado compacto que devuelven las queries de estadísticas.
@@ -118,7 +119,7 @@ export class LogRepository implements ILogRepository {
       fecha: toLogicalDate(row.fecha),
       valor: row.valor !== null ? row.valor : undefined,
       nota: row.nota !== null ? row.nota : undefined,
-      completado: Number(row.completado) === 1,
+      completado: parseSqliteBoolean(row.completado),
     };
   }
 

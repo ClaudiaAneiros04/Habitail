@@ -16,6 +16,7 @@ import { isHabitExpectedOnDate } from '../utils/frequencyEngine';
 import { Habit, Frequency } from '../types';
 import { getDb, initDb } from '../storage/database';
 import { habitCompletionService } from '../services/HabitCompletionService';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 import i18n from '../i18n';
 
 // ============================================================================
@@ -108,12 +109,12 @@ export async function isHabitCompletedOnDate(
   if (Platform.OS !== 'web') {
     try {
       const db = await getDb();
-      const row = await db.getFirstAsync<{ completado: number | boolean }>(
+      const row = await db.getFirstAsync<{ completado: number | boolean | string }>(
         'SELECT completado FROM habit_logs WHERE habitId = ? AND fecha = ?',
         [habitId, dateStr]
       );
       if (row !== null && row !== undefined) {
-        return Number(row.completado) === 1 || row.completado === true;
+        return parseSqliteBoolean(row.completado);
       }
     } catch (error) {
       // Si SQLite no está disponible de inmediato, continuar con fallback
@@ -124,7 +125,7 @@ export async function isHabitCompletedOnDate(
     const logs = useLogStore.getState().logs;
     if (Array.isArray(logs) && logs.length > 0) {
       return logs.some(
-        (l) => l.habitId === habitId && toLogicalDate(l.fecha) === dateStr && Boolean(l.completado)
+        (l) => l.habitId === habitId && toLogicalDate(l.fecha) === dateStr && parseSqliteBoolean(l.completado)
       );
     }
   } catch (storeError) {}

@@ -4,6 +4,7 @@ import { HabitRow, HabitScheduleHistoryRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
 import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
 import { generateUUID } from '../utils/uuid';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 
 export interface IHabitRepository {
   get(userId?: string): Promise<Habit[]>;
@@ -36,7 +37,7 @@ export class HabitRepository implements IHabitRepository {
       fechaInicio: toLogicalDate(row.fechaInicio),
       fechaFin: row.fechaFin ? toLogicalDate(row.fechaFin) : undefined,
       diasSemana,
-      activo: Boolean(row.activo),
+      activo: parseSqliteBoolean(row.activo),
     } as Habit;
   }
 
@@ -57,7 +58,7 @@ export class HabitRepository implements IHabitRepository {
 
     const today = getLogicalToday();
     const habitStart = toLogicalDate(habit.fechaInicio || today);
-    const targetActivo = Boolean(habit.activo);
+    const targetActivo = parseSqliteBoolean(habit.activo, true);
     const targetFreq = habit.frecuencia;
     const targetDays = JSON.stringify(habit.diasSemana);
 
@@ -77,7 +78,7 @@ export class HabitRepository implements IHabitRepository {
       return;
     }
 
-    const rowActivo = activeRow.activo !== undefined ? Boolean(activeRow.activo) : true;
+    const rowActivo = parseSqliteBoolean(activeRow.activo, true);
     const sameActivo = rowActivo === targetActivo;
     const sameFreq = activeRow.frecuencia === targetFreq;
     const sameDays = activeRow.diasSemana === targetDays;
@@ -138,7 +139,7 @@ export class HabitRepository implements IHabitRepository {
         diasSemana: JSON.parse(hr.diasSemana),
         validFrom: toLogicalDate(hr.validFrom),
         validUntil: hr.validUntil ? toLogicalDate(hr.validUntil) : null,
-        activo: hr.activo !== undefined ? Boolean(hr.activo) : true,
+        activo: parseSqliteBoolean(hr.activo, true),
       });
     }
 
@@ -166,7 +167,7 @@ export class HabitRepository implements IHabitRepository {
       diasSemana: JSON.parse(hr.diasSemana),
       validFrom: toLogicalDate(hr.validFrom),
       validUntil: hr.validUntil ? toLogicalDate(hr.validUntil) : null,
-      activo: hr.activo !== undefined ? Boolean(hr.activo) : true,
+      activo: parseSqliteBoolean(hr.activo, true),
     }));
 
     return habit;
@@ -181,7 +182,7 @@ export class HabitRepository implements IHabitRepository {
       ...habit,
       fechaInicio: toLogicalDate(habit.fechaInicio || getLogicalToday()),
       fechaFin: habit.fechaFin ? toLogicalDate(habit.fechaFin) : undefined,
-      activo: habit.activo !== undefined ? Boolean(habit.activo) : true,
+      activo: parseSqliteBoolean(habit.activo, true),
     };
 
     // Asegurar que el usuario existe en users para respetar foreign key (ON DELETE CASCADE)
@@ -271,7 +272,7 @@ export class HabitRepository implements IHabitRepository {
       fechaFin: changes.fechaFin !== undefined
         ? (changes.fechaFin ? toLogicalDate(changes.fechaFin) : undefined)
         : current.fechaFin,
-      activo: changes.activo !== undefined ? Boolean(changes.activo) : current.activo,
+      activo: changes.activo !== undefined ? parseSqliteBoolean(changes.activo) : current.activo,
     };
 
     await runInTransaction(async (db) => {

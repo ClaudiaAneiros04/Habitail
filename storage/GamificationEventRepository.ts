@@ -2,6 +2,7 @@ import { GamificationEvent, LogicalDate } from '../types';
 import { getDb } from './database';
 import { GamificationEventRow } from '../db/schema';
 import { toLogicalDate, toInstant } from '../utils/dateUtils';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 
 export interface IGamificationEventRepository {
   getByEventKey(eventKey: string): Promise<GamificationEvent | null>;
@@ -26,7 +27,7 @@ export class GamificationEventRepository implements IGamificationEventRepository
         : Number(row.healthDelta),
       pointsDelta: Number(row.pointsDelta),
       createdAt: toInstant(row.createdAt),
-      isReverted: Number(row.isReverted) === 1,
+      isReverted: parseSqliteBoolean(row.isReverted),
       revertedAt: row.revertedAt ? toInstant(row.revertedAt) : null,
     };
   }

@@ -2,6 +2,7 @@ import { getDb } from './database';
 import { User } from '../types';
 import { UserRow } from '../db/schema';
 import * as SQLite from 'expo-sqlite';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 
 export interface IUserRepository {
   get(userId?: string): Promise<User | null>;
@@ -49,7 +50,7 @@ export class UserRepository implements IUserRepository {
       avatar: row.avatar || undefined,
       fechaRegistro: row.fechaRegistro,
       puntos: row.puntos,
-      onboardingCompleted: Boolean(row.onboardingCompleted),
+      onboardingCompleted: parseSqliteBoolean(row.onboardingCompleted),
       lastPenaltyAppliedDate: row.lastPenaltyAppliedDate || undefined,
       badges,
       inventario,

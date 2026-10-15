@@ -21,6 +21,7 @@ import { useLogStore } from '../store/useLogStore';
 import { usePetStore } from '../store/usePetStore';
 import { useUserStore } from '../store/useUserStore';
 import { CacheInvalidationService } from './cacheInvalidationService';
+import { parseSqliteBoolean } from '../utils/booleanUtils';
 
 export interface CompleteHabitParams {
   userId: string;
@@ -174,7 +175,7 @@ export class HabitCompletionService {
       fechaInicio: toLogicalDate(habitRow.fechaInicio),
       fechaFin: habitRow.fechaFin ? toLogicalDate(habitRow.fechaFin) : undefined,
       diasSemana: typeof habitRow.diasSemana === 'string' ? JSON.parse(habitRow.diasSemana) : habitRow.diasSemana,
-      activo: Boolean(habitRow.activo),
+      activo: parseSqliteBoolean(habitRow.activo),
       scheduleHistory: historyRows.map((hr) => ({
         id: hr.id,
         habitId: hr.habitId,
@@ -182,7 +183,7 @@ export class HabitCompletionService {
         diasSemana: typeof hr.diasSemana === 'string' ? JSON.parse(hr.diasSemana) : hr.diasSemana,
         validFrom: toLogicalDate(hr.validFrom),
         validUntil: hr.validUntil ? toLogicalDate(hr.validUntil) : null,
-        activo: hr.activo !== undefined ? Boolean(hr.activo) : true,
+        activo: parseSqliteBoolean(hr.activo, true),
       })),
     } as Habit;
 
@@ -199,7 +200,7 @@ export class HabitCompletionService {
       [params.habitId, targetDate]
     );
 
-    if (existingLog && Number(existingLog.completado) === 1) {
+    if (existingLog && parseSqliteBoolean(existingLog.completado)) {
       return {
         success: true,
         logId: existingLog.id,
@@ -246,7 +247,7 @@ export class HabitCompletionService {
         'SELECT * FROM habit_logs WHERE habitId = ? AND fecha = ?',
         [params.habitId, targetDate]
       );
-      if (inTxLog && Number(inTxLog.completado) === 1) {
+      if (inTxLog && parseSqliteBoolean(inTxLog.completado)) {
         return;
       }
 
@@ -422,7 +423,7 @@ export class HabitCompletionService {
       [params.habitId, targetDate]
     );
 
-    if (!existingLog || Number(existingLog.completado) === 0) {
+    if (!existingLog || !parseSqliteBoolean(existingLog.completado)) {
       // Ya estaba desmarcado o nunca existió
       return {
         success: true,
@@ -445,7 +446,7 @@ export class HabitCompletionService {
     let appliedHealthDeltaToRevert = 0;
     let pointsDeltaToRevert = 0;
 
-    if (event && Number(event.isReverted) === 0) {
+    if (event && !parseSqliteBoolean(event.isReverted)) {
       healthDeltaToRevert = event.healthDelta;
       appliedHealthDeltaToRevert = event.appliedHealthDelta !== undefined && event.appliedHealthDelta !== null
         ? event.appliedHealthDelta

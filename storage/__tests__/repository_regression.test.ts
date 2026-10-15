@@ -248,4 +248,100 @@ describe('Repository Regression Tests', () => {
     const updated = await userRepo.getByUserId('u-opened');
     expect(updated?.lastOpenedAt).toBe(newTimestamp);
   });
+
+  it('HabitRepository y LogRepository leen correctamente valores booleanos almacenados como 0, 1, "0" y "1"', async () => {
+    const rawDb = (db as any).rawDb;
+
+    // 1. Insertar usuario de prueba
+    await userRepo.create({
+      id: 'u-bool',
+      username: 'BoolUser',
+      fechaRegistro: '2026-01-01',
+      puntos: 10,
+      onboardingCompleted: true,
+    });
+
+    // 2. Insertar hábitos con valores como string "0" y "1" directamente en SQLite para simular driver web / migraciones
+    rawDb.exec(`
+      INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+      VALUES ('h-inactive-str', 'u-bool', 'Inactivo String', 'SALUD', 'heart', '#fff', 'DAILY', '[0,1,2,3,4,5,6]', 'BOOLEAN', 'NORMAL', '2026-01-01', '0');
+
+      INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+      VALUES ('h-active-str', 'u-bool', 'Activo String', 'SALUD', 'heart', '#fff', 'DAILY', '[0,1,2,3,4,5,6]', 'BOOLEAN', 'NORMAL', '2026-01-01', '1');
+
+      INSERT INTO habit_schedule_history (id, habitId, frecuencia, diasSemana, validFrom, validUntil, activo)
+      VALUES ('sh-1', 'h-inactive-str', 'DAILY', '[0,1,2,3,4,5,6]', '2026-01-01', NULL, '0');
+
+      INSERT INTO habit_schedule_history (id, habitId, frecuencia, diasSemana, validFrom, validUntil, activo)
+      VALUES ('sh-2', 'h-active-str', 'DAILY', '[0,1,2,3,4,5,6]', '2026-01-01', NULL, '1');
+
+      INSERT INTO habit_logs (id, habitId, userId, fecha, completado, timestampRegistro)
+      VALUES ('l-uncompleted-str', 'h-active-str', 'u-bool', '2026-01-02', '0', '2026-01-02T10:00:00Z');
+
+      INSERT INTO habit_logs (id, habitId, userId, fecha, completado, timestampRegistro)
+      VALUES ('l-completed-str', 'h-active-str', 'u-bool', '2026-01-03', '1', '2026-01-03T10:00:00Z');
+    `);
+
+    // Recuperar mediante repositorios tipados
+    const inactiveHabit = await habitRepo.getById('h-inactive-str');
+    const activeHabit = await habitRepo.getById('h-active-str');
+
+    expect(inactiveHabit?.activo).toBe(false);
+    expect(inactiveHabit?.scheduleHistory?.[0]?.activo).toBe(false);
+
+    expect(activeHabit?.activo).toBe(true);
+    expect(activeHabit?.scheduleHistory?.[0]?.activo).toBe(true);
+
+    const logs = await logRepo.getByHabit('h-active-str');
+    const uncompletedLog = logs.find((l) => l.id === 'l-uncompleted-str');
+    const completedLog = logs.find((l) => l.id === 'l-completed-str');
+
+    expect(uncompletedLog?.completado).toBe(false);
+    expect(completedLog?.completado).toBe(true);
+  });
+
+  it('Archivar y reactivar hábitos preserva y alterna correctamente el estado activo sin corromper el historial', async () => {
+    const user: User = { id: 'u-toggle', username: 'Toggle', fechaRegistro: '2026-01-01', puntos: 0, onboardingCompleted: true };
+    await userRepo.create(user);
+
+    const habit: Habit = {
+      id: 'h-toggle',
+      userId: 'u-toggle',
+      nombre: 'Toggle Habit',
+      categoria: 'SALUD',
+      icono: 'heart',
+      colorHex: '#000',
+      frecuencia: 'DAILY',
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
+      tipoVerificacion: 'BOOLEAN',
+      nivelPrioridad: 'NORMAL',
+      fechaInicio: '2026-01-01',
+      activo: true,
+    };
+    await habitRepo.create(habit);
+
+    let h = await habitRepo.getById('h-toggle');
+    expect(h?.activo).toBe(true);
+
+    // Archivar
+    await habitRepo.archive('h-toggle');
+    h = await habitRepo.getById('h-toggle');
+    expect(h?.activo).toBe(false);
+    const activeHistoryArchive = h?.scheduleHistory?.find((s) => s.validUntil === null);
+    expect(activeHistoryArchive?.activo).toBe(false);
+
+    // Reactivar
+    await habitRepo.update('h-toggle', { activo: true });
+    h = await habitRepo.getById('h-toggle');
+    expect(h?.activo).toBe(true);
+    const activeHistoryReactivate = h?.scheduleHistory?.find((s) => s.validUntil === null);
+    expect(activeHistoryReactivate?.activo).toBe(true);
+
+    // Volver a archivar
+    await habitRepo.update('h-toggle', { activo: false });
+    h = await habitRepo.getById('h-toggle');
+    expect(h?.activo).toBe(false);
+    const activeHistoryArchive2 = h?.scheduleHistory?.find((s) => s.validUntil === null);
+    expect(activeHistoryArchive2?.activo).toBe(false);
+  });
 });

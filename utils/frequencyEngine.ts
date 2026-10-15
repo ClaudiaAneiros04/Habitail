@@ -8,6 +8,7 @@ import {
   getLogicalToday,
   compareLogicalDates,
 } from './dateUtils';
+import { parseSqliteBoolean } from './booleanUtils';
 
 /**
  * Snapshot del estado de programación de un hábito en una fecha histórica o actual.
@@ -81,7 +82,7 @@ export const getHabitScheduleForDate = (
       if (targetDate >= validFrom && (validUntil === null || targetDate < validUntil)) {
         return {
           exists: true,
-          active: entry.activo !== undefined ? Boolean(entry.activo) : true,
+          active: parseSqliteBoolean(entry.activo, true),
           frecuencia: entry.frecuencia,
           diasSemana: Array.isArray(entry.diasSemana) ? entry.diasSemana : [],
         };
@@ -92,7 +93,7 @@ export const getHabitScheduleForDate = (
     if (sorted.length > 0 && targetDate < toLogicalDate(sorted[0].validFrom)) {
       return {
         exists: true,
-        active: sorted[0].activo !== undefined ? Boolean(sorted[0].activo) : true,
+        active: parseSqliteBoolean(sorted[0].activo, true),
         frecuencia: sorted[0].frecuencia,
         diasSemana: Array.isArray(sorted[0].diasSemana) ? sorted[0].diasSemana : [],
       };
@@ -103,7 +104,7 @@ export const getHabitScheduleForDate = (
   // Si targetDate está dentro del ciclo de vida [fechaInicio, fechaFin], el hábito estaba activo durante ese periodo.
   const wasActiveDuringLifespan = habit.fechaFin
     ? targetDate <= toLogicalDate(habit.fechaFin)
-    : Boolean(habit.activo);
+    : parseSqliteBoolean(habit.activo, true);
 
   return {
     exists: true,
