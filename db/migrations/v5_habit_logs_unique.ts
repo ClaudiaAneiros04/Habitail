@@ -6,13 +6,21 @@ export const migrationV5: Migration = {
   name: 'habit_logs_unique_constraint',
   up: async (db: SQLite.SQLiteDatabase): Promise<void> => {
     // 1. Manejar de forma segura posibles duplicados históricos,
-    // conservando de forma determinista el registro válido más reciente.
-    // Usamos ROW_NUMBER() OVER (...) para quedarnos con el último.
+    // considerando que las fechas pueden venir en formato ISO/timestamp (con hora)
+    // o ya normalizadas (YYYY-MM-DD). Al normalizar a substr(fecha, 1, 10), dos registros
+    // del mismo hábito en el mismo día colisionarían al crear el índice único o al normalizar.
+    // Prioridad determinista para conservar información relevante:
+    // 1) completado = 1 (si el usuario completó el hábito ese día, conservamos el cumplimiento)
+    // 2) timestampRegistro DESC (el registro más reciente)
+    // 3) id DESC (desempate determinista)
     await db.execAsync(`
       WITH RankedLogs AS (
         SELECT id, ROW_NUMBER() OVER (
-          PARTITION BY habitId, fecha
-          ORDER BY timestampRegistro DESC, id DESC
+          PARTITION BY habitId, CASE 
+            WHEN length(fecha) >= 10 THEN substr(fecha, 1, 10) 
+            ELSE fecha 
+          END
+          ORDER BY completado DESC, timestampRegistro DESC, id DESC
         ) as rn
         FROM habit_logs
       )

@@ -23,8 +23,33 @@ export const migrationV6: Migration = {
       `);
     }
 
-    // 2. Normalizar todas las fechas a formato estricto LogicalDate (YYYY-MM-DD)
+    // 2. Normalizar todas las fechas a formato estricto LogicalDate (YYYY-MM-DD).
+    // Antes de recortar habit_logs.fecha, es imperativo deduplicar aquellos registros que,
+    // al truncar la fecha a 10 caracteres (YYYY-MM-DD), colisionarían con la restricción
+    // UNIQUE (habitId, fecha) establecida en la migración v5 o bases que ya la aplican.
+    // Estrategia determinista de resolución de conflictos:
+    // 1) completado DESC (si uno de los logs fue completado, conservamos el registro exitoso)
+    // 2) timestampRegistro DESC (el registro más reciente)
+    // 3) id DESC (desempate determinista)
     await db.execAsync(`
+      WITH RankedLogs AS (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY habitId, substr(fecha, 1, 10)
+          ORDER BY completado DESC, timestampRegistro DESC, id DESC
+        ) as rn
+        FROM habit_logs
+        WHERE length(fecha) > 10
+           OR fecha IN (
+             SELECT substr(fecha, 1, 10) 
+             FROM habit_logs 
+             WHERE length(fecha) > 10
+           )
+      )
+      DELETE FROM habit_logs 
+      WHERE id IN (
+        SELECT id FROM RankedLogs WHERE rn > 1
+      );
+
       UPDATE ${TABLE_NAMES.HABITS} 
       SET fechaInicio = substr(fechaInicio, 1, 10) 
       WHERE length(fechaInicio) > 10;

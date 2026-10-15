@@ -288,6 +288,153 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
     });
   });
 
+  describe('Migraciones v5 y v6 con resolución de duplicados y normalización de fechas', () => {
+    test('Base de datos nueva: se crea directamente con todas las tablas e índices únicos', async () => {
+      const db = testDb.asExpoDb();
+      await runMigrations(db);
+      expect(await getDatabaseVersion(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      // Comprobar índice único
+      const indexList = await db.getAllAsync<{ name: string; unique: number }>(
+        "PRAGMA index_list('habit_logs');"
+      );
+      const uniqueIndex = indexList.find((idx) => idx.name === 'idx_habit_logs_habit_fecha');
+      expect(uniqueIndex).toBeDefined();
+      expect(uniqueIndex?.unique).toBe(1);
+    });
+
+    test('Base de datos actualizada desde v4: migra correctamente a v8 resolviendo duplicados de fecha con horas', async () => {
+      const db = testDb.asExpoDb();
+      // Aplicar hasta v4
+      const v1ToV4 = migrations.filter((m) => m.version <= 4);
+      await runMigrations(db, v1ToV4);
+      expect(await getDatabaseVersion(db)).toBe(4);
+
+      // Insertar datos previos con horas distintas en el mismo día para el mismo hábito
+      await db.execAsync(`
+        INSERT INTO users (id, username, fechaRegistro) VALUES ('u1', 'User 1', '2026-10-10');
+        INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+        VALUES ('h1', 'u1', 'Hábito Test', 'SALUD', 'heart', '#FF0000', 'DAILY', '[]', 'BOOLEAN', 'NORMAL', '2026-10-01 08:00:00', 1);
+
+        INSERT INTO habit_logs (id, habitId, userId, fecha, completado, valor, nota, timestampRegistro)
+        VALUES 
+          ('l1', 'h1', 'u1', '2026-10-14 09:30:00', 0, NULL, 'Mañana no completado', '2026-10-14T09:30:00Z'),
+          ('l2', 'h1', 'u1', '2026-10-14 18:45:00', 1, NULL, 'Tarde completado', '2026-10-14T18:45:00Z');
+      `);
+
+      // Ejecutar migraciones restantes (v5 -> v8)
+      await runMigrations(db);
+      expect(await getDatabaseVersion(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      // Comprobar que solo quedó un log para ese día, conservando el completado = 1
+      const remainingLogs = await db.getAllAsync<{ id: string; fecha: string; completado: number; nota: string }>(
+        'SELECT id, fecha, completado, nota FROM habit_logs WHERE habitId = ?;',
+        ['h1']
+      );
+      expect(remainingLogs.length).toBe(1);
+      expect(remainingLogs[0].id).toBe('l2');
+      expect(remainingLogs[0].fecha).toBe('2026-10-14');
+      expect(remainingLogs[0].completado).toBe(1);
+      expect(remainingLogs[0].nota).toBe('Tarde completado');
+
+      // Las fechas de habits también deben estar normalizadas a YYYY-MM-DD
+      const habit = await db.getFirstAsync<{ fechaInicio: string }>('SELECT fechaInicio FROM habits WHERE id = ?;', ['h1']);
+      expect(habit?.fechaInicio).toBe('2026-10-01');
+    });
+
+    test('Base de datos actualizada desde v5: ya tiene índice único pero registros con timestamp con hora colisionan en v6', async () => {
+      const db = testDb.asExpoDb();
+      // Simular base en versión 5
+      const v1ToV5 = migrations.filter((m) => m.version <= 5);
+      await runMigrations(db, v1ToV5);
+      expect(await getDatabaseVersion(db)).toBe(5);
+
+      // En v5, el índice único es ON (habitId, fecha).
+      // Dos registros con diferente hora no violaban v5: '2026-10-14 09:30' != '2026-10-14 18:45'.
+      await db.execAsync(`
+        INSERT INTO users (id, username, fechaRegistro) VALUES ('u2', 'User 2', '2026-10-10');
+        INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+        VALUES ('h2', 'u2', 'Hábito Test 2', 'SALUD', 'heart', '#FF0000', 'DAILY', '[]', 'BOOLEAN', 'NORMAL', '2026-10-01', 1);
+
+        INSERT INTO habit_logs (id, habitId, userId, fecha, completado, valor, nota, timestampRegistro)
+        VALUES 
+          ('l3', 'h2', 'u2', '2026-10-14T09:30:00.000Z', 1, NULL, 'Registro mañana', '2026-10-14T09:30:00.000Z'),
+          ('l4', 'h2', 'u2', '2026-10-14T18:45:00.000Z', 0, NULL, 'Registro tarde', '2026-10-14T18:45:00.000Z');
+      `);
+
+      // Ejecutar migraciones v6+
+      await runMigrations(db);
+      expect(await getDatabaseVersion(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      // Comprobar que v6 deduplicó sin violar UNIQUE y preservó el registro completado = 1
+      const logs = await db.getAllAsync<{ id: string; fecha: string; completado: number }>(
+        'SELECT id, fecha, completado FROM habit_logs WHERE habitId = ?;',
+        ['h2']
+      );
+      expect(logs.length).toBe(1);
+      expect(logs[0].id).toBe('l3');
+      expect(logs[0].fecha).toBe('2026-10-14');
+      expect(logs[0].completado).toBe(1);
+    });
+
+    test('Base de datos sin duplicados: preserva todos los registros íntegros', async () => {
+      const db = testDb.asExpoDb();
+      const v1ToV4 = migrations.filter((m) => m.version <= 4);
+      await runMigrations(db, v1ToV4);
+
+      await db.execAsync(`
+        INSERT INTO users (id, username, fechaRegistro) VALUES ('u3', 'User 3', '2026-10-10');
+        INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+        VALUES ('h3', 'u3', 'Hábito 3', 'SALUD', 'heart', '#FF0000', 'DAILY', '[]', 'BOOLEAN', 'NORMAL', '2026-10-01', 1);
+
+        INSERT INTO habit_logs (id, habitId, userId, fecha, completado, timestampRegistro)
+        VALUES 
+          ('d1', 'h3', 'u3', '2026-10-12 10:00:00', 1, '2026-10-12T10:00:00Z'),
+          ('d2', 'h3', 'u3', '2026-10-13 11:00:00', 1, '2026-10-13T11:00:00Z'),
+          ('d3', 'h3', 'u3', '2026-10-14 12:00:00', 0, '2026-10-14T12:00:00Z');
+      `);
+
+      await runMigrations(db);
+      expect(await getDatabaseVersion(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const logs = await db.getAllAsync<{ id: string; fecha: string }>(
+        'SELECT id, fecha FROM habit_logs WHERE habitId = ? ORDER BY fecha ASC;',
+        ['h3']
+      );
+      expect(logs.length).toBe(3);
+      expect(logs.map((l) => l.fecha)).toEqual(['2026-10-12', '2026-10-13', '2026-10-14']);
+    });
+
+    test('Base de datos donde un registro ya tenía YYYY-MM-DD y otro tenía ISO con hora del mismo día', async () => {
+      const db = testDb.asExpoDb();
+      const v1ToV5 = migrations.filter((m) => m.version <= 5);
+      await runMigrations(db, v1ToV5);
+
+      await db.execAsync(`
+        INSERT INTO users (id, username, fechaRegistro) VALUES ('u4', 'User 4', '2026-10-10');
+        INSERT INTO habits (id, userId, nombre, categoria, icono, colorHex, frecuencia, diasSemana, tipoVerificacion, nivelPrioridad, fechaInicio, activo)
+        VALUES ('h4', 'u4', 'Hábito 4', 'SALUD', 'heart', '#FF0000', 'DAILY', '[]', 'BOOLEAN', 'NORMAL', '2026-10-01', 1);
+
+        INSERT INTO habit_logs (id, habitId, userId, fecha, completado, timestampRegistro)
+        VALUES 
+          ('norm1', 'h4', 'u4', '2026-10-14', 0, '2026-10-14T08:00:00Z'),
+          ('iso1', 'h4', 'u4', '2026-10-14T20:00:00.000Z', 1, '2026-10-14T20:00:00Z');
+      `);
+
+      await runMigrations(db);
+
+      const logs = await db.getAllAsync<{ id: string; fecha: string; completado: number }>(
+        'SELECT id, fecha, completado FROM habit_logs WHERE habitId = ?;',
+        ['h4']
+      );
+      expect(logs.length).toBe(1);
+      // El completado=1 debe haber ganado sobre el completado=0
+      expect(logs[0].id).toBe('iso1');
+      expect(logs[0].fecha).toBe('2026-10-14');
+      expect(logs[0].completado).toBe(1);
+    });
+  });
+
   describe('Manejo de errores y transaccionalidad', () => {
     test('si una migración falla, debe hacer rollback y no avanzar user_version', async () => {
       const db = testDb.asExpoDb();
@@ -315,6 +462,35 @@ describe('Sistema de Migraciones SQLite (Migrator)', () => {
         "SELECT name FROM sqlite_master WHERE type='table' AND name='temp_test';"
       );
       expect(table).toBeNull();
+    });
+
+    test('error durante la ejecución de la migración no deja la base de datos parcialmente actualizada', async () => {
+      const db = testDb.asExpoDb();
+      await runMigrations(db, migrations.filter((m) => m.version <= 4));
+      expect(await getDatabaseVersion(db)).toBe(4);
+
+      // Insertar un registro testigo
+      await db.execAsync(`
+        INSERT INTO users (id, username, fechaRegistro) VALUES ('u_err', 'User Error', '2026-10-10');
+      `);
+
+      const flawedMigration: Migration = {
+        version: 5,
+        name: 'flawed_v5',
+        up: async (database) => {
+          await database.execAsync("UPDATE users SET username = 'Modificado' WHERE id = 'u_err';");
+          throw new Error('Fallo crítico en v5');
+        },
+      };
+
+      await expect(runMigrations(db, [flawedMigration])).rejects.toThrow('Fallo crítico en v5');
+
+      // Comprobar que la versión sigue en 4
+      expect(await getDatabaseVersion(db)).toBe(4);
+
+      // Comprobar que el UPDATE fue revertido por el rollback
+      const user = await db.getFirstAsync<{ username: string }>('SELECT username FROM users WHERE id = ?;', ['u_err']);
+      expect(user?.username).toBe('User Error');
     });
   });
 });
