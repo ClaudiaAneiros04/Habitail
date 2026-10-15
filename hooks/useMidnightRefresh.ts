@@ -3,6 +3,7 @@ import { useHabitStore } from '../store/useHabitStore';
 import { useLogStore } from '../store/useLogStore';
 import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
+import { runDailyPenaltyJob } from './useDailyPenaltyJob';
 import { AppState } from 'react-native';
 
 /**
@@ -29,6 +30,7 @@ export function useMidnightRefresh(onRefresh: () => void) {
         await useLogStore.getState().loadLogs();
         await useUserStore.getState().loadUser();
         await usePetStore.getState().loadPet();
+        await runDailyPenaltyJob();
         onRefresh();
       }
     }, 60000);

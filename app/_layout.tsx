@@ -11,7 +11,7 @@ import { initDb } from '../storage/database';
 import { useUserStore } from '../store/useUserStore';
 import { usePetStore } from '../store/usePetStore';
 import { useHabitStore } from '../store/useHabitStore';
-import { useDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
+import { useDailyPenaltyJob, runDailyPenaltyJob } from '../hooks/useDailyPenaltyJob';
 import { useOnboarding } from '../hooks/useOnboarding';
 import { registerNotificationCategories, setupNotificationListeners, rescheduleAll } from '../notifications/notificationService';
 import { handleAppForeground } from '../notifications/inactivityService';
@@ -70,6 +70,9 @@ export default function RootLayout() {
         const habits = useHabitStore.getState().habits;
         await rescheduleAll(habits);
         await handleAppForeground();
+
+        // 4. Ejecutar job de penalización diario para aplicar deducción de vida de hábitos de ayer si aplica
+        await runDailyPenaltyJob();
 
         setDbReady(true);
       } catch (error: any) {
