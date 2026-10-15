@@ -346,7 +346,7 @@ export class HabitCompletionService {
     } catch (e) {}
 
     try {
-      CacheInvalidationService.invalidateHabitCaches(params.habitId);
+      CacheInvalidationService.invalidateHabitCaches(params.habitId, params.userId);
     } catch (e) {}
 
     // Evaluación de insignias con el historial persistido completo
@@ -512,7 +512,7 @@ export class HabitCompletionService {
     } catch (e) {}
 
     try {
-      CacheInvalidationService.invalidateHabitCaches(params.habitId);
+      CacheInvalidationService.invalidateHabitCaches(params.habitId, params.userId);
     } catch (e) {}
 
     return {

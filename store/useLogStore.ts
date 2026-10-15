@@ -30,7 +30,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       logs: [...state.logs.filter((l) => l.id !== log.id), log],
       lastUpdate: Date.now(),
     }));
-    CacheInvalidationService.invalidateHabitCaches(log.habitId);
+    CacheInvalidationService.invalidateHabitCaches(log.habitId, log.userId);
   },
 
   /**
@@ -45,7 +45,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
       logs: state.logs.filter((l) => l.id !== logId),
       lastUpdate: Date.now(),
     }));
-    CacheInvalidationService.invalidateHabitCaches(existingLog?.habitId);
+    CacheInvalidationService.invalidateHabitCaches(existingLog?.habitId, existingLog?.userId);
   },
 
   loadLogs: async (date?: string, userId?: string) => {

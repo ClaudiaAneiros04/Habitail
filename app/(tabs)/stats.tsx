@@ -21,10 +21,11 @@ import { SkeletonItem } from '../../components/skeletons/SkeletonItem';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Lógica e integración
 import { useHabitStore } from '../../store/useHabitStore';
 import { useUserStore } from '../../store/useUserStore';
 import { useHabitStats } from '../../hooks/useHabitStats';
+import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
+import { useMidnightRefresh } from '../../hooks/useMidnightRefresh';
 import { aggregateChartData } from '../../utils/chartAggregator';
 import { LogRepository } from '../../storage/LogRepository';
 import { HabitLog } from '../../types';
@@ -160,6 +161,7 @@ export default function StatsScreen() {
   // Logs cargados para el gráfico de barras (se recargan al cambiar hábito)
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [isLogsLoading, setIsLogsLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // El periodo coincide directamente con activeTab
   const period = activeTab;
@@ -169,11 +171,23 @@ export default function StatsScreen() {
     currentStreak, 
     maxStreak, 
     completionRate, 
-    loading: isStatsLoading 
+    loading: isStatsLoading,
+    refresh: refreshStats
   } = useHabitStats({
     habitId: selectedHabitId,
     period,
     userId: user?.id
+  });
+
+  // Al volver de segundo plano o detectar cambio de día en primer plano, recargar estadísticas y logs
+  useAppStateRefresh(() => {
+    refreshStats();
+    setRefreshTrigger(prev => prev + 1);
+  });
+
+  useMidnightRefresh(() => {
+    refreshStats();
+    setRefreshTrigger(prev => prev + 1);
   });
 
   // 2. Cargar logs reales para alimentar el agregador del gráfico de barras
@@ -187,7 +201,7 @@ export default function StatsScreen() {
         } else {
           // Para vista global, cargamos todos los logs del usuario
           if (user?.id) {
-            const allLogs = await logRepo.getAll(); // O una consulta más específica
+            const allLogs = await logRepo.getAll();
             setLogs(allLogs);
           }
         }
@@ -198,7 +212,7 @@ export default function StatsScreen() {
       }
     }
     loadLogs();
-  }, [selectedHabitId, user?.id, lastUpdate]);
+  }, [selectedHabitId, user?.id, lastUpdate, refreshTrigger]);
 
   // 3. Procesar datos para el BarChartComponent
   const chartData = useMemo(() => {

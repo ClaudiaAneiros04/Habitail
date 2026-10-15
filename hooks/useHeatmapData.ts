@@ -31,11 +31,13 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { LogRepository, ILogRepository } from '../storage/LogRepository';
 import { useHeatmapStore, buildHeatmapCacheKey } from '../store/useHeatmapStore';
+import { useUserStore } from '../store/useUserStore';
 import {
   HeatmapEntry,
   buildHeatmapRange,
   mergeHeatmapData,
 } from '../utils/heatmapUtils';
+import { getLogicalToday } from '../utils/dateUtils';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tipos del hook
@@ -46,7 +48,7 @@ export interface UseHeatmapDataOptions {
   habitId?: string;
   /**
    * UUID del usuario activo. Requerido en modo global (habitId undefined).
-   * En modo individual se infiere del log (no se usa directamente).
+   * En modo individual se infiere del store o del hábito.
    */
   userId?: string;
   /** Inyección de dependencias — no usar en producción. */
@@ -74,32 +76,41 @@ export interface UseHeatmapDataReturn {
 
 export const useHeatmapData = ({
   habitId,
-  userId,
+  userId: propUserId,
   _logRepo,
 }: UseHeatmapDataOptions = {}): UseHeatmapDataReturn => {
   // Repositorio instanciado una sola vez por mount del hook (useRef evita recreaciones).
   const logRepoRef = useRef<ILogRepository>(_logRepo ?? new LogRepository());
 
-  const cacheKey = buildHeatmapCacheKey(habitId);
+  const activeUser = useUserStore((state) => state.user);
+  const effectiveUserId = propUserId || activeUser?.id || 'default-user';
+
+  const cacheKey = buildHeatmapCacheKey(habitId, effectiveUserId);
 
   // Leer el estado actual del caché reactivamente.
   const cacheEntry = useHeatmapStore((state) => state.cache[cacheKey]);
   const { setLoading, setData, setError, invalidate } = useHeatmapStore.getState();
 
+  const requestTokenRef = useRef(0);
+
   /**
    * Carga los datos del heatmap desde la DB, los mezcla con el rango completo
    * de fechas y los almacena en el caché de Zustand.
-   *
-   * Guarda contra recálculos innecesarios:
-   *   Si el caché ya tiene datos válidos y no está en loading, la función
-   *   retorna inmediatamente sin hacer ninguna query.
    */
   const load = useCallback(async () => {
+    const todayStr = getLogicalToday();
     const current = useHeatmapStore.getState().cache[cacheKey];
-    if (current?.data !== null && current?.data !== undefined && !current.isLoading) {
-      return; // Datos en caché válidos, no recalcular
+
+    if (
+      current?.data !== null &&
+      current?.data !== undefined &&
+      !current.isLoading &&
+      current.calculatedForDate === todayStr
+    ) {
+      return; // Datos en caché válidos para hoy, no recalcular
     }
 
+    const currentToken = ++requestTokenRef.current;
     setLoading(cacheKey);
 
     try {
@@ -110,37 +121,49 @@ export const useHeatmapData = ({
 
       if (habitId) {
         // ── Modo individual: heatmap de un hábito concreto ────────────────
-        // Query usa índice (habitId, fecha): O(log N) para localizar el hábito,
-        // luego GROUP BY DATE(fecha) sobre su subconjunto.
         rawRows = await logRepo.getHeatmapForHabit(habitId, fromDate, toDate);
-
       } else {
         // ── Modo global: heatmap de todos los hábitos del usuario ─────────
-        if (!userId) {
-          // Si no hay userId pero tampoco habitId, simplemente esperamos (podría estar cargando el usuario)
+        if (!effectiveUserId) {
           return;
         }
-        // Query usa índice (userId, fecha): añadido en database.ts para esta query.
-        rawRows = await logRepo.getHeatmapGlobal(userId, fromDate, toDate);
+        rawRows = await logRepo.getHeatmapGlobal(effectiveUserId, fromDate, toDate);
+      }
+
+      if (requestTokenRef.current !== currentToken) {
+        return;
       }
 
       // Mezclar filas SQL (solo días con logs) con el rango completo de 365 días,
       // rellenando con value=0 los días sin actividad.
       const entries = mergeHeatmapData(rawRows, fromDate, toDate);
-      setData(cacheKey, entries);
+
+      if (requestTokenRef.current !== currentToken) {
+        return;
+      }
+
+      setData(cacheKey, entries, todayStr);
 
     } catch (err) {
-      // Preservar datos anteriores en caché (stale-while-error) para que la UI
-      // pueda seguir mostrando el estado previo mientras muestra el error.
-      const error = err instanceof Error ? err : new Error(String(err));
-      setError(cacheKey, error);
+      if (requestTokenRef.current === currentToken) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        setError(cacheKey, error);
+      }
     }
-  }, [cacheKey, habitId, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cacheKey, habitId, effectiveUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Efecto principal ──────────────────────────────────────────────────────
   useEffect(() => {
     load();
   }, [load]);
+
+  // Validar si cambió el día
+  useEffect(() => {
+    const todayStr = getLogicalToday();
+    if (cacheEntry?.data && cacheEntry.calculatedForDate && cacheEntry.calculatedForDate !== todayStr) {
+      load();
+    }
+  }, [cacheEntry?.data, cacheEntry?.calculatedForDate, load]);
 
   /**
    * Función de refresco pública: invalida el caché y relanza load().

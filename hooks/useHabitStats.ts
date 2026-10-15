@@ -40,6 +40,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { LogRepository, ILogRepository } from '../storage/LogRepository';
 import { HabitRepository, IHabitRepository } from '../storage/HabitRepository';
 import { useStatsStore, buildStatsCacheKey } from '../store/useStatsStore';
+import { useUserStore } from '../store/useUserStore';
 import {
   StatsPeriod,
   HabitStatsResult,
@@ -52,7 +53,7 @@ import {
   calculateCurrentStreak,
   calculateMaxStreak,
 } from '../utils/streakCalculator';
-import { toLogicalDate } from '../utils/dateUtils';
+import { toLogicalDate, getLogicalToday } from '../utils/dateUtils';
 import { format } from 'date-fns';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ export interface UseHabitStatsOptions {
   period?: StatsPeriod;
   /**
    * UUID del usuario activo. Requerido si habitId es undefined (vista global).
-   * En vista de hábito individual se extrae del objeto Habit de la DB.
+   * En vista de hábito individual se extrae del objeto Habit de la DB o del store de usuario.
    */
   userId?: string;
   /** Inyección de dependencias para tests — no usar en producción. */
@@ -105,42 +106,57 @@ const EMPTY_STATS: HabitStatsResult = {
 export const useHabitStats = ({
   habitId,
   period = 'monthly',
-  userId,
+  userId: propUserId,
   _logRepo,
   _habitRepo,
 }: UseHabitStatsOptions = {}): UseHabitStatsReturn => {
   // Repositorios — se instancian una vez por mount del hook.
-  // Al ser singletons de módulo (no de clase), no generan conexiones duplicadas.
   const logRepoRef = useRef<ILogRepository>(_logRepo ?? new LogRepository());
   const habitRepoRef = useRef<IHabitRepository>(_habitRepo ?? new HabitRepository());
 
-  const cacheKey = buildStatsCacheKey(habitId, period);
+  // Resolver userId efectivo: si no viene en props, extraer del userStore
+  const activeUser = useUserStore((state) => state.user);
+  const effectiveUserId = propUserId || activeUser?.id || 'default-user';
 
-  // Leer el estado actual del caché para esta clave.
+  const cacheKey = buildStatsCacheKey(habitId, period, effectiveUserId);
+
+  // Leer el estado actual del caché para esta clave reactivamente.
   const cacheEntry = useStatsStore((state) => state.cache[cacheKey]);
   const { setLoading, setData, setError, invalidate } = useStatsStore.getState();
 
+  // Contador / token para evitar que consultas asíncronas lentas sobrescriban resultados más recientes
+  const requestTokenRef = useRef(0);
+
   /**
    * Carga las estadísticas desde la DB, calcula los resultados y los cachea.
-   * Se llama en el primer mount y cada vez que habitId o period cambian.
+   * Se llama en el primer mount y cada vez que habitId, period o usuario cambian.
    */
   const load = useCallback(async () => {
+    const todayStr = getLogicalToday();
     const current = useStatsStore.getState().cache[cacheKey];
-    // Si ya está cargando o ya tiene datos válidos en caché, no relanzar la query.
+
+    // Si ya está cargando para esta clave, no duplicar la query
     if (current?.loading) {
       return;
     }
-    if (current?.data !== undefined && current?.data !== null) {
+
+    // Si ya tiene datos válidos en caché Y fueron calculados para la fecha lógica de hoy, no recalcular
+    if (
+      current?.data !== undefined &&
+      current?.data !== null &&
+      current.calculatedForDate === todayStr
+    ) {
       return;
     }
 
-    setLoading(cacheKey);
+    const requestedKey = cacheKey;
+    const currentToken = ++requestTokenRef.current;
+    setLoading(requestedKey);
 
     try {
       const logRepo = logRepoRef.current;
       const habitRepo = habitRepoRef.current;
       const today = new Date();
-      const todayStr = format(today, 'yyyy-MM-dd');
 
       if (habitId) {
         // ── Modo individual: estadísticas para un hábito concreto ──────────
@@ -148,7 +164,9 @@ export const useHabitStats = ({
         // Obtener el hábito primero
         const habit = await habitRepo.getById(habitId);
         if (!habit) {
-          setData(cacheKey, EMPTY_STATS);
+          if (requestTokenRef.current === currentToken) {
+            setData(requestedKey, EMPTY_STATS, todayStr);
+          }
           return;
         }
 
@@ -159,10 +177,6 @@ export const useHabitStats = ({
         let effectiveTo = todayStr;
 
         if (period === 'total') {
-          // Determinamos fecha lógica de inicio para el periodo 'total':
-          // 1. habit.fechaInicio
-          // 2. Si existen logs completados anteriores a fechaInicio, usamos la fecha más antigua
-          // 3. Fallback a hoy si no hay fechas disponibles (nunca 1970-01-01)
           let earliestDate = habit.fechaInicio ? toLogicalDate(habit.fechaInicio) : null;
 
           if (logs.length > 0) {
@@ -178,7 +192,6 @@ export const useHabitStats = ({
 
           effectiveFrom = earliestDate || todayStr;
 
-          // Si el hábito tiene fechaFin y es anterior a hoy, acotamos el fin
           if (habit.fechaFin) {
             const habitEnd = toLogicalDate(habit.fechaFin);
             if (habitEnd < effectiveTo) {
@@ -190,8 +203,6 @@ export const useHabitStats = ({
           effectiveFrom = range.fromDate;
           effectiveTo = range.toDate;
 
-          // Si el hábito se creó después de fromDate (ej. a mitad de semana/mes),
-          // acotamos el inicio para no consultar periodos previos a su existencia
           if (habit.fechaInicio) {
             const habitStart = toLogicalDate(habit.fechaInicio);
             if (habitStart > effectiveFrom) {
@@ -199,7 +210,6 @@ export const useHabitStats = ({
             }
           }
 
-          // Si el hábito tiene fechaFin anterior a toDate, acotamos el fin
           if (habit.fechaFin) {
             const habitEnd = toLogicalDate(habit.fechaFin);
             if (habitEnd < effectiveTo) {
@@ -208,20 +218,31 @@ export const useHabitStats = ({
           }
         }
 
+        // Si la petición ya quedó obsoleta por un cambio posterior de parámetros, ignorar resultado
+        if (requestTokenRef.current !== currentToken) {
+          return;
+        }
+
         // Si el periodo resultante es inválido (ej. hábito creado en el futuro o finalizado antes del periodo)
         if (effectiveFrom > effectiveTo) {
           const currentStreak = calculateCurrentStreak(logs, habit, today);
           const maxStreak = calculateMaxStreak(logs, habit);
-          setData(cacheKey, {
-            ...EMPTY_STATS,
-            currentStreak,
-            maxStreak,
-          });
+          if (requestTokenRef.current === currentToken) {
+            setData(requestedKey, {
+              ...EMPTY_STATS,
+              currentStreak,
+              maxStreak,
+            }, todayStr);
+          }
           return;
         }
 
         // a) Query SQL agregada para los contadores de completados del periodo
         const periodStats = await logRepo.getStatsByPeriod(habitId, effectiveFrom, effectiveTo);
+
+        if (requestTokenRef.current !== currentToken) {
+          return;
+        }
 
         // b) computeStats calcula métricas finales con fecha y dateRange exacto
         const result = computeStats(
@@ -231,22 +252,27 @@ export const useHabitStats = ({
           today,
           { fromDate: effectiveFrom, toDate: effectiveTo }
         );
-        setData(cacheKey, result);
+
+        if (requestTokenRef.current !== currentToken) {
+          return;
+        }
+
+        setData(requestedKey, result, todayStr);
 
       } else {
         // ── Modo global: estadísticas de todos los hábitos del usuario ─────
 
-        if (!userId) {
+        if (!effectiveUserId) {
           setError(cacheKey, 'useHabitStats: userId es requerido en modo global (habitId no definido).');
           return;
         }
 
         // Obtenemos los hábitos del usuario para calcular el esperado global
         const allHabits = await habitRepo.get();
-        const userHabits = allHabits.filter(h => h.userId === userId || !h.userId);
+        const userHabits = allHabits.filter(h => h.userId === effectiveUserId || !h.userId);
 
         // Para las rachas globales usamos las fechas históricas donde se completó al menos un hábito (string[])
-        const activeDates = await logRepo.getGlobalActiveDates(userId);
+        const activeDates = await logRepo.getGlobalActiveDates(effectiveUserId);
 
         let effectiveFrom: string;
         let effectiveTo = todayStr;
@@ -282,7 +308,11 @@ export const useHabitStats = ({
         }
 
         // a) Query SQL agregada global
-        const periodStats = await logRepo.getGlobalStatsByPeriod(userId, effectiveFrom, effectiveTo);
+        const periodStats = await logRepo.getGlobalStatsByPeriod(effectiveUserId, effectiveFrom, effectiveTo);
+
+        if (requestTokenRef.current !== currentToken) {
+          return;
+        }
 
         // b) computeGlobalStats recibe activeDates como string[]
         const result = computeGlobalStats(
@@ -292,18 +322,34 @@ export const useHabitStats = ({
           userHabits,
           { fromDate: effectiveFrom, toDate: effectiveTo }
         );
-        setData(cacheKey, result);
+
+        if (requestTokenRef.current !== currentToken) {
+          return;
+        }
+
+        setData(requestedKey, result, todayStr);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido en useHabitStats';
-      setError(cacheKey, message);
+      if (requestTokenRef.current === currentToken) {
+        const message = err instanceof Error ? err.message : 'Error desconocido en useHabitStats';
+        setError(requestedKey, message);
+      }
     }
-  }, [cacheKey, habitId, period, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cacheKey, habitId, period, effectiveUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Efecto principal: cargar datos al montar o cuando cambian las dependencias o se limpia el caché ──
   useEffect(() => {
     load();
   }, [load, cacheEntry === undefined]);
+
+  // ── Efecto de ciclo de vida: validar cambio de día y regreso de segundo plano ──
+  useEffect(() => {
+    // Si la entrada actual en caché fue calculada para un día previo, forzar recálculo
+    const todayStr = getLogicalToday();
+    if (cacheEntry?.data && cacheEntry.calculatedForDate && cacheEntry.calculatedForDate !== todayStr) {
+      load();
+    }
+  }, [cacheEntry?.data, cacheEntry?.calculatedForDate, load]);
 
   /**
    * Función de refresco pública: invalida el caché y lanza load() de nuevo.

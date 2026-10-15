@@ -93,7 +93,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
 
     // Invalida cachés (crear un hábito modifica el denominador de estadísticas y heatmap)
-    CacheInvalidationService.invalidateHabitCaches(newId);
+    CacheInvalidationService.invalidateHabitCaches(newId, targetUserId);
 
     // Programar recordatorio si está activo, tiene hora de recordatorio y las notificaciones están habilitadas
     const reminderTime = newHabit.horaRecordatorio || (newHabit as any).reminderTime;
@@ -113,7 +113,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
 
     // Invalida cachés de estadísticas y heatmap (editar frecuencia, días, fechas o reactivar)
-    CacheInvalidationService.invalidateHabitCaches(id);
+    CacheInvalidationService.invalidateHabitCaches(id, updatedFromDb.userId);
 
     // Programar/actualizar o cancelar recordatorio si las notificaciones están habilitadas
     const reminderTime = updatedFromDb.horaRecordatorio || (updatedFromDb as any).reminderTime;
@@ -135,7 +135,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
 
     // Invalida cachés de estadísticas y heatmap (archivar modifica el total de hábitos activos)
-    CacheInvalidationService.invalidateHabitCaches(id);
+    CacheInvalidationService.invalidateHabitCaches(id, archivedFromDb.userId);
 
     if (get().notificationsEnabled) {
       await cancelHabitReminder(id);
@@ -143,6 +143,9 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
   },
 
   removeHabit: async (id: string) => {
+    const habitToDelete = get().habits.find(h => h.id === id);
+    const habitUserId = habitToDelete?.userId;
+
     await habitRepo.delete(id);
     set((state) => ({
       habits: state.habits.filter((h) => h.id !== id),
@@ -159,7 +162,7 @@ export const useHabitStore = create<HabitState>()((set, get) => ({
     }));
 
     // Invalida cachés de estadísticas y heatmap
-    CacheInvalidationService.invalidateHabitCaches(id);
+    CacheInvalidationService.invalidateHabitCaches(id, habitUserId);
   },
 
   loadHabits: async (userId?: string, repository: HabitRepository = habitRepo) => {

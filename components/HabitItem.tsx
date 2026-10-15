@@ -49,7 +49,8 @@ export default function HabitItem({ habit, completed, onToggle, streak, snoozedU
   // Usamos el nuevo hook centralizado
   const { currentStreak, refresh } = useHabitStats({ 
     habitId: habit.id,
-    period: 'total' // Queremos la racha total para el badge
+    period: 'total', // Queremos la racha total para el badge
+    userId: habit.userId
   });
   
   const displayStreak = streak !== undefined ? streak : currentStreak;

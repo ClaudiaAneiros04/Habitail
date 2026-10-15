@@ -41,7 +41,8 @@ export default function HabitDetailScreen() {
     loading 
   } = useHabitStats({
     habitId: id as string,
-    period: 'total'
+    period: 'total',
+    userId: habit?.userId
   });
 
   if (!habit) {
