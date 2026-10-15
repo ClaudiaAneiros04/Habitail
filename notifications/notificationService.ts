@@ -599,10 +599,14 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
     // ─────────────────────────────────────────────────────────────────────────
     // FRECUENCIA DAILY
     // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    // FRECUENCIA DAILY
+    // ─────────────────────────────────────────────────────────────────────────
     if (freq === Frequency.DAILY || freq === 'DAILY') {
       if (isCompletedToday && !hasReminderPassedToday) {
         // Completado hoy antes de la hora del recordatorio:
-        // No alertar hoy, pero mantener programadas las próximas ocurrencias en un horizonte de 7 días
+        // 1. Programamos triggers DATE para los próximos 7 días (para garantizar que hoy no suene en el SO
+        //    y que los días venideros tengan alertas garantizadas).
         for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
           const targetDateStr = addDaysToLogicalDate(todayStr, dayOffset);
           if (isHabitExpectedOnDate(habit, targetDateStr)) {
@@ -624,7 +628,25 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
             });
           }
         }
-        console.log(`[NotificationService] Hábito diario ${habit.id} completado hoy antes de hora. Horizonte de 7 días programado.`);
+        // 2. Programamos ADEMÁS el trigger diario nativo recurrente (repeats: true)
+        // para que si el usuario no abre la app en semanas/meses, las notificaciones NUNCA se agoten.
+        // En primer plano o foreground el notificationHandler suprime alertas si ya fue completado.
+        await Notifications.scheduleNotificationAsync({
+          identifier: `habit:${habit.id}:daily`,
+          content: {
+            title,
+            body,
+            categoryIdentifier: HABIT_REMINDER_CATEGORY,
+            data: { habitId: habit.id, habitName } as HabitNotificationData,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+            hour: hours,
+            minute: minutes,
+            repeats: true,
+          },
+        });
+        console.log(`[NotificationService] Hábito diario ${habit.id} completado hoy antes de hora. Horizonte de 7 días y trigger recurrente nativo asegurados.`);
       } else {
         // Caso normal o la hora ya pasó hoy: trigger diario nativo recurrente
         await Notifications.scheduleNotificationAsync({
@@ -659,7 +681,7 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
 
         if (isToday && isCompletedToday && !hasReminderPassedToday) {
           // Si correspondía hoy y ya fue completado antes del recordatorio:
-          // Saltamos hoy y agendamos el próximo día correspondiente de la semana entrante como DATE trigger
+          // 1. Agendamos la próxima ocurrencia de la semana entrante como DATE trigger para compatibilidad
           const nextDateStr = addDaysToLogicalDate(todayStr, 7);
           const [y, m, d] = nextDateStr.split('-').map(Number);
           const nextDate = new Date(y, m - 1, d, hours, minutes, 0, 0);
@@ -677,7 +699,26 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
               date: nextDate,
             },
           });
-          console.log(`[NotificationService] Hábito semanal ${habit.id} completado hoy para día ${habitDay}. Próxima ocurrencia programada: ${nextDateStr}`);
+
+          // 2. Mantenemos el trigger semanal nativo recurrente (repeats: true)
+          // para garantizar que en las siguientes semanas continúe sonando sin agotarse jamás.
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:weekly:${habitDay}`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, weekday: habitDay } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              weekday: expoWeekday,
+              hour: hours,
+              minute: minutes,
+              repeats: true,
+            },
+          });
+          console.log(`[NotificationService] Hábito semanal ${habit.id} completado hoy para día ${habitDay}. Próxima ocurrencia y trigger recurrente nativo asegurados.`);
         } else {
           // Programar trigger nativo WEEKLY recurrente para este día
           await Notifications.scheduleNotificationAsync({
@@ -715,7 +756,7 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
 
         if (isTodayMonthly && isCompletedToday && !hasReminderPassedToday) {
           // Si correspondía hoy y ya fue completado antes del recordatorio:
-          // Calculamos la ocurrencia del próximo mes con DATE trigger
+          // 1. Calculamos la ocurrencia del próximo mes con DATE trigger
           const upcoming = getUpcomingMonthlyOccurrences(habit, todayStr, 2);
           const nextOccStr = upcoming.find((d) => d > todayStr);
           if (nextOccStr) {
@@ -736,6 +777,24 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
               },
             });
           }
+          // 2. Mantener el trigger mensual nativo recurrente para que nunca expire en meses subsiguientes
+          await Notifications.scheduleNotificationAsync({
+            identifier: `habit:${habit.id}:monthly:${creationDay}`,
+            content: {
+              title,
+              body,
+              categoryIdentifier: HABIT_REMINDER_CATEGORY,
+              data: { habitId: habit.id, habitName, day: creationDay } as HabitNotificationData,
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              day: creationDay,
+              hour: hours,
+              minute: minutes,
+              repeats: true,
+            },
+          });
+          console.log(`[NotificationService] Hábito mensual ${habit.id} completado hoy para día ${creationDay}. Próxima ocurrencia y trigger recurrente mensual nativo asegurados.`);
         } else {
           // Programamos el trigger mensual recurrente nativo
           await Notifications.scheduleNotificationAsync({
@@ -759,8 +818,9 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
       } else {
         // Hábitos iniciados 29, 30 o 31:
         // La regla de Habitail los desplaza al último día de meses más cortos (ej: 28/29 feb, 30 abr).
-        // Usamos el motor canónico para generar un horizonte razonable de ocurrencias DATE (6 meses):
-        const occurrences = getUpcomingMonthlyOccurrences(habit, todayStr, 6);
+        // Usamos el motor canónico para generar un horizonte amplio de ocurrencias DATE (12 meses = 1 año completo)
+        // que garantiza supervivencia a largo plazo sin exceder el límite de 64 notificaciones de iOS.
+        const occurrences = getUpcomingMonthlyOccurrences(habit, todayStr, 12);
 
         for (const occStr of occurrences) {
           if (occStr === todayStr && (isCompletedToday || hasReminderPassedToday)) {
@@ -784,7 +844,7 @@ export async function scheduleHabitReminder(habit: Habit): Promise<void> {
             },
           });
         }
-        console.log(`[NotificationService] Hábito mensual 29/30/31 ${habit.id}. Horizonte de ${occurrences.length} ocurrencias DATE programado.`);
+        console.log(`[NotificationService] Hábito mensual 29/30/31 ${habit.id}. Horizonte de ${occurrences.length} ocurrencias DATE programado (12 meses).`);
       }
     }
   }, undefined);

@@ -433,8 +433,8 @@ describe('NotificationService - Cobertura Integral de Reglas Canónicas', () => 
   // ───────────────────────────────────────────────────────────────────────────
   // 10. COMPLETAR ANTES DEL RECORDATORIO
   // ───────────────────────────────────────────────────────────────────────────
-  describe('10. Completar antes del recordatorio', () => {
-    test('No programa recordatorio para hoy pero mantiene programadas fechas futuras en un horizonte de DATE triggers', async () => {
+  describe('10. Completar antes del recordatorio y supervivencia indefinida', () => {
+    test('No programa recordatorio para hoy pero mantiene programadas fechas futuras y trigger recurrente diario', async () => {
       // Simular que el hábito ya fue completado hoy en SQLite
       mockGetFirstAsync.mockResolvedValueOnce({ completado: 1 });
 
@@ -454,9 +454,45 @@ describe('NotificationService - Cobertura Integral de Reglas Canónicas', () => 
       const scheduledForToday = calls.some((c) => c[0].identifier === `habit:habit-1:daily:${todayStr}`);
       expect(scheduledForToday).toBe(false);
 
-      // Pero deben haberse programado días futuros (mañana, etc.)
+      // Pero deben haberse programado días futuros (DATE triggers de horizonte)
       const scheduledForFuture = calls.some((c) => c[0].trigger.type === 'date');
       expect(scheduledForFuture).toBe(true);
+
+      // Y FUNDAMENTAL: Mantiene además el trigger diario nativo recurrente (repeats: true)
+      // para que si la app nunca se abre tras el horizonte de 7 días, el hábito no se extinga
+      const scheduledDailyNative = calls.some(
+        (c) => c[0].identifier === 'habit:habit-1:daily' && c[0].trigger.type === 'calendar' && c[0].trigger.repeats === true
+      );
+      expect(scheduledDailyNative).toBe(true);
+    });
+
+    test('Hábito semanal completado hoy antes de la hora mantiene el trigger nativo semanal recurrente', async () => {
+      mockGetFirstAsync.mockResolvedValueOnce({ completado: 1 });
+
+      const todayStr = getLogicalToday();
+      const [y, m, d] = todayStr.split('-').map(Number);
+      const todayDate = new Date(y, m - 1, d);
+      const currentHabitDay = todayDate.getDay(); // 0..6
+
+      const weeklyHabit: Habit = {
+        ...baseHabit,
+        frecuencia: Frequency.WEEKLY,
+        diasSemana: [currentHabitDay],
+        horaRecordatorio: '23:59',
+      };
+
+      await scheduleHabitReminder(weeklyHabit);
+
+      const calls = (Notifications.scheduleNotificationAsync as jest.Mock).mock.calls;
+      // Debe haber programado la próxima ocurrencia específica (DATE)
+      const hasDateTrigger = calls.some((c) => c[0].identifier === `habit:habit-1:weekly:${currentHabitDay}:next`);
+      expect(hasDateTrigger).toBe(true);
+
+      // Y también el trigger recurrente nativo (repeats: true) para que nunca se extinga
+      const hasRepeatingCalendar = calls.some(
+        (c) => c[0].identifier === `habit:habit-1:weekly:${currentHabitDay}` && c[0].trigger.repeats === true
+      );
+      expect(hasRepeatingCalendar).toBe(true);
     });
   });
 
