@@ -80,9 +80,11 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     });
   });
 
-  test('El job no se ejecuta si lastPenaltyAppliedDate === today', async () => {
+  test('El job no se ejecuta si lastPenaltyAppliedDate === yesterday', async () => {
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+
     (useUserStore as any).mockReturnValue({
-      user: { id: 'u1', lastPenaltyAppliedDate: todayString },
+      user: { id: 'u1', lastPenaltyAppliedDate: yesterday },
       updateUser: mockUpdateUser,
     });
 
@@ -93,19 +95,25 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  test('Primera ejecución (lastPenaltyAppliedDate es null): registra today y no penaliza', async () => {
+  test('Primera ejecución (lastPenaltyAppliedDate es null y registrado hoy): registra yesterday y no penaliza', async () => {
     mockGetMissedHabits.mockResolvedValue([]);
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+    (useUserStore as any).mockReturnValue({
+      user: { id: 'u1', lastPenaltyAppliedDate: null, fechaRegistro: todayString, lastOpenedAt: Date.now() },
+      updateUser: mockUpdateUser,
+    });
 
     renderHook(() => useDailyPenaltyJob());
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: yesterday });
     expect(mockGetMissedHabits).not.toHaveBeenCalled();
     expect(mockUpdateHealth).not.toHaveBeenCalled();
   });
 
-  test('Para ausencias < 72h: procesa como máximo el día cerrado pendiente (ayer), evitando acumulaciones retroactivas masivas', async () => {
-    // Usuario no abrió la app durante 2 días (hace 48h)
+  test('Itera y penaliza cada día de ausencia no completado desde la última fecha procesada', async () => {
+    // Usuario no abrió la app durante 2 días de ausencia (lastPenaltyAppliedDate hace 2 días)
     const twoDaysAgo = format(subDays(new Date(), 2), 'yyyy-MM-dd');
     const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
@@ -113,6 +121,7 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
       user: {
         id: 'u1',
         lastPenaltyAppliedDate: twoDaysAgo,
+        fechaRegistro: twoDaysAgo,
         lastOpenedAt: Date.now() - 48 * 60 * 60 * 1000,
       },
       updateUser: mockUpdateUser,
@@ -123,41 +132,52 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     renderHook(() => useDailyPenaltyJob());
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    // Debe consultar ÚNICAMENTE ayer (1 día como máximo, no múltiples días acumulativos)
+    // Debe consultar el día cerrado pendiente (yesterday)
     expect(mockGetMissedHabits).toHaveBeenCalledTimes(1);
     expect(mockGetMissedHabits).toHaveBeenCalledWith(yesterday, expect.any(Array));
 
-    // Aplica delta de un solo día (-10)
+    // Aplica delta de salud (-10)
     expect(mockUpdateHealth).toHaveBeenCalledWith(-10);
-    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: yesterday });
   });
 
-  test('Coherencia con regla de 72h: si la ausencia es >= 72h, la absorbe la regla terminal y no penaliza doble', async () => {
-    const fiveDaysAgo = format(subDays(new Date(), 5), 'yyyy-MM-dd');
+  test('Itera múltiples días ausentes (ej. 3 días) acumulando penalizaciones por cada día', async () => {
+    // Usuario ausente desde hace 3 días
+    const threeDaysAgo = format(subDays(new Date(), 3), 'yyyy-MM-dd');
+    const twoDaysAgo = format(subDays(new Date(), 2), 'yyyy-MM-dd');
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
     (useUserStore as any).mockReturnValue({
       user: {
         id: 'u1',
-        lastPenaltyAppliedDate: fiveDaysAgo,
-        lastOpenedAt: Date.now() - 75 * 60 * 60 * 1000, // Inactividad >= 72h
+        lastPenaltyAppliedDate: threeDaysAgo,
+        fechaRegistro: threeDaysAgo,
+        lastOpenedAt: Date.now() - 72 * 60 * 60 * 1000,
       },
       updateUser: mockUpdateUser,
     });
 
+    mockGetMissedHabits.mockResolvedValue([{ id: 'h1' }]);
+
     renderHook(() => useDailyPenaltyJob());
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    // No debe calcular faltas ni penalizar vida
-    expect(mockGetMissedHabits).not.toHaveBeenCalled();
-    expect(mockUpdateHealth).not.toHaveBeenCalled();
-    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    // Debe evaluar 2 días cerrados pendientes: twoDaysAgo y yesterday
+    expect(mockGetMissedHabits).toHaveBeenCalledTimes(2);
+    expect(mockGetMissedHabits).toHaveBeenNthCalledWith(1, twoDaysAgo, expect.any(Array));
+    expect(mockGetMissedHabits).toHaveBeenNthCalledWith(2, yesterday, expect.any(Array));
+
+    // Se aplicaron las deducciones correspondientes (-10 por cada día = 2 veces)
+    expect(mockUpdateHealth).toHaveBeenCalledTimes(2);
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: yesterday });
   });
 
   test('Mascota en estado terminal (vida = 0 / ABSENT): no aplica penalizaciones', async () => {
-    const yesterday = format(subDays(new Date(), 2), 'yyyy-MM-dd');
+    const twoDaysAgo = format(subDays(new Date(), 2), 'yyyy-MM-dd');
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
     (useUserStore as any).mockReturnValue({
-      user: { id: 'u1', lastPenaltyAppliedDate: yesterday, lastOpenedAt: Date.now() },
+      user: { id: 'u1', lastPenaltyAppliedDate: twoDaysAgo, lastOpenedAt: Date.now() },
       updateUser: mockUpdateUser,
     });
 
@@ -171,11 +191,12 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
 
     expect(mockGetMissedHabits).not.toHaveBeenCalled();
     expect(mockUpdateHealth).not.toHaveBeenCalled();
-    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: yesterday });
   });
 
   test('Semáforo de ejecución previene doble procesamiento concurrente', async () => {
     mockGetMissedHabits.mockResolvedValue([]);
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
     const { rerender } = renderHook(() => useDailyPenaltyJob());
     rerender(undefined);
@@ -183,6 +204,6 @@ describe('useDailyPenaltyJob - Reglas de Dominio y Resiliencia', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
-    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: todayString });
+    expect(mockUpdateUser).toHaveBeenCalledWith({ lastPenaltyAppliedDate: yesterday });
   });
 });

@@ -8,6 +8,7 @@ import { calculatePenaltyDelta, getPetState, clampHealth, isPetTerminal } from '
 import { 
   getLogicalToday, 
   toLogicalDate,
+  addDaysToLogicalDate,
   subDaysFromLogicalDate, 
   compareLogicalDates, 
   getCurrentInstant 
@@ -38,126 +39,144 @@ const logRepo = new LogRepository();
  *      con clave determinista `penalty:daily:${targetDate}`.
  *    - Si la deducción lleva los HP a <= 0, fuerza el estado a terminal (`ABSENT`) de forma irreversible.
  */
-export const runDailyPenaltyJob = async (): Promise<boolean> => {
-  const user = useUserStore.getState().user;
-  const habits = useHabitStore.getState().habits;
-  const pet = usePetStore.getState().pet;
+export const runDailyPenaltyJob = async (params?: {
+  user?: import('../types').User | null;
+  habits?: import('../types').Habit[];
+  pet?: import('../types').Pet | null;
+  updateUser?: (updates: Partial<import('../types').User>) => Promise<void>;
+  updateHealth?: (delta: number) => Promise<void>;
+}): Promise<boolean> => {
+  const user = params?.user ?? (useUserStore.getState ? useUserStore.getState().user : (useUserStore as any)().user);
+  const habits = params?.habits ?? (useHabitStore.getState ? useHabitStore.getState().habits : (useHabitStore as any)().habits);
+  const pet = params?.pet ?? (usePetStore.getState ? usePetStore.getState().pet : (usePetStore as any)().pet);
+
+  const updateUserFn = params?.updateUser ?? (useUserStore.getState ? useUserStore.getState().updateUser : (useUserStore as any)().updateUser);
+  const updateHealthFn = params?.updateHealth ?? (usePetStore.getState ? usePetStore.getState().updateHealth : (usePetStore as any)().updateHealth);
 
   if (!user || !pet || !habits) return false;
 
   const todayString = getLogicalToday();
+  const yesterday = subDaysFromLogicalDate(todayString, 1);
 
-  // Si el usuario ya fue procesado para el día de hoy -> no hacer nada
-  if (user.lastPenaltyAppliedDate === todayString) {
+  // Si el usuario ya fue procesado para ayer (o una fecha igual/posterior a ayer) -> no hay días cerrados que evaluar
+  if (user.lastPenaltyAppliedDate && compareLogicalDates(user.lastPenaltyAppliedDate, yesterday) >= 0) {
     return false;
   }
 
   try {
-    const lastProcessedDateStr = user.lastPenaltyAppliedDate;
-
-    // Usuario nuevo sin historial de penalizaciones: registrar hoy para comenzar a evaluar mañana
-    if (!lastProcessedDateStr) {
-      await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
-      return false;
-    }
-
     // Si la mascota ya está en estado terminal (vida = 0 / ABSENT), no penalizar más
     if (isPetTerminal(pet)) {
-      await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
+      await updateUserFn({ lastPenaltyAppliedDate: yesterday });
       return false;
     }
 
-    // Regla de coherencia 72h: Si la inactividad es de 72h o más, la absorbe la regla de marcha terminal
-    if (user.lastOpenedAt) {
-      const elapsedMs = Date.now() - user.lastOpenedAt;
-      if (elapsedMs >= 72 * 60 * 60 * 1000) {
-        await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
-        return false;
+    const userRegistrationDate = user.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
+
+    // Determinar la fecha inicial desde donde evaluar:
+    // Si el usuario nunca ha corrido penalizaciones (lastPenaltyAppliedDate es null/undefined),
+    // se empieza a evaluar desde la fecha de registro (o fallback a yesterday).
+    let startEvaluationDate: string | null = user.lastPenaltyAppliedDate;
+
+    if (!startEvaluationDate) {
+      if (userRegistrationDate) {
+        startEvaluationDate = userRegistrationDate;
+      } else {
+        startEvaluationDate = yesterday;
       }
     }
 
-    // Para ausencias inferiores a 72h, procesar como máximo el día cerrado pendiente más reciente (ayer)
-    const targetDate = subDaysFromLogicalDate(todayString, 1);
-
-    // Regla de dominio: ningún usuario debe recibir penalizaciones por días anteriores a su registro
-    const userRegistrationDate = user.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
-    if (userRegistrationDate && compareLogicalDates(targetDate, userRegistrationDate) < 0) {
-      await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
+    // Si startEvaluationDate es posterior a yesterday (ej. usuario registrado hoy),
+    // aún no hay días cerrados para evaluar.
+    if (compareLogicalDates(startEvaluationDate, yesterday) > 0) {
+      // Marcamos ayer como fecha procesada para que mañana comience evaluando hoy
+      await updateUserFn({ lastPenaltyAppliedDate: yesterday });
       return false;
     }
 
-    // Si el día pendiente ya fue cubierto en una fecha igual o posterior
-    if (compareLogicalDates(lastProcessedDateStr, targetDate) >= 0) {
-      await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
+    // Si user.lastPenaltyAppliedDate ya existía, el día de esa fecha ya fue evaluado, por lo que avanzamos 1 día.
+    // Si NO existía (primera vez tras registro), evaluamos desde la fecha de registro inclusive.
+    let currentDate = user.lastPenaltyAppliedDate
+      ? addDaysToLogicalDate(user.lastPenaltyAppliedDate, 1)
+      : startEvaluationDate;
+
+    // Si al avanzar nos pasamos de yesterday, no hay días pendientes
+    if (compareLogicalDates(currentDate, yesterday) > 0) {
+      await updateUserFn({ lastPenaltyAppliedDate: yesterday });
       return false;
     }
 
-    // Clave determinista de idempotencia para la penalización del día cerrado
-    const eventKey = `penalty:daily:${targetDate}`;
-
-    // Obtener hábitos programados rigurosamente para ese día (respeta inicio, fin, archivados y frecuencias)
-    const expectedHabits = getHabitsExpectedOnDate(habits, targetDate);
-    const missedHabits = await logRepo.getMissedHabitsForDate(targetDate, expectedHabits);
-    const delta = missedHabits.length > 0 ? calculatePenaltyDelta(missedHabits) : 0;
-
-    let db: SQLiteDatabase;
+    let db: SQLiteDatabase | null = null;
     try {
       db = await getDb();
     } catch (dbError) {
-      // Si el entorno es un test unitario con store mockeado sin DB real
-      if (delta < 0 && pet.vida > 0) {
-        await usePetStore.getState().updateHealth(delta);
-      }
-      await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
-      return true;
+      db = null;
     }
 
-    // Transacción atómica en SQLite para resistencia frente a crashes o reinicios inesperados
-    await db.withTransactionAsync(async () => {
-      // A. Verificar si el evento de penalización ya existía previamente en SQLite
-      const existingEvent = await db.getFirstAsync<GamificationEventRow>(
-        'SELECT * FROM gamification_events WHERE eventKey = ?',
-        [eventKey]
-      );
+    let currentVida = pet.vida;
+    let lastEvaluatedDate: string = user.lastPenaltyAppliedDate || yesterday;
 
-      if (!existingEvent && delta < 0) {
-        // Consultar el estado más fresco de la mascota
-        const freshPet = await db.getFirstAsync<PetRow>(
-          'SELECT vida, estadoActual FROM pets WHERE id = ?',
-          [pet.id]
-        );
-        const currentVida = freshPet ? freshPet.vida : pet.vida;
+    // Iterar día a día evaluando hábitos incumplidos hasta yesterday
+    while (compareLogicalDates(currentDate, yesterday) <= 0 && currentVida > 0) {
+      const eventKey = `penalty:daily:${currentDate}`;
+      const expectedHabits = getHabitsExpectedOnDate(habits, currentDate);
+      const missedHabits = await logRepo.getMissedHabitsForDate(currentDate, expectedHabits);
+      const delta = missedHabits.length > 0 ? calculatePenaltyDelta(missedHabits) : 0;
 
-        if (currentVida > 0) {
+      if (db) {
+        await db.withTransactionAsync(async () => {
+          const existingEvent = await db!.getFirstAsync<GamificationEventRow>(
+            'SELECT * FROM gamification_events WHERE eventKey = ?',
+            [eventKey]
+          );
+
+          if (!existingEvent && delta < 0 && currentVida > 0) {
+            const nuevaVida = clampHealth(currentVida + delta);
+            const nuevoEstado = getPetState(nuevaVida);
+
+            await db!.runAsync(
+              'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
+              [nuevaVida, nuevoEstado, pet.id]
+            );
+
+            const appliedDelta = nuevaVida - currentVida;
+
+            await db!.runAsync(
+              `INSERT INTO gamification_events
+               (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted)
+               VALUES (?, ?, ?, NULL, ?, 'DAILY_PENALTY', ?, ?, 0, ?, 0)`,
+              [eventKey, user.id, pet.id, currentDate, delta, appliedDelta, getCurrentInstant()]
+            );
+
+            currentVida = nuevaVida;
+          }
+        });
+      } else {
+        // En entorno mockeado (ej. tests unitarios sin DB real)
+        if (delta < 0 && currentVida > 0) {
           const nuevaVida = clampHealth(currentVida + delta);
-          const nuevoEstado = getPetState(nuevaVida);
-
-          await db.runAsync(
-            'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
-            [nuevaVida, nuevoEstado, pet.id]
-          );
-
-          const appliedDelta = nuevaVida - currentVida;
-
-          await db.runAsync(
-            `INSERT INTO gamification_events
-             (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted)
-             VALUES (?, ?, ?, NULL, ?, 'DAILY_PENALTY', ?, ?, 0, ?, 0)`,
-            [eventKey, user.id, pet.id, targetDate, delta, appliedDelta, getCurrentInstant()]
-          );
+          await updateHealthFn(delta);
+          currentVida = nuevaVida;
         }
       }
 
-      // B. Actualizar fecha de penalización procesada en SQLite
+      lastEvaluatedDate = currentDate;
+      currentDate = addDaysToLogicalDate(currentDate, 1);
+    }
+
+    // Actualizar lastPenaltyAppliedDate con el último día cerrado evaluado (yesterday)
+    const finalProcessedDate = compareLogicalDates(lastEvaluatedDate, yesterday) >= 0 ? yesterday : lastEvaluatedDate;
+
+    if (db) {
       await db.runAsync(
         'UPDATE users SET lastPenaltyAppliedDate = ? WHERE id = ?',
-        [todayString, user.id]
+        [finalProcessedDate, user.id]
       );
-    });
+      if (usePetStore.getState) {
+        await usePetStore.getState().loadPet();
+      }
+    }
+    await updateUserFn({ lastPenaltyAppliedDate: finalProcessedDate });
 
-    // Sincronizar stores
-    await usePetStore.getState().loadPet();
-    await useUserStore.getState().updateUser({ lastPenaltyAppliedDate: todayString });
     return true;
   } catch (error) {
     console.error('[useDailyPenaltyJob] Error durante la ejecución del job de penalización:', error);
@@ -166,153 +185,51 @@ export const runDailyPenaltyJob = async (): Promise<boolean> => {
 };
 
 export const useDailyPenaltyJob = () => {
-  const { user, updateUser } = useUserStore();
-  const { habits } = useHabitStore();
-  const { pet, updateHealth } = usePetStore();
+  const userStore = useUserStore();
+  const habitStore = useHabitStore();
+  const petStore = usePetStore();
+
+  const storeUser = userStore?.user;
+  const updateUser = userStore?.updateUser;
+  const habits = habitStore?.habits;
+  const pet = petStore?.pet;
+  const updateHealth = petStore?.updateHealth;
 
   const isRunningRef = useRef(false);
   const lastRunDateRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!user || !pet || !habits) return;
+    if (!storeUser || !pet || !habits) return;
 
-    const runJob = async () => {
-      const todayString = getLogicalToday();
+    const todayString = getLogicalToday();
+    const yesterday = subDaysFromLogicalDate(todayString, 1);
 
-      // 1. Evitar ejecuciones simultáneas o redundantes en la misma sesión
-      if (lastRunDateRef.current === todayString || isRunningRef.current) {
-        return;
-      }
+    if (lastRunDateRef.current === todayString || isRunningRef.current) {
+      return;
+    }
 
-      // 2. Si el usuario ya fue procesado para el día de hoy -> no hacer nada
-      if (user.lastPenaltyAppliedDate === todayString) {
+    // Si ya se evaluó hasta ayer o posterior, no volver a correr hoy
+    if (storeUser.lastPenaltyAppliedDate && compareLogicalDates(storeUser.lastPenaltyAppliedDate, yesterday) >= 0) {
+      lastRunDateRef.current = todayString;
+      return;
+    }
+
+    isRunningRef.current = true;
+    runDailyPenaltyJob({
+      user: storeUser,
+      habits,
+      pet,
+      updateUser,
+      updateHealth,
+    })
+      .then(() => {
         lastRunDateRef.current = todayString;
-        return;
-      }
-
-      isRunningRef.current = true;
-
-      try {
-        const lastProcessedDateStr = user.lastPenaltyAppliedDate;
-
-        // Usuario nuevo sin historial de penalizaciones: registrar hoy para comenzar a evaluar mañana
-        if (!lastProcessedDateStr) {
-          await updateUser({ lastPenaltyAppliedDate: todayString });
-          lastRunDateRef.current = todayString;
-          return;
-        }
-
-        // Si la mascota ya está en estado terminal (vida = 0 / ABSENT), no penalizar más
-        if (isPetTerminal(pet)) {
-          await updateUser({ lastPenaltyAppliedDate: todayString });
-          lastRunDateRef.current = todayString;
-          return;
-        }
-
-        // Regla de coherencia 72h: Si la inactividad es de 72h o más, la absorbe la regla de marcha terminal
-        if (user.lastOpenedAt) {
-          const elapsedMs = Date.now() - user.lastOpenedAt;
-          if (elapsedMs >= 72 * 60 * 60 * 1000) {
-            await updateUser({ lastPenaltyAppliedDate: todayString });
-            lastRunDateRef.current = todayString;
-            return;
-          }
-        }
-
-        // Para ausencias inferiores a 72h, procesar como máximo el día cerrado pendiente más reciente (ayer)
-        const targetDate = subDaysFromLogicalDate(todayString, 1);
-
-        // Regla de dominio: ningún usuario debe recibir penalizaciones por días anteriores a su registro
-        const userRegistrationDate = user.fechaRegistro ? toLogicalDate(user.fechaRegistro) : null;
-        if (userRegistrationDate && compareLogicalDates(targetDate, userRegistrationDate) < 0) {
-          await updateUser({ lastPenaltyAppliedDate: todayString });
-          lastRunDateRef.current = todayString;
-          return;
-        }
-
-        // Si el día pendiente ya fue cubierto en una fecha igual o posterior
-        if (compareLogicalDates(lastProcessedDateStr, targetDate) >= 0) {
-          await updateUser({ lastPenaltyAppliedDate: todayString });
-          lastRunDateRef.current = todayString;
-          return;
-        }
-
-        // Clave determinista de idempotencia para la penalización del día cerrado
-        const eventKey = `penalty:daily:${targetDate}`;
-
-        // Obtener hábitos programados rigurosamente para ese día (respeta inicio, fin, archivados y frecuencias)
-        const expectedHabits = getHabitsExpectedOnDate(habits, targetDate);
-        const missedHabits = await logRepo.getMissedHabitsForDate(targetDate, expectedHabits);
-        const delta = missedHabits.length > 0 ? calculatePenaltyDelta(missedHabits) : 0;
-
-        let db: SQLiteDatabase;
-        try {
-          db = await getDb();
-        } catch (dbError) {
-          // Si el entorno es un test unitario con store mockeado sin DB real
-          if (delta < 0 && pet.vida > 0) {
-            await updateHealth(delta);
-          }
-          await updateUser({ lastPenaltyAppliedDate: todayString });
-          lastRunDateRef.current = todayString;
-          return;
-        }
-
-        // Transacción atómica en SQLite para resistencia frente a crashes o reinicios inesperados
-        await db.withTransactionAsync(async () => {
-          // A. Verificar si el evento de penalización ya existía previamente en SQLite
-          const existingEvent = await db.getFirstAsync<GamificationEventRow>(
-            'SELECT * FROM gamification_events WHERE eventKey = ?',
-            [eventKey]
-          );
-
-          if (!existingEvent && delta < 0) {
-            // Consultar el estado más fresco de la mascota
-            const freshPet = await db.getFirstAsync<PetRow>(
-              'SELECT vida, estadoActual FROM pets WHERE id = ?',
-              [pet.id]
-            );
-            const currentVida = freshPet ? freshPet.vida : pet.vida;
-
-            if (currentVida > 0) {
-              const nuevaVida = clampHealth(currentVida + delta);
-              const nuevoEstado = getPetState(nuevaVida);
-
-              await db.runAsync(
-                'UPDATE pets SET vida = ?, estadoActual = ? WHERE id = ?',
-                [nuevaVida, nuevoEstado, pet.id]
-              );
-
-              const appliedDelta = nuevaVida - currentVida;
-
-              await db.runAsync(
-                `INSERT INTO gamification_events
-                 (eventKey, userId, petId, habitId, logicalDate, eventType, healthDelta, appliedHealthDelta, pointsDelta, createdAt, isReverted)
-                 VALUES (?, ?, ?, NULL, ?, 'DAILY_PENALTY', ?, ?, 0, ?, 0)`,
-                [eventKey, user.id, pet.id, targetDate, delta, appliedDelta, getCurrentInstant()]
-              );
-            }
-          }
-
-          // B. Actualizar fecha de penalización procesada en SQLite
-          await db.runAsync(
-            'UPDATE users SET lastPenaltyAppliedDate = ? WHERE id = ?',
-            [todayString, user.id]
-          );
-        });
-
-        // Sincronizar stores
-        await usePetStore.getState().loadPet();
-        await updateUser({ lastPenaltyAppliedDate: todayString });
-        lastRunDateRef.current = todayString;
-
-      } catch (error) {
-        console.error('[useDailyPenaltyJob] Error durante la ejecución del job de penalización:', error);
-      } finally {
+      })
+      .catch((err) => {
+        console.error('[useDailyPenaltyJob] Error en hook:', err);
+      })
+      .finally(() => {
         isRunningRef.current = false;
-      }
-    };
-
-    runJob();
-  }, [user, pet, habits, updateUser, updateHealth]);
+      });
+  }, [storeUser, pet, habits, updateUser, updateHealth]);
 };
